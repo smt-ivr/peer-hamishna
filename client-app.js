@@ -1,25 +1,26 @@
 const API_BASE = '/peer/api';
 
-// משתנים לשמירת הנתונים בזיכרון כדי למנוע קריאות מיותרות לשרת בעת חיפוש
 let studentsList = [];
 let examsList = [];
+
+// אובייקטים לשמירת החיפוש החכם כדי שנוכל לאפס אותם אחרי שמירה
+let studentSelectControl = null;
+let examSelectControl = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
     
-    // מאזין ללחיצות על התפריט
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            renderTab(e.target.dataset.tab);
+            e.currentTarget.classList.add('active');
+            renderTab(e.currentTarget.dataset.tab);
         });
     });
 });
 
 async function initApp() {
     try {
-        // טעינת הנתונים הראשוניים הדרושים לחיפושים
         const [studentsRes, examsRes] = await Promise.all([
             fetch(`${API_BASE}/students`),
             fetch(`${API_BASE}/exams`)
@@ -28,7 +29,6 @@ async function initApp() {
         studentsList = await studentsRes.json();
         examsList = await examsRes.json();
         
-        // טעינת לשונית ברירת המחדל
         renderTab('grades');
     } catch (error) {
         document.getElementById('app-content').innerHTML = `<div class="card"><p style="color:red;">שגיאה בטעינת המערכת: ${error.message}</p></div>`;
@@ -48,75 +48,84 @@ function renderTab(tabName) {
 }
 
 // ==========================================
-// לשונית ציונים (עם חיפוש חכם)
+// לשונית ציונים 
 // ==========================================
 async function renderGradesApp(container) {
-    // יצירת רשימות ה-datalist לחיפוש חכם
-    const studentsOptions = studentsList.map(s => 
-        `<option value="${s.student_code} - ${s.first_name} ${s.last_name} (כיתה ${s.class_grade})">`
-    ).join('');
+    // הרכבת האפשרויות ל-Select - הערך הוא הקוד נטו, הטקסט הוא מה שהמשתמש רואה ומחפש
+    const studentsOptions = `<option value="">-- חפש ובחר תלמיד --</option>` + 
+        studentsList.map(s => `<option value="${s.student_code}">${s.first_name} ${s.last_name} (כיתה ${s.class_grade}) - [${s.student_code}]</option>`).join('');
     
-    const examsOptions = examsList.map(e => 
-        `<option value="${e.exam_code} - ${e.masechet} | פרק ${e.chapter_name || ''}">`
-    ).join('');
+    const examsOptions = `<option value="">-- חפש ובחר מבחן --</option>` + 
+        examsList.map(e => `<option value="${e.exam_code}">${e.exam_code} - ${e.masechet} | פרק ${e.chapter_name || ''}</option>`).join('');
 
     container.innerHTML = `
         <div class="card">
-            <h2>הזנת תוצאה לתלמיד</h2>
-            <div class="form-group">
-                <div class="input-field">
-                    <label>חיפוש תלמיד (שם או קוד)</label>
-                    <input list="students-datalist" id="grade-student" placeholder="התחל להקליד...">
-                    <datalist id="students-datalist">${studentsOptions}</datalist>
+            <h2><i class="fas fa-edit" style="color:var(--accent); margin-left:8px;"></i>הזנת תוצאה לתלמיד</h2>
+            <div class="form-group" style="align-items: flex-start;">
+                
+                <div class="input-field" style="flex: 2; min-width: 250px;">
+                    <label>תלמיד</label>
+                    <select id="grade-student">${studentsOptions}</select>
                 </div>
                 
-                <div class="input-field">
-                    <label>חיפוש מבחן (מסכת, פרק או קוד)</label>
-                    <input list="exams-datalist" id="grade-exam" placeholder="התחל להקליד...">
-                    <datalist id="exams-datalist">${examsOptions}</datalist>
+                <div class="input-field" style="flex: 2; min-width: 250px;">
+                    <label>מבחן</label>
+                    <select id="grade-exam">${examsOptions}</select>
                 </div>
 
-                <div class="input-field">
+                <div class="input-field" style="flex: 1; min-width: 150px;">
                     <label>תוצאה</label>
-                    <select id="grade-passed">
+                    <select id="grade-passed" class="standard-select">
                         <option value="1">עבר / השלים</option>
                         <option value="0">לא עבר / חסר</option>
                     </select>
                 </div>
                 
-                <button class="btn btn-success" onclick="submitGrade()" style="margin-bottom: 2px;">עדכן במערכת</button>
+                <button class="btn btn-success" onclick="submitGrade()" style="margin-top: 26px; height: 42px;">
+                    <i class="fas fa-check"></i> שמור תוצאה
+                </button>
             </div>
             <div id="grade-msg" class="status-msg"></div>
         </div>
 
         <div class="card">
-            <h2>היסטוריית ציונים אחרונים</h2>
-            <div id="grades-table-container">טוען היסטוריה...</div>
+            <h2><i class="fas fa-history" style="color:var(--accent); margin-left:8px;"></i>היסטוריית עדכונים (אחרונים)</h2>
+            <div id="grades-table-container"><div class="loader"><i class="fas fa-spinner fa-spin"></i> טוען...</div></div>
         </div>
     `;
     
+    // הפעלת ספריית החיפוש החכם (חוסם אפשרות לטקסט חופשי, מאפשר רק מהרשימה)
+    studentSelectControl = new TomSelect('#grade-student', {
+        create: false,
+        sortField: { field: "text", direction: "asc" },
+        render: { no_results: function(data, escape) { return '<div class="no-results">לא נמצאו תוצאות</div>'; } }
+    });
+    
+    examSelectControl = new TomSelect('#grade-exam', {
+        create: false,
+        maxOptions: null,
+        render: { no_results: function(data, escape) { return '<div class="no-results">לא נמצאו תוצאות</div>'; } }
+    });
+
     loadRecentGrades();
 }
 
 async function submitGrade() {
-    const studentInput = document.getElementById('grade-student').value;
-    const examInput = document.getElementById('grade-exam').value;
+    // בגלל שאנחנו עובדים עם Select מסודר, הערך (value) הוא כבר הקוד המדויק!
+    const studentCode = document.getElementById('grade-student').value;
+    const examCode = document.getElementById('grade-exam').value;
     const passed = document.getElementById('grade-passed').value === '1';
     const msg = document.getElementById('grade-msg');
 
-    // חילוץ הקודים מתוך המחרוזת (לוקח את מה שלפני המקף הראשון)
-    const studentCode = studentInput.split(' - ')[0];
-    const examCode = examInput.split(' - ')[0];
-
     if (!studentCode || !examCode) {
-        msg.style.color = 'red';
-        msg.innerText = 'נא לוודא שבחרת תלמיד ומבחן תקינים מתוך הרשימה.';
+        msg.style.color = 'var(--danger)';
+        msg.innerHTML = '<i class="fas fa-exclamation-circle"></i> חובה לבחור תלמיד ומבחן מתוך הרשימה.';
         return;
     }
 
     try {
-        msg.style.color = 'black';
-        msg.innerText = 'שומר נתונים...';
+        msg.style.color = 'var(--text-main)';
+        msg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר נתונים...';
         
         const res = await fetch(`${API_BASE}/student-exams`, {
             method: 'POST',
@@ -125,17 +134,20 @@ async function submitGrade() {
         });
 
         if (res.ok) {
-            msg.style.color = 'green';
-            msg.innerText = 'התוצאה עודכנה בהצלחה!';
-            document.getElementById('grade-student').value = ''; // ניקוי שדה
+            msg.style.color = 'var(--success)';
+            msg.innerHTML = '<i class="fas fa-check-circle"></i> התוצאה עודכנה בהצלחה!';
+            
+            // איפוס שדה התלמיד כדי שיהיה נוח להזין את הבא
+            studentSelectControl.clear();
+            
             loadRecentGrades();
         } else {
-            msg.style.color = 'red';
-            msg.innerText = 'שגיאה בעדכון.';
+            msg.style.color = 'var(--danger)';
+            msg.innerHTML = '<i class="fas fa-times-circle"></i> שגיאה בעדכון.';
         }
     } catch (e) {
-        msg.style.color = 'red';
-        msg.innerText = 'שגיאת רשת.';
+        msg.style.color = 'var(--danger)';
+        msg.innerHTML = '<i class="fas fa-wifi"></i> שגיאת רשת, נסה שוב.';
     }
 }
 
@@ -145,18 +157,27 @@ async function loadRecentGrades() {
         const grades = await res.json();
         
         let html = `<table>
-            <thead><tr><th>קוד תלמיד</th><th>קוד מבחן</th><th>סטטוס</th><th>תאריך שעה</th><th>פעולות</th></tr></thead>
+            <thead><tr>
+                <th>קוד תלמיד</th><th>קוד מבחן</th><th>סטטוס</th><th>תאריך עדכון</th><th>פעולות</th>
+            </tr></thead>
             <tbody>`;
             
         grades.forEach(g => {
-            const status = g.passed ? '<span style="color:var(--success-color)">עבר</span>' : '<span style="color:var(--danger-color)">לא עבר</span>';
+            // מציאת שם התלמיד המלא מתוך הרשימה לתצוגה יפה יותר
+            const sDetails = studentsList.find(s => s.student_code === g.student_code);
+            const sName = sDetails ? `${sDetails.first_name} ${sDetails.last_name}` : g.student_code;
+            
+            const status = g.passed ? 
+                '<span style="color:var(--success); font-weight:500;"><i class="fas fa-check"></i> עבר</span>' : 
+                '<span style="color:var(--danger); font-weight:500;"><i class="fas fa-times"></i> לא עבר</span>';
+                
             html += `
                 <tr>
-                    <td>${g.student_code}</td>
-                    <td>${g.exam_code}</td>
+                    <td>${sName}</td>
+                    <td><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:13px;">${g.exam_code}</span></td>
                     <td>${status}</td>
-                    <td dir="ltr" style="text-align:right">${g.updated_at}</td>
-                    <td><button class="btn btn-danger" onclick="deleteGrade('${g.student_code}', '${g.exam_code}')">מחק</button></td>
+                    <td dir="ltr" style="text-align:right; font-size:14px; color:#64748b;">${g.updated_at}</td>
+                    <td><button class="btn btn-danger" onclick="deleteGrade('${g.student_code}', '${g.exam_code}')"><i class="fas fa-trash"></i></button></td>
                 </tr>
             `;
         });
@@ -169,7 +190,7 @@ async function loadRecentGrades() {
 }
 
 async function deleteGrade(studentCode, examCode) {
-    if (!confirm(`למחוק תוצאה של מבחן ${examCode} לתלמיד ${studentCode}?`)) return;
+    if (!confirm(`למחוק את התוצאה למבחן ${examCode}?`)) return;
     await fetch(`${API_BASE}/student-exams/${encodeURIComponent(studentCode)}/${encodeURIComponent(examCode)}`, { method: 'DELETE' });
     loadRecentGrades();
 }
@@ -178,12 +199,19 @@ async function deleteGrade(studentCode, examCode) {
 // פונקציות תלמידים ומבחנים (תצוגת טבלאות)
 // ==========================================
 function renderStudentsApp(container) {
-    let html = `<div class="card"><h2>רשימת תלמידים</h2><table>
+    let html = `<div class="card">
+        <h2><i class="fas fa-users" style="color:var(--accent); margin-left:8px;"></i>רשימת תלמידים</h2>
+        <table>
         <thead><tr><th>קוד</th><th>שם מלא</th><th>כיתה</th><th>טלפונים</th></tr></thead><tbody>`;
         
     studentsList.forEach(s => {
         const phones = (s.phones || []).join(', ');
-        html += `<tr><td>${s.student_code}</td><td>${s.first_name} ${s.last_name}</td><td>${s.class_grade}</td><td>${phones}</td></tr>`;
+        html += `<tr>
+            <td><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:13px;">${s.student_code}</span></td>
+            <td>${s.first_name} ${s.last_name}</td>
+            <td>${s.class_grade}</td>
+            <td dir="ltr" style="text-align:right">${phones}</td>
+        </tr>`;
     });
     
     html += `</tbody></table></div>`;
@@ -191,11 +219,18 @@ function renderStudentsApp(container) {
 }
 
 function renderExamsApp(container) {
-    let html = `<div class="card"><h2>רשימת מבחנים</h2><table>
+    let html = `<div class="card">
+        <h2><i class="fas fa-file-alt" style="color:var(--accent); margin-left:8px;"></i>רשימת מבחנים</h2>
+        <table>
         <thead><tr><th>קוד</th><th>פרטים</th><th>כיתה</th><th>משניות</th></tr></thead><tbody>`;
         
     examsList.forEach(e => {
-        html += `<tr><td>${e.exam_code}</td><td>${e.masechet} | פרק ${e.chapter_name || ''} - ${e.chapter_title || ''}</td><td>${e.target_grade || ''}</td><td>${e.total_mishnayot || ''}</td></tr>`;
+        html += `<tr>
+            <td><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:13px;">${e.exam_code}</span></td>
+            <td><strong>${e.masechet}</strong> | פרק ${e.chapter_name || ''} - ${e.chapter_title || ''}</td>
+            <td>${e.target_grade || ''}</td>
+            <td>${e.total_mishnayot || ''}</td>
+        </tr>`;
     });
     
     html += `</tbody></table></div>`;
