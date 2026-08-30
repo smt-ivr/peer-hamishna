@@ -1,161 +1,284 @@
 :root {
-    --primary-color: #2c3e50;
-    --accent-color: #3498db;
-    --success-color: #27ae60;
-    --danger-color: #e74c3c;
-    --bg-color: #f8f9fa;
-    --card-bg: #ffffff;
-    --text-color: #333333;
-    --border-radius: 8px;
+    /* פלטת צבעים יוקרתית */
+    --primary-bg: #0f172a;      /* כחול כהה עמוק לסיידבר */
+    --primary-light: #1e293b;   /* כחול מעט בהיר יותר להובר */
+    --accent: #d97706;          /* זהב/אמבר לפריטים בולטים */
+    --accent-hover: #f59e0b;    
+    --bg-color: #f1f5f9;        /* רקע אפור-תכלת בהיר מאוד לתוכן */
+    --card-bg: #ffffff;         /* רקע לבן נקי לכרטיסיות */
+    --text-main: #334155;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --success: #059669;
+    --danger: #dc2626;
+    --radius: 10px;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 body {
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Rubik', system-ui, Arial, sans-serif;
     margin: 0;
     padding: 0;
     background-color: var(--bg-color);
-    color: var(--text-color);
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
+/* באנר בבנייה */
 .construction-banner {
-    background-color: #f1c40f;
-    color: #000;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    color: #fff;
     text-align: center;
     padding: 8px;
-    font-weight: bold;
+    font-weight: 500;
     font-size: 14px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+/* פריסת לוח הבקרה */
+.dashboard-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* תפריט צד (Sidebar) */
+.sidebar {
+    width: 250px;
+    background-color: var(--primary-bg);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.sidebar-header {
+    padding: 30px 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.logo-icon {
+    font-size: 36px;
+    color: var(--accent);
+    margin-bottom: 10px;
+}
+
+.sidebar-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 400;
     letter-spacing: 1px;
 }
 
-header {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.header-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px 20px 0 20px;
-}
-
-h1 {
-    margin: 0 0 20px 0;
-    font-size: 24px;
-}
-
-nav {
+.sidebar-nav {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    padding: 20px 0;
+    gap: 5px;
 }
 
 .nav-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
     border: none;
-    color: white;
-    padding: 12px 24px;
+    color: #cbd5e1;
+    padding: 15px 25px;
+    text-align: right;
     font-size: 16px;
+    font-family: inherit;
     cursor: pointer;
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
-    transition: background 0.3s;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-right: 4px solid transparent;
 }
 
 .nav-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background-color: var(--primary-light);
+    color: white;
 }
 
 .nav-btn.active {
-    background: var(--bg-color);
-    color: var(--primary-color);
-    font-weight: bold;
+    background-color: var(--primary-light);
+    color: var(--accent);
+    border-right: 4px solid var(--accent);
+    font-weight: 500;
 }
 
-main {
-    max-width: 1200px;
-    margin: 30px auto;
-    padding: 0 20px;
+.nav-btn i {
+    width: 20px;
+    text-align: center;
+    font-size: 18px;
 }
 
+/* אזור תוכן מרכזי */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+/* הדר עליון */
+.top-header {
+    background-color: var(--card-bg);
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.header-title h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--primary-bg);
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-name {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.avatar {
+    background-color: var(--bg-color);
+    color: var(--primary-bg);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    border: 1px solid var(--border-color);
+}
+
+/* אזור התוכן המשתנה */
+.content-area {
+    padding: 30px;
+    max-width: 1400px;
+}
+
+/* כרטיסיות (Cards) */
 .card {
     background: var(--card-bg);
-    padding: 25px;
-    border-radius: var(--border-radius);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
+    padding: 25px 30px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 25px;
+    border: 1px solid rgba(0,0,0,0.02);
 }
 
+.card h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 18px;
+    color: var(--primary-bg);
+    border-bottom: 2px solid var(--bg-color);
+    padding-bottom: 10px;
+}
+
+/* טפסים */
 .form-group {
     display: flex;
-    gap: 15px;
+    gap: 20px;
     flex-wrap: wrap;
     align-items: flex-end;
-    margin-bottom: 20px;
 }
 
 .input-field {
     display: flex;
     flex-direction: column;
     flex: 1;
-    min-width: 200px;
+    min-width: 220px;
 }
 
 .input-field label {
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     font-size: 14px;
-    font-weight: bold;
-    color: #555;
+    font-weight: 500;
+    color: var(--text-muted);
 }
 
 input, select {
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
     font-size: 15px;
     font-family: inherit;
+    background-color: #f8fafc;
+    transition: all 0.2s ease;
 }
 
 input:focus, select:focus {
     outline: none;
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    border-color: var(--accent);
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
 }
 
+/* כפתורים */
 .btn {
-    padding: 10px 20px;
+    padding: 12px 24px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 15px;
-    font-weight: bold;
+    font-weight: 500;
+    font-family: inherit;
     color: white;
-    transition: opacity 0.2s;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.btn:hover { opacity: 0.9; }
-.btn-primary { background-color: var(--accent-color); }
-.btn-success { background-color: var(--success-color); }
-.btn-danger { background-color: var(--danger-color); padding: 6px 12px; font-size: 13px; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.btn:active { transform: translateY(0); }
+.btn-success { background-color: var(--success); }
+.btn-success:hover { background-color: #047857; }
+.btn-danger { background-color: var(--danger); padding: 8px 15px; font-size: 13px; }
+.btn-danger:hover { background-color: #b91c1c; }
 
+/* טבלאות */
 table {
     width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 10px;
 }
 
 th, td {
-    padding: 12px;
-    border-bottom: 1px solid #eee;
+    padding: 15px;
     text-align: right;
+    border-bottom: 1px solid var(--border-color);
 }
 
 th {
-    background-color: #f8f9fa;
-    color: #666;
-    font-weight: bold;
+    background-color: #f8fafc;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 14px;
 }
 
-tr:hover { background-color: #f1f4f6; }
+th:first-child { border-top-right-radius: 8px; }
+th:last-child { border-top-left-radius: 8px; }
 
-.status-msg { margin-top: 10px; font-weight: bold; font-size: 14px; }
-.loader { text-align: center; font-size: 18px; color: #666; padding: 40px; }
+tr:hover td { background-color: #f1f5f9; }
+
+.status-msg { margin-top: 15px; font-weight: 500; font-size: 15px; }
+.loader { text-align: center; font-size: 18px; color: var(--text-muted); padding: 50px; }
+.loader i { color: var(--accent); margin-left: 10px; }
