@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>פאר המשנה - ניהול</title>
+    <title>פאר המשנה - מערכת ניהול מתקדמת</title>
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Tom Select -->
+    <!-- Tom Select לחיפוש מתקדם -->
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     
@@ -22,8 +22,11 @@
                     <h2>פאר המשנה</h2>
                 </div>
                 <nav id="main-nav" class="sidebar-nav">
-                    <button class="nav-btn active" data-tab="grades" onclick="document.getElementById('page-title').innerText='עדכון ציונים'">
-                        <i class="fas fa-medal"></i> עדכון ציונים
+                    <button class="nav-btn active" data-tab="update" onclick="document.getElementById('page-title').innerText='עדכון מבחנים'">
+                        <i class="fas fa-edit"></i> עדכון מבחנים
+                    </button>
+                    <button class="nav-btn" data-tab="history" onclick="document.getElementById('page-title').innerText='היסטוריית עדכונים'">
+                        <i class="fas fa-history"></i> היסטוריות
                     </button>
                     <button class="nav-btn" data-tab="students" onclick="document.getElementById('page-title').innerText='ניהול תלמידים'">
                         <i class="fas fa-user-graduate"></i> תלמידים
@@ -41,7 +44,7 @@
         <main class="main-content">
             <header class="top-header">
                 <div class="header-title">
-                    <h1 id="page-title">עדכון ציונים</h1>
+                    <h1 id="page-title">עדכון מבחנים</h1>
                 </div>
                 <div class="user-profile">
                     <span class="admin-name">מנהל מערכת</span>
@@ -54,9 +57,6 @@
             </div>
         </main>
     </div>
-
-    <!-- עוגן למודל העדכונים -->
-    <div id="modal-root"></div>
 
     <script src="/peer/client-app.js"></script>
 </body>
