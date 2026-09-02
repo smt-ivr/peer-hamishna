@@ -1,13 +1,14 @@
 import indexHtml from './index.html';
 import stylesCss from './styles.css';
 import clientAppJs from './client-app.js';
+import examUpdateJs from './exam-update.js'; // הקובץ החדש שלנו
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // הגשת דף הבית תחת הנתיב /peer
+    // הגשת דף הבית
     if (path === '/peer' || path === '/peer/' || path === '/peer/index.html') {
       return new Response(indexHtml, { 
         status: 200,
@@ -23,9 +24,17 @@ export default {
       });
     }
 
-    // הגשת קובץ הלוגיקה
+    // הגשת קובץ הלוגיקה הראשי
     if (path === '/peer/client-app.js') {
       return new Response(clientAppJs, { 
+        status: 200,
+        headers: { 'Content-Type': 'application/javascript; charset=utf-8' } 
+      });
+    }
+
+    // הגשת קובץ עדכון המבחנים (החדש)
+    if (path === '/peer/exam-update.js') {
+      return new Response(examUpdateJs, { 
         status: 200,
         headers: { 'Content-Type': 'application/javascript; charset=utf-8' } 
       });
