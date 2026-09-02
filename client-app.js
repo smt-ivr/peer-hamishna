@@ -63,7 +63,8 @@ function goToStudentUpdate(studentCode) {
 
 async function fetchStudentsList() {
     try {
-        const response = await fetch(`${API_BASE}/students`);
+        // הוספנו כאן את הפרמטר ?full_details=true כדי למשוך את כל המידע המלא מהשרת
+        const response = await fetch(`${API_BASE}/students?full_details=true`);
         if(response.ok) {
             allStudents = await response.json();
         }
@@ -112,7 +113,7 @@ function setupSearchBox() {
                 item.innerHTML = `
                     <div>
                         <span class="result-name">${student.first_name} ${student.last_name}</span>
-                        <span class="result-class">כיתה ${student.class_grade}</span>
+                        <span class="result-class">כיתה ${student.class_grade || '-'}</span>
                     </div>
                     <div class="result-code">${student.student_code}</div>
                 `;
