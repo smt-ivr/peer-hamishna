@@ -21,6 +21,7 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .sidebar { width: 220px; background-color: var(--sidebar-bg); color: white; padding: 15px 0; display: flex; flex-direction: column; }
 .sidebar .logo { padding: 0 15px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
 .sidebar .logo h2 { font-size: 1.1rem; }
+.developer-credit { padding: 0 15px 15px; color: #94a3b8; font-size: 0.8rem; font-weight: 500; }
 .menu-item { display: flex; align-items: center; padding: 10px 15px; color: #94a3b8; text-decoration: none; font-weight: 500; transition: 0.2s; font-size: 0.9rem; }
 .menu-item i { margin-left: 10px; font-size: 1rem; width: 20px; text-align: center; }
 .menu-item.active, .menu-item:hover { background-color: rgba(255,255,255,0.05); color: white; border-right: 3px solid var(--primary-color); }
@@ -41,8 +42,9 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 
 /* חיפוש כללי */
 .search-box { position: relative; max-width: 100%; }
-.search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; }
-#studentSearch { width: 100%; padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: var(--border-radius); font-size: 0.9rem; outline: none; transition: 0.2s; }
+.search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; z-index: 2; }
+/* תוקן הריפוד של טקסט החיפוש בהתאמה לימין (35px מימין במקום משמאל) */
+#studentSearch { width: 100%; padding: 8px 35px 8px 12px; border: 1px solid var(--border-color); border-radius: var(--border-radius); font-size: 0.9rem; outline: none; transition: 0.2s; }
 #studentSearch:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
 .search-results-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-color); border-radius: var(--border-radius); margin-top: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 10; }
 .search-result-item { padding: 8px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
@@ -147,6 +149,7 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .app-container { flex-direction: column; overflow: auto; height: auto; min-height: 100vh; }
     .sidebar { width: 100%; padding: 10px; flex-direction: row; align-items: center; justify-content: space-between; }
     .sidebar .logo { padding: 0; border: none; margin: 0; }
+    .developer-credit { padding: 0; margin-left: 10px; }
     .menu { display: flex; }
     .content-area { padding: 10px; overflow-y: visible; }
     .exam-row-item { grid-template-columns: 1fr; gap: 6px; padding: 10px; }
