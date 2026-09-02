@@ -14,31 +14,43 @@
                 <h2>ניהול מבחנים</h2>
             </div>
             <nav class="menu">
-                <a href="#" class="menu-item active">
+                <a href="#" class="menu-item active" data-target="view-update">
                     <i class="fas fa-edit"></i> עדכון והזנת ציונים
+                </a>
+                <a href="#" class="menu-item" data-target="view-students">
+                    <i class="fas fa-users"></i> ניהול תלמידים
+                </a>
+                <a href="#" class="menu-item" data-target="view-exams">
+                    <i class="fas fa-file-alt"></i> ניהול מבחנים
                 </a>
             </nav>
         </aside>
         
         <main class="main-content">
             <header class="topbar">
-                <h1>ניהול מבחני תלמידים</h1>
+                <h1>מערכת ניהול פדגוגית</h1>
             </header>
 
             <div class="content-area">
-                <!-- מסך חיפוש תלמיד -->
-                <div id="search-section" class="card search-card">
-                    <h3>בחירת תלמיד לעדכון</h3>
-                    <p class="text-muted">חפש לפי קוד תלמיד, שם פרטי או שם משפחה</p>
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="studentSearch" placeholder="הקלד לחיפוש תלמיד..." autocomplete="off">
-                        <div id="searchResults" class="search-results-dropdown hidden"></div>
+                <!-- מסך 1: עדכון ציונים -->
+                <div id="view-update" class="view-section active">
+                    <div id="search-section" class="card compact-card">
+                        <h3>בחירת תלמיד לעדכון</h3>
+                        <p class="text-muted">חפש לפי קוד תלמיד או שם</p>
+                        <div class="search-box" style="margin-top: 10px;">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="studentSearch" placeholder="הקלד לחיפוש תלמיד..." autocomplete="off">
+                            <div id="searchResults" class="search-results-dropdown hidden"></div>
+                        </div>
                     </div>
+                    <div id="student-portal" class="student-portal hidden"></div>
                 </div>
 
-                <!-- פורטל התלמיד -->
-                <div id="student-portal" class="student-portal hidden"></div>
+                <!-- מסך 2: ניהול תלמידים -->
+                <div id="view-students" class="view-section hidden"></div>
+
+                <!-- מסך 3: ניהול מבחנים -->
+                <div id="view-exams" class="view-section hidden"></div>
             </div>
         </main>
     </div>
@@ -47,7 +59,7 @@
     <div id="historyModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fas fa-history"></i> היסטוריית מבחנים מלאה</h3>
+                <h3><i class="fas fa-history"></i> היסטוריית מבחנים</h3>
                 <button class="close-modal-btn" id="closeModalBtn">&times;</button>
             </div>
             <div class="modal-body" id="modalHistoryBody">
