@@ -1,66 +1,54 @@
 <!DOCTYPE html>
-<html dir="rtl" lang="he">
+<html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>פאר המשנה - מערכת ניהול</title>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Tom Select -->
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-    
+    <title>מערכת ניהול פדגוגית - SMT</title>
     <link rel="stylesheet" href="/peer/styles.css">
+    <!-- אייקונים -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="dashboard-layout">
+    <div class="app-container">
+        <!-- תפריט צד -->
         <aside class="sidebar">
-            <div class="sidebar-top">
-                <div class="sidebar-header">
-                    <div class="logo-icon"><i class="fas fa-book-reader"></i></div>
-                    <h2>פאר המשנה</h2>
-                </div>
-                <nav id="main-nav" class="sidebar-nav">
-                    <button class="nav-btn active" data-tab="update" onclick="document.getElementById('page-title').innerText='עדכון מבחנים'">
-                        <i class="fas fa-edit"></i> עדכון מבחנים
-                    </button>
-                    <button class="nav-btn" data-tab="history" onclick="document.getElementById('page-title').innerText='היסטוריית עדכונים'">
-                        <i class="fas fa-history"></i> היסטוריות
-                    </button>
-                    <button class="nav-btn" data-tab="students" onclick="document.getElementById('page-title').innerText='ניהול תלמידים'">
-                        <i class="fas fa-user-graduate"></i> תלמידים
-                    </button>
-                    <button class="nav-btn" data-tab="exams" onclick="document.getElementById('page-title').innerText='ניהול מבחנים'">
-                        <i class="fas fa-file-alt"></i> מבחנים
-                    </button>
-                </nav>
+            <div class="logo">
+                <h2>ניהול מבחנים</h2>
             </div>
-            <div class="sidebar-footer">
-                <p>פותח ע"י S.M.T Telephone Systems</p>
-            </div>
+            <nav class="menu">
+                <a href="#" class="menu-item active">
+                    <i class="fas fa-edit"></i> עדכון והזנת ציונים
+                </a>
+            </nav>
         </aside>
-
+        
+        <!-- תוכן מרכזי -->
         <main class="main-content">
-            <header class="top-header">
-                <div class="header-title">
-                    <h1 id="page-title">עדכון מבחנים</h1>
-                </div>
-                <div class="user-profile">
-                    <span class="admin-name">מנהל מערכת</span>
-                    <div class="avatar"><i class="fas fa-user-shield"></i></div>
-                </div>
+            <header class="topbar">
+                <h1>עדכון מבחנים לתלמידים</h1>
             </header>
 
-            <div id="app-content" class="content-area">
-                <div class="loader"><i class="fas fa-circle-notch fa-spin"></i> טוען נתונים...</div>
+            <div class="content-area">
+                <!-- אזור חיפוש -->
+                <div class="card search-card">
+                    <h3>בחירת תלמיד לעדכון</h3>
+                    <p class="text-muted">חפש לפי קוד תלמיד, שם פרטי או שם משפחה</p>
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="studentSearch" placeholder="הקלד לחיפוש תלמיד..." autocomplete="off">
+                        <div id="searchResults" class="search-results-dropdown hidden"></div>
+                    </div>
+                </div>
+
+                <!-- אזור פרטי תלמיד וטופס הזנה (מוזרק דרך JS) -->
+                <div id="student-portal" class="student-portal hidden">
+                    <!-- תוכן נטען כאן דינאמית -->
+                </div>
             </div>
         </main>
     </div>
-
-    <!-- עוגן למודלים הקופצים (חלונות חיפוש) -->
-    <div id="modals-container"></div>
-
-    <script src="/peer/client-app.js"></script>
+    
+    <!-- ייבוא הקובץ הראשי כמודול -->
+    <script type="module" src="/peer/client-app.js"></script>
 </body>
 </html>
