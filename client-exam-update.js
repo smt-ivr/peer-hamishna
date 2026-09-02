@@ -14,7 +14,6 @@ export class ExamUpdateManager {
     }
 
     setupGlobalEvents() {
-        // סגירת חלוניות חיפוש מבחנים בלחיצה מחוץ לאזור
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.exam-search-container')) {
                 document.querySelectorAll('.exam-search-results').forEach(el => el.classList.add('hidden'));
@@ -149,7 +148,6 @@ export class ExamUpdateManager {
 
         const container = document.getElementById('examRowsContainer');
 
-        // טיפול בחיפוש ואזהרות בהקלדה
         container.addEventListener('input', (e) => {
             if (e.target.classList.contains('exam-code-input')) {
                 const input = e.target;
@@ -157,7 +155,6 @@ export class ExamUpdateManager {
                 const row = input.closest('.exam-row-item');
                 const resultsContainer = row.querySelector('.exam-search-results');
 
-                // טיפול בחיפוש דינמי
                 if (code.length === 0) {
                     resultsContainer.innerHTML = '';
                     resultsContainer.classList.add('hidden');
@@ -169,13 +166,12 @@ export class ExamUpdateManager {
                             String(val).includes(code)
                         );
                         return codeMatch || textMatch;
-                    }).slice(0, 10); // הצגת עד 10 תוצאות
+                    }).slice(0, 10);
 
                     if (filtered.length > 0) {
                         resultsContainer.innerHTML = filtered.map(ex => {
                             let desc = '';
                             if (ex.details) {
-                                // איסוף כל הטקסטים מהפרטים ליצירת תיאור מובן
                                 desc = Object.values(ex.details)
                                     .filter(val => val !== null && val !== '')
                                     .join(' | ');
@@ -193,7 +189,6 @@ export class ExamUpdateManager {
                     resultsContainer.classList.remove('hidden');
                 }
 
-                // בדיקה אם המבחן כבר קיים בהיסטוריה
                 let warningEl = row.querySelector('.inline-exam-warning');
                 const existingExams = this.currentStudent.exams_details || [];
                 const found = existingExams.find(ex => ex.exam_code === code);
@@ -212,7 +207,6 @@ export class ExamUpdateManager {
             }
         });
 
-        // בחירת מבחן מהרשימה הנפתחת וקליקים על כפתורי המחיקה
         container.addEventListener('click', (e) => {
             const resultItem = e.target.closest('.exam-result-item');
             if (resultItem) {
@@ -223,9 +217,8 @@ export class ExamUpdateManager {
                 input.value = code;
                 searchContainer.querySelector('.exam-search-results').classList.add('hidden');
                 
-                // הפעלת אירוע אינפוט כדי לעדכן את בדיקת ההיסטוריה באופן אוטומטי
                 input.dispatchEvent(new Event('input', { bubbles: true }));
-                return; // יציאה כדי לא להמשיך לבדוק כפתורים אחרים
+                return;
             }
 
             const toggleBtn = e.target.closest('.toggle-btn');
@@ -409,31 +402,67 @@ export class ExamUpdateManager {
         const modal = document.getElementById('historyModal');
         const body = document.getElementById('modalHistoryBody');
         const exams = this.currentStudent.exams_details || [];
+        const totalReward = this.currentStudent.total_reward || 0;
 
         if (exams.length === 0) {
-            body.innerHTML = '<p class="text-muted text-center">אין עדיין היסטוריית מבחנים רשומה לתלמיד זה.</p>';
+            body.innerHTML = '<div style="padding:20px;text-align:center;"><p class="text-muted">אין עדיין היסטוריית מבחנים רשומה לתלמיד זה.</p></div>';
         } else {
+            // הוספת סטטיסטיקה למעלה וטבלה חכמה עם פירוט
             body.innerHTML = `
-                <table class="modern-table">
-                    <thead>
-                        <tr>
-                            <th>קוד מבחן</th>
-                            <th>סטטוס מעבר</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${exams.map(ex => `
+                <div class="history-summary">
+                    <div class="summary-card">
+                        <span class="summary-label">סך הכל מבחנים:</span>
+                        <span class="summary-value">${exams.length}</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-label">סך הכל ניקוד:</span>
+                        <span class="summary-value">${totalReward.toFixed(1)}</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="modern-table sticky-header">
+                        <thead>
                             <tr>
-                                <td><strong>${ex.exam_code}</strong></td>
-                                <td>
-                                    <span class="status-pill ${ex.passed ? 'success' : 'danger'}">
-                                        <i class="fas ${ex.passed ? 'fa-check' : 'fa-times'}"></i> ${ex.passed ? 'עבר בהצלחה' : 'לא עבר'}
-                                    </span>
-                                </td>
+                                <th>קוד</th>
+                                <th>סוג</th>
+                                <th>פרטים</th>
+                                <th>ניקוד</th>
+                                <th>סטטוס</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${exams.map(ex => {
+                                let detailsText = 'ללא פרטים';
+                                if (ex.details) {
+                                    if (ex.exam_type === 'mishnayot') {
+                                        detailsText = `${ex.details.masechet || ''} - פרק ${ex.details.chapter_name || ''} (${ex.details.total_mishnayot} יח')`;
+                                    } else if (ex.exam_type === 'gemara') {
+                                        detailsText = `${ex.details.masechet || ''} (${ex.details.gemara_pages || 0} דפים)`;
+                                    } else {
+                                        detailsText = Object.values(ex.details).join(', ');
+                                    }
+                                }
+                                
+                                const typeLabel = ex.exam_type === 'mishnayot' ? 'משניות' : (ex.exam_type === 'gemara' ? 'גמרא' : 'כללי');
+                                const typeClass = ex.exam_type === 'mishnayot' ? 'type-mishnayot' : 'type-gemara';
+
+                                return `
+                                <tr>
+                                    <td><strong>${ex.exam_code}</strong></td>
+                                    <td><span class="type-badge ${typeClass}">${typeLabel}</span></td>
+                                    <td class="exam-details-cell" title="${detailsText}">${detailsText}</td>
+                                    <td><span class="reward-badge">${ex.reward ? ex.reward.toFixed(1) : '-'}</span></td>
+                                    <td>
+                                        <span class="status-pill ${ex.passed ? 'success' : 'danger'}">
+                                            <i class="fas ${ex.passed ? 'fa-check' : 'fa-times'}"></i>
+                                        </span>
+                                    </td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
             `;
         }
 
