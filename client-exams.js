@@ -13,7 +13,7 @@ export class ExamManager {
                     <h3 style="margin: 0;"><i class="fas fa-file-alt"></i> מאגר המבחנים</h3>
                     <div class="search-box" style="width: 250px;">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="filterExams" placeholder="חיפוש קוד או פרטים..." autocomplete="off" style="padding: 6px 10px 6px 30px;">
+                        <input type="text" id="filterExams" placeholder="חיפוש קוד או פרטים..." autocomplete="off" style="padding: 6px 30px 6px 10px;">
                     </div>
                 </div>
                 
