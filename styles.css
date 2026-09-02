@@ -113,3 +113,16 @@ body { background-color: var(--bg-color); color: var(--text-main); }
     .student-top-card { flex-direction: column; align-items: flex-start; }
     .student-top-actions { width: 100%; justify-content: space-between; }
 }
+/* אזהרה חיה בזמן הקלדה על מבחן קיים */
+.inline-exam-warning {
+    margin-top: 6px;
+    font-size: 0.8rem;
+    color: #b37400;
+    background: rgba(255, 181, 71, 0.12);
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
