@@ -1,177 +1,163 @@
 :root {
-    --primary-color: #4361ee;
-    --primary-hover: #3a53d0;
-    --bg-color: #f4f7fe;
-    --sidebar-bg: #111c44;
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --bg-color: #f8fafc;
+    --sidebar-bg: #1e293b;
     --card-bg: #ffffff;
-    --text-main: #2b3674;
-    --text-muted: #a3aed1;
+    --text-main: #334155;
+    --text-muted: #64748b;
     --border-color: #e2e8f0;
-    --success: #05cd99;
-    --warning: #ffb547;
-    --danger: #ee5d50;
-    --border-radius: 12px;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --border-radius: 6px; /* מראה יותר מקצועי ופחות מעוגל */
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-body { background-color: var(--bg-color); color: var(--text-main); }
-.app-container { display: flex; min-height: 100vh; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+body { background-color: var(--bg-color); color: var(--text-main); font-size: 14px; /* פונט קטן יותר למראה עבודה נקי */ }
+.app-container { display: flex; height: 100vh; overflow: hidden; /* מניעת גלילה של כל המסך, הופך למערכת יציבה */ }
 
-.sidebar { width: 250px; background-color: var(--sidebar-bg); color: white; padding: 20px 0; }
-.sidebar .logo { padding: 0 24px 30px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; }
-.menu-item { display: flex; align-items: center; padding: 15px 24px; color: var(--text-muted); text-decoration: none; font-weight: 500; transition: 0.3s; }
-.menu-item i { margin-left: 15px; font-size: 1.2rem; }
-.menu-item.active, .menu-item:hover { background-color: rgba(255,255,255,0.05); color: white; border-right: 4px solid var(--primary-color); }
+/* תפריט צד */
+.sidebar { width: 220px; background-color: var(--sidebar-bg); color: white; padding: 15px 0; display: flex; flex-direction: column; }
+.sidebar .logo { padding: 0 15px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
+.sidebar .logo h2 { font-size: 1.1rem; }
+.menu-item { display: flex; align-items: center; padding: 10px 15px; color: #94a3b8; text-decoration: none; font-weight: 500; transition: 0.2s; font-size: 0.9rem; }
+.menu-item i { margin-left: 10px; font-size: 1rem; width: 20px; text-align: center; }
+.menu-item.active, .menu-item:hover { background-color: rgba(255,255,255,0.05); color: white; border-right: 3px solid var(--primary-color); }
 
-.main-content { flex: 1; padding: 30px; max-width: 1050px; margin: 0 auto; }
-.topbar { margin-bottom: 25px; }
+/* אזור מרכזי */
+.main-content { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.topbar { padding: 15px 25px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; }
+.topbar h1 { font-size: 1.2rem; margin: 0; }
+.content-area { flex: 1; padding: 20px 25px; overflow-y: auto; } /* גלילה פנימית לאזור התוכן בלבד */
 
-.card { background-color: var(--card-bg); border-radius: var(--border-radius); padding: 24px; margin-bottom: 24px; box-shadow: 0 5px 14px rgba(0,0,0,0.04); }
-.card h3 { margin-bottom: 10px; font-size: 1.2rem; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
-.text-muted { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px; }
+/* כרטיסיות */
+.card { background-color: var(--card-bg); border-radius: var(--border-radius); padding: 16px; margin-bottom: 16px; border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.card h3 { margin-bottom: 6px; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
+.text-muted { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px; }
 
-/* Search */
-.search-box { position: relative; }
-.search-icon { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
-#studentSearch { width: 100%; padding: 15px 15px 15px 45px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; outline: none; transition: 0.2s; }
-#studentSearch:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15); }
-.search-results-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 5px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 300px; overflow-y: auto; z-index: 10; }
-.search-result-item { padding: 12px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+/* חיפוש כללי */
+.search-box { position: relative; max-width: 400px; }
+.search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; }
+#studentSearch { width: 100%; padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: var(--border-radius); font-size: 0.9rem; outline: none; transition: 0.2s; }
+#studentSearch:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
+.search-results-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-color); border-radius: var(--border-radius); margin-top: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 10; }
+.search-result-item { padding: 8px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
 .search-result-item:hover { background-color: var(--bg-color); }
 .result-name { font-weight: 600; }
-.result-class { color: var(--text-muted); font-size: 0.85rem; margin-right: 10px; }
-.result-code { background: var(--bg-color); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; }
+.result-class { color: var(--text-muted); font-size: 0.8rem; margin-right: 8px; }
+.result-code { background: var(--bg-color); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border-color); }
 
-/* Student Top Card */
-.student-top-card { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
-.student-info-left { display: flex; align-items: center; gap: 20px; }
-.avatar { width: 55px; height: 55px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
-.profile-badges { margin-top: 6px; display: flex; gap: 10px; }
-.badge { background: var(--bg-color); padding: 3px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; }
-.student-top-actions { display: flex; gap: 10px; }
+/* כרטיס תלמיד עליון */
+.student-top-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; }
+.student-info-left { display: flex; align-items: center; gap: 12px; }
+.avatar { width: 40px; height: 40px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.student-info-left h2 { font-size: 1.1rem; margin-bottom: 4px; }
+.profile-badges { display: flex; gap: 6px; }
+.badge { background: var(--bg-color); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; border: 1px solid var(--border-color); }
+.student-top-actions { display: flex; gap: 8px; }
 
-/* Exam Rows & Toggles */
-.exam-row-item { display: grid; grid-template-columns: 2fr 3fr 60px; gap: 15px; align-items: center; margin-bottom: 12px; background: var(--bg-color); padding: 12px; border-radius: 10px; }
-.exam-code-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; outline: none; background: white; }
+/* טופס מבחנים (שורות) */
+.exam-row-item { display: grid; grid-template-columns: 2.5fr 2fr 40px; gap: 12px; align-items: center; margin-bottom: 8px; background: var(--bg-color); padding: 8px 12px; border-radius: var(--border-radius); border: 1px solid var(--border-color); }
+.form-group label { display: none; /* הסתרת תוויות בשורות לחיסכון במקום אנכי */ }
+.exam-row-item:first-child .form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+
+.exam-code-input { width: 100%; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem; outline: none; background: white; }
 .exam-code-input:focus { border-color: var(--primary-color); }
 
-.toggle-group { display: flex; gap: 8px; }
-.toggle-btn { flex: 1; padding: 10px; border: 1px solid var(--border-color); background: white; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; color: var(--text-muted); }
-.toggle-btn.pass-btn.active { background: rgba(5, 205, 153, 0.15); border-color: var(--success); color: var(--success); }
-.toggle-btn.fail-btn.active { background: rgba(238, 93, 80, 0.15); border-color: var(--danger); color: var(--danger); }
+.toggle-group { display: flex; gap: 4px; height: 32px; }
+.toggle-btn { flex: 1; padding: 0 10px; border: 1px solid var(--border-color); background: white; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: 0.2s; color: var(--text-muted); }
+.toggle-btn.pass-btn.active { background: rgba(16, 185, 129, 0.1); border-color: var(--success); color: var(--success); }
+.toggle-btn.fail-btn.active { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); color: var(--danger); }
 
-.btn-icon-danger { background: none; border: none; color: var(--danger); font-size: 1.1rem; cursor: pointer; padding: 8px; border-radius: 6px; transition: 0.2s; }
-.btn-icon-danger:hover:not(:disabled) { background: rgba(238, 93, 80, 0.1); }
+.btn-icon-danger { background: none; border: none; color: var(--danger); font-size: 1rem; cursor: pointer; padding: 6px; border-radius: 4px; transition: 0.2s; display: flex; align-items: center; justify-content: center; height: 32px; width: 32px; }
+.btn-icon-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.1); }
 .btn-icon-danger:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.form-actions-inline { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+.form-actions-inline { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px; }
 
-/* Buttons */
-.btn { padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; }
+/* כפתורים */
+.btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; height: 32px; }
 .btn-primary { background-color: var(--primary-color); color: white; }
 .btn-primary:hover { background-color: var(--primary-hover); }
 .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
-.btn-secondary { background-color: #eef2ff; color: var(--primary-color); }
-.btn-secondary:hover { background-color: #e0e7ff; }
-.btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+.btn-secondary { background-color: #eff6ff; color: var(--primary-color); border: 1px solid #bfdbfe; }
+.btn-secondary:hover { background-color: #dbeafe; }
+.btn-outline { background: white; border: 1px solid var(--border-color); color: var(--text-main); }
 .btn-outline:hover { background: var(--bg-color); }
-.btn-dashed { background: transparent; border: 1px dashed var(--primary-color); color: var(--primary-color); }
-.btn-dashed:hover { background: rgba(67, 97, 238, 0.05); }
+.btn-dashed { background: transparent; border: 1px dashed var(--border-color); color: var(--text-main); }
+.btn-dashed:hover { border-color: var(--primary-color); color: var(--primary-color); }
 
-/* Server Feedback Box */
-.server-feedback { margin-top: 20px; padding: 16px; border-radius: 10px; background: white; border: 1px solid var(--border-color); }
-.server-feedback h4 { margin-bottom: 10px; font-size: 1rem; color: var(--text-main); }
-.feedback-group { margin-bottom: 10px; font-size: 0.9rem; padding: 8px 12px; border-radius: 6px; }
-.success-group { background: rgba(5, 205, 153, 0.1); color: #048a68; }
-.warning-group { background: rgba(255, 181, 71, 0.1); color: #b37400; }
-.error-group { background: rgba(238, 93, 80, 0.1); color: #c53026; }
-.feedback-group ul { margin-right: 20px; margin-top: 4px; }
+/* חיפוש מבחנים בתוך השורה */
+.exam-search-container { position: relative; }
+.exam-search-results { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 180px; overflow-y: auto; z-index: 20; }
+.exam-result-item { padding: 6px 10px; border-bottom: 1px solid var(--bg-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+.exam-result-item:last-child { border-bottom: none; }
+.exam-result-item:hover { background-color: var(--bg-color); }
+.exam-result-code { font-weight: 600; background: var(--bg-color); color: var(--text-main); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border-color); }
+.exam-result-desc { color: var(--text-muted); font-size: 0.8rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%; }
+.inline-exam-warning { margin-top: 4px; font-size: 0.75rem; color: #b45309; background: #fef3c7; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #fde68a; }
 
-/* Modal Styles */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal-content { background: white; border-radius: var(--border-radius); width: 90%; max-width: 550px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
-.modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
-.close-modal-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
-.modal-body { padding: 20px; overflow-y: auto; max-height: 60vh; }
+/* הודעות שרת */
+.server-feedback { margin-top: 12px; padding: 12px; border-radius: var(--border-radius); background: white; border: 1px solid var(--border-color); }
+.server-feedback h4 { margin-bottom: 8px; font-size: 0.9rem; }
+.feedback-group { margin-bottom: 8px; font-size: 0.85rem; padding: 6px 10px; border-radius: 4px; }
+.success-group { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.warning-group { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.error-group { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.feedback-group ul { margin-right: 15px; margin-top: 4px; padding-right: 10px; }
+.feedback-group li { margin-bottom: 2px; }
 
-/* Tables */
-.modern-table { width: 100%; border-collapse: collapse; }
-.modern-table th, .modern-table td { padding: 12px 15px; text-align: right; border-bottom: 1px solid var(--border-color); }
-.modern-table th { color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }
-.status-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
-.status-pill.success { background: rgba(5, 205, 153, 0.1); color: var(--success); }
-.status-pill.danger { background: rgba(238, 93, 80, 0.1); color: var(--danger); }
+/* חלונית (Modal) של ההיסטוריה */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+.modal-content { background: white; border-radius: 8px; width: 90%; max-width: 800px; height: 75vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid var(--border-color); }
+.modal-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 8px 8px 0 0; }
+.modal-header h3 { font-size: 1.05rem; margin: 0; }
+.close-modal-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-muted); line-height: 1; padding: 0 4px; }
+.close-modal-btn:hover { color: var(--danger); }
+.modal-body { display: flex; flex-direction: column; overflow: hidden; flex: 1; padding: 0; background: white; }
 
-/* Utils */
+/* כרטיסיות סיכום היסטוריה */
+.history-summary { display: flex; gap: 12px; padding: 12px 16px; background: white; border-bottom: 1px solid var(--border-color); }
+.summary-card { background: var(--bg-color); padding: 6px 12px; border-radius: 4px; border: 1px solid var(--border-color); display: flex; gap: 8px; align-items: center; }
+.summary-label { color: var(--text-muted); font-size: 0.85rem; }
+.summary-value { font-weight: 600; color: var(--primary-color); font-size: 0.95rem; }
+
+/* טבלת היסטוריה */
+.table-container { overflow-y: auto; flex: 1; }
+.modern-table { width: 100%; border-collapse: collapse; text-align: right; }
+.modern-table.sticky-header th { position: sticky; top: 0; background: #f1f5f9; z-index: 10; border-bottom: 2px solid var(--border-color); }
+.modern-table th, .modern-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 0.85rem; }
+.modern-table th { color: var(--text-muted); font-weight: 600; }
+.modern-table tbody tr:hover { background-color: var(--bg-color); }
+
+/* תגיות בתוך הטבלה */
+.type-badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; border: 1px solid transparent; }
+.type-mishnayot { background: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
+.type-gemara { background: #fef3c7; color: #d97706; border-color: #fde68a; }
+.exam-details-cell { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+.reward-badge { background: #f1f5f9; color: var(--text-main); padding: 2px 8px; border-radius: 12px; font-weight: 600; font-size: 0.8rem; display: inline-block; text-align: center; min-width: 35px; border: 1px solid var(--border-color); }
+.status-pill { padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; }
+.status-pill.success { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+.status-pill.danger { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+
+/* כלים */
 .hidden { display: none !important; }
-.loading { text-align: center; padding: 40px; color: var(--text-muted); font-size: 1.1rem; }
-.error-card { text-align: center; color: var(--danger); }
+.loading { text-align: center; padding: 30px; color: var(--text-muted); font-size: 0.95rem; }
+.error-card { text-align: center; color: var(--danger); padding: 20px; }
 .text-center { text-align: center; }
 
+/* התאמה למסכים קטנים */
 @media (max-width: 768px) {
-    .exam-row-item { grid-template-columns: 1fr; }
-    .student-top-card { flex-direction: column; align-items: flex-start; }
+    .app-container { flex-direction: column; overflow: auto; height: auto; min-height: 100vh; }
+    .sidebar { width: 100%; padding: 10px; flex-direction: row; align-items: center; justify-content: space-between; }
+    .sidebar .logo { padding: 0; border: none; margin: 0; }
+    .menu { display: flex; }
+    .main-content { overflow: visible; height: auto; }
+    .content-area { padding: 15px; }
+    .exam-row-item { grid-template-columns: 1fr; gap: 8px; padding: 12px; }
+    .form-group label { display: block !important; margin-bottom: 4px; font-size: 0.8rem; color: var(--text-muted); }
+    .student-top-card { flex-direction: column; align-items: flex-start; gap: 12px; }
     .student-top-actions { width: 100%; justify-content: space-between; }
-}
-/* אזהרה חיה בזמן הקלדה על מבחן קיים */
-.inline-exam-warning {
-    margin-top: 6px;
-    font-size: 0.8rem;
-    color: #b37400;
-    background: rgba(255, 181, 71, 0.12);
-    padding: 4px 8px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-weight: 500;
-}
-/* Exam Search Dropdown Styles */
-.exam-search-container { 
-    position: relative; 
-}
-.exam-search-results {
-    position: absolute; 
-    top: 100%; 
-    left: 0; 
-    right: 0;
-    background: white; 
-    border: 1px solid var(--border-color);
-    border-radius: 8px; 
-    margin-top: 5px; 
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    max-height: 220px; 
-    overflow-y: auto; 
-    z-index: 20; /* חשוב כדי שזה יקפוץ מעל לשורות הבאות */
-}
-.exam-result-item {
-    padding: 10px 12px; 
-    border-bottom: 1px solid var(--border-color);
-    cursor: pointer; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center;
-    transition: background 0.2s;
-}
-.exam-result-item:last-child {
-    border-bottom: none;
-}
-.exam-result-item:hover { 
-    background-color: var(--bg-color); 
-}
-.exam-result-code { 
-    font-weight: 600; 
-    background: rgba(67, 97, 238, 0.1); 
-    color: var(--primary-color);
-    padding: 3px 8px; 
-    border-radius: 6px;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    margin-right: 10px;
-}
-.exam-result-desc { 
-    color: var(--text-main); 
-    font-size: 0.85rem; 
-    line-height: 1.4;
-    text-align: right;
+    .history-summary { flex-direction: column; gap: 8px; }
 }
