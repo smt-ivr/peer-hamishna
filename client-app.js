@@ -2,11 +2,14 @@ import { ExamUpdateManager } from './client-exam-update.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 let allStudents = [];
+let allExams = [];
 let examManager;
 
 document.addEventListener('DOMContentLoaded', async () => {
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
-    await fetchStudentsList();
+    // טעינת תלמידים ומבחנים במקביל לחיסכון בזמן
+    await Promise.all([fetchStudentsList(), fetchExamsList()]);
+    examManager.setExams(allExams);
     setupSearchBox();
 });
 
@@ -18,6 +21,17 @@ async function fetchStudentsList() {
         }
     } catch(error) {
         console.error('שגיאה בטעינת תלמידים:', error);
+    }
+}
+
+async function fetchExamsList() {
+    try {
+        const response = await fetch(`${API_BASE}/exams`);
+        if(response.ok) {
+            allExams = await response.json();
+        }
+    } catch(error) {
+        console.error('שגיאה בטעינת מבחנים:', error);
     }
 }
 
@@ -53,7 +67,7 @@ function setupSearchBox() {
 function renderSearchResults(results, container, inputElement) {
     container.innerHTML = '';
     if(results.length === 0) {
-        container.innerHTML = '<div class="no-results">לא נמצאו תלמידים תואמים</div>';
+        container.innerHTML = '<div class="no-results" style="padding:15px;text-align:center;">לא נמצאו תלמידים תואמים</div>';
     } else {
         results.forEach(student => {
             const item = document.createElement('div');
