@@ -17,12 +17,26 @@ export class ExamUpdateManager {
             const response = await fetch(`${this.apiBase}/students?student_code=${studentCode}`);
             if (response.ok) {
                 this.currentStudent = await response.json();
-                this.renderPortal();
-            } else {
+                if (!silent) {
+                    this.renderPortal();
+                } else {
+                    // עדכון שקט של מונה ההיסטוריה בכפתור בלי לגעת בטופס או במשוב
+                    this.updateHistoryButtonCount();
+                }
+            } else if (!silent) {
                 this.showError('אירעה שגיאה בטעינת נתוני התלמיד.');
             }
         } catch (error) {
-            this.showError('שגיאת תקשורת מול השרת.');
+            if (!silent) {
+                this.showError('שגיאת תקשורת מול השרת.');
+            }
+        }
+    }
+
+    updateHistoryButtonCount() {
+        const btn = document.getElementById('openHistoryModalBtn');
+        if (btn && this.currentStudent && this.currentStudent.exams_details) {
+            btn.innerHTML = `<i class="fas fa-history"></i> היסטוריית מבחנים (${this.currentStudent.exams_details.length})`;
         }
     }
 
@@ -64,7 +78,7 @@ export class ExamUpdateManager {
                         <div class="exam-row-item">
                             <div class="form-group exam-code-group">
                                 <label>קוד מבחן:</label>
-                                <input type="text" class="exam-code-input" required placeholder="לדוגמא: 1א">
+                                <input type="text" class="exam-code-input" required placeholder="לדוגמא: 1א" autocomplete="off">
                             </div>
                             
                             <div class="form-group exam-status-group">
@@ -88,6 +102,10 @@ export class ExamUpdateManager {
                         </div>
                     </div>
 
+<div>
+    <div id="serverFeedback" class="server-feedback hidden"></div>
+</div>
+
                     <div class="form-actions-inline">
                         <button type="button" class="btn btn-dashed" id="addRowBtn">
                             <i class="fas fa-plus"></i> הוסף מבחן נוסף לרשימה
@@ -97,9 +115,6 @@ export class ExamUpdateManager {
                         </button>
                     </div>
                 </form>
-                
-                <!-- אזור הצגת תגובות שרת מפורטות -->
-                <div id="serverFeedback" class="server-feedback hidden"></div>
             </div>
         `;
 
@@ -108,23 +123,45 @@ export class ExamUpdateManager {
     }
 
     attachPortalEvents() {
-        // כפתור החלפת תלמיד
         document.getElementById('switchStudentBtn').addEventListener('click', () => {
             if (this.onSwitchCallback) this.onSwitchCallback();
         });
 
-        // כפתור פתיחת מדיאטור היסטוריה
         document.getElementById('openHistoryModalBtn').addEventListener('click', () => {
             this.openHistoryModal();
         });
 
-        // הוספת שורת מבחן חדשה
         document.getElementById('addRowBtn').addEventListener('click', () => {
             this.addExamRow();
         });
 
-        // ניהול כפתורי V ו-X ובחירת שורות
         const container = document.getElementById('examRowsContainer');
+
+        // בדיקה בזמן אמת בהקלדה האם המבחן קיים בהיסטוריה
+        container.addEventListener('input', (e) => {
+            if (e.target.classList.contains('exam-code-input')) {
+                const input = e.target;
+                const code = input.value.trim();
+                const row = input.closest('.exam-row-item');
+                let warningEl = row.querySelector('.inline-exam-warning');
+
+                const existingExams = this.currentStudent.exams_details || [];
+                const found = existingExams.find(ex => ex.exam_code === code);
+
+                if (code && found) {
+                    if (!warningEl) {
+                        warningEl = document.createElement('div');
+                        warningEl.className = 'inline-exam-warning';
+                        input.closest('.exam-code-group').appendChild(warningEl);
+                    }
+                    const statusText = found.passed ? 'עבר' : 'לא עבר';
+                    warningEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> מבחן זה כבר קיים בהיסטוריה (${statusText})`;
+                } else {
+                    if (warningEl) warningEl.remove();
+                }
+            }
+        });
+
         container.addEventListener('click', (e) => {
             const toggleBtn = e.target.closest('.toggle-btn');
             if (toggleBtn) {
@@ -141,7 +178,6 @@ export class ExamUpdateManager {
             }
         });
 
-        // שליחת הטופס לשרת
         document.getElementById('multiExamForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             await this.submitExams();
@@ -154,7 +190,7 @@ export class ExamUpdateManager {
         newRow.className = 'exam-row-item';
         newRow.innerHTML = `
             <div class="form-group exam-code-group">
-                <input type="text" class="exam-code-input" required placeholder="לדוגמא: 2ב">
+                <input type="text" class="exam-code-input" required placeholder="לדוגמא: 2ב" autocomplete="off">
             </div>
             <div class="form-group exam-status-group">
                 <div class="toggle-group">
@@ -178,9 +214,9 @@ export class ExamUpdateManager {
 
     updateRemoveButtonsState() {
         const rows = document.querySelectorAll('.exam-row-item');
-        rows.forEach((row, index) => {
+        rows.forEach((row) => {
             const btn = row.querySelector('.remove-row-btn');
-            btn.disabled = rows.length === 1;
+            if (btn) btn.disabled = rows.length === 1;
         });
     }
 
@@ -219,14 +255,15 @@ export class ExamUpdateManager {
             if (response.ok) {
                 const result = await response.json();
                 this.renderServerFeedback(result);
-                // רענון שקט של נתוני התלמיד ברקע לעדכון היסטוריה
+                
+                // רענון שקט ברקע לעדכון נתוני ההיסטוריה והמונה בלי לאפס את המסך
                 await this.loadStudentData(this.currentStudent.student_code, true);
                 
-                // איפוס הטופס לשורה אחת
+                // איפוס הטופס חזרה לשורה אחת נקייה
                 document.getElementById('examRowsContainer').innerHTML = `
                     <div class="exam-row-item">
                         <div class="form-group exam-code-group">
-                            <input type="text" class="exam-code-input" required placeholder="לדוגמא: 1א">
+                            <input type="text" class="exam-code-input" required placeholder="לדוגמא: 1א" autocomplete="off">
                         </div>
                         <div class="form-group exam-status-group">
                             <div class="toggle-group">
@@ -260,7 +297,7 @@ export class ExamUpdateManager {
 
     renderServerFeedback(res) {
         const box = document.getElementById('serverFeedback');
-        let html = '<h4>תוצאות פעולת העדכון:</h4><div class="feedback-lists">';
+        let html = '<h4>תוצאות פעולת העדכון מול השרת:</h4><div class="feedback-lists">';
 
         if (res.updated && res.updated.length > 0) {
             html += `<div class="feedback-group success-group">
