@@ -10,12 +10,12 @@
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #ef4444;
-    --border-radius: 6px; /* מראה יותר מקצועי ופחות מעוגל */
+    --border-radius: 6px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-body { background-color: var(--bg-color); color: var(--text-main); font-size: 14px; /* פונט קטן יותר למראה עבודה נקי */ }
-.app-container { display: flex; height: 100vh; overflow: hidden; /* מניעת גלילה של כל המסך, הופך למערכת יציבה */ }
+body { background-color: var(--bg-color); color: var(--text-main); font-size: 14px; }
+.app-container { display: flex; height: 100vh; overflow: hidden; }
 
 /* תפריט צד */
 .sidebar { width: 220px; background-color: var(--sidebar-bg); color: white; padding: 15px 0; display: flex; flex-direction: column; }
@@ -29,7 +29,7 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .main-content { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .topbar { padding: 15px 25px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; }
 .topbar h1 { font-size: 1.2rem; margin: 0; }
-.content-area { flex: 1; padding: 20px 25px; overflow-y: auto; } /* גלילה פנימית לאזור התוכן בלבד */
+.content-area { flex: 1; padding: 20px 25px; overflow-y: auto; }
 
 /* כרטיסיות */
 .card { background-color: var(--card-bg); border-radius: var(--border-radius); padding: 16px; margin-bottom: 16px; border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -48,8 +48,8 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .result-class { color: var(--text-muted); font-size: 0.8rem; margin-right: 8px; }
 .result-code { background: var(--bg-color); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border-color); }
 
-/* כרטיס תלמיד עליון */
-.student-top-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; }
+/* כרטיס תלמיד עליון וסטטיסטיקות */
+.student-top-card { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px; padding: 12px 16px; }
 .student-info-left { display: flex; align-items: center; gap: 12px; }
 .avatar { width: 40px; height: 40px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 .student-info-left h2 { font-size: 1.1rem; margin-bottom: 4px; }
@@ -57,16 +57,40 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .badge { background: var(--bg-color); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; border: 1px solid var(--border-color); }
 .student-top-actions { display: flex; gap: 8px; }
 
-/* טופס מבחנים (שורות) */
-.exam-row-item { display: grid; grid-template-columns: 2.5fr 2fr 40px; gap: 12px; align-items: center; margin-bottom: 8px; background: var(--bg-color); padding: 8px 12px; border-radius: var(--border-radius); border: 1px solid var(--border-color); }
-.form-group label { display: none; /* הסתרת תוויות בשורות לחיסכון במקום אנכי */ }
-.exam-row-item:first-child .form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+.student-stats-bar { width: 100%; display: flex; gap: 10px; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 15px; }
+.stat-box { flex: 1; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.stat-value { font-size: 1.2rem; font-weight: bold; color: var(--text-main); margin-bottom: 2px; }
+.stat-label { font-size: 0.8rem; color: var(--text-muted); }
+.text-primary { color: var(--primary-color) !important; }
+.text-success { color: var(--success) !important; }
+.text-danger { color: var(--danger) !important; }
 
+/* טופס מבחנים (שורות) */
+.form-header-actions { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+.btn-lg { padding: 8px 16px; font-size: 0.95rem; height: 38px; }
+
+.exam-row-item { 
+    display: grid; 
+    /* הגריד החדש: חיפוש רחב -> הערה מתגמשת -> כפתורים בגודל קבוע -> פח */
+    grid-template-columns: 2fr auto 180px 40px; 
+    gap: 12px; align-items: center; margin-bottom: 8px; background: var(--bg-color); 
+    padding: 8px 12px; border-radius: var(--border-radius); border: 1px solid var(--border-color); 
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+/* כשיש אזהרה, השורה כולה מחליפה צבע! */
+.exam-row-item.has-warning { background-color: #fffbeb; border-color: #fde68a; }
+
+.form-group label { display: none; }
 .exam-code-input { width: 100%; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem; outline: none; background: white; }
 .exam-code-input:focus { border-color: var(--primary-color); }
 
-.toggle-group { display: flex; gap: 4px; height: 32px; }
-.toggle-btn { flex: 1; padding: 0 10px; border: 1px solid var(--border-color); background: white; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: 0.2s; color: var(--text-muted); }
+/* הערה ייעודית באמצע השורה */
+.warning-container:empty { display: none; }
+.warning-container { font-size: 0.8rem; color: #b45309; display: flex; align-items: center; gap: 5px; white-space: nowrap; font-weight: 500; }
+
+.toggle-group { display: flex; gap: 4px; height: 32px; width: 100%; }
+.toggle-btn { flex: 1; padding: 0; border: 1px solid var(--border-color); background: white; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: 0.2s; color: var(--text-muted); }
 .toggle-btn.pass-btn.active { background: rgba(16, 185, 129, 0.1); border-color: var(--success); color: var(--success); }
 .toggle-btn.fail-btn.active { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); color: var(--danger); }
 
@@ -74,7 +98,7 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .btn-icon-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.1); }
 .btn-icon-danger:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.form-actions-inline { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px; }
+.form-actions-inline { margin-top: 12px; }
 
 /* כפתורים */
 .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; height: 32px; }
@@ -96,7 +120,6 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .exam-result-item:hover { background-color: var(--bg-color); }
 .exam-result-code { font-weight: 600; background: var(--bg-color); color: var(--text-main); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border-color); }
 .exam-result-desc { color: var(--text-muted); font-size: 0.8rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%; }
-.inline-exam-warning { margin-top: 4px; font-size: 0.75rem; color: #b45309; background: #fef3c7; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #fde68a; }
 
 /* הודעות שרת */
 .server-feedback { margin-top: 12px; padding: 12px; border-radius: var(--border-radius); background: white; border: 1px solid var(--border-color); }
@@ -117,7 +140,7 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .close-modal-btn:hover { color: var(--danger); }
 .modal-body { display: flex; flex-direction: column; overflow: hidden; flex: 1; padding: 0; background: white; }
 
-/* כרטיסיות סיכום היסטוריה */
+/* כרטיסיות סיכום היסטוריה פנימי */
 .history-summary { display: flex; gap: 12px; padding: 12px 16px; background: white; border-bottom: 1px solid var(--border-color); }
 .summary-card { background: var(--bg-color); padding: 6px 12px; border-radius: 4px; border: 1px solid var(--border-color); display: flex; gap: 8px; align-items: center; }
 .summary-label { color: var(--text-muted); font-size: 0.85rem; }
@@ -156,8 +179,10 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .main-content { overflow: visible; height: auto; }
     .content-area { padding: 15px; }
     .exam-row-item { grid-template-columns: 1fr; gap: 8px; padding: 12px; }
-    .form-group label { display: block !important; margin-bottom: 4px; font-size: 0.8rem; color: var(--text-muted); }
+    .form-header-actions { flex-direction: column; gap: 15px; }
+    .form-header-actions button { width: 100%; }
     .student-top-card { flex-direction: column; align-items: flex-start; gap: 12px; }
     .student-top-actions { width: 100%; justify-content: space-between; }
-    .history-summary { flex-direction: column; gap: 8px; }
+    .student-stats-bar { flex-wrap: wrap; }
+    .stat-box { min-width: calc(50% - 5px); }
 }
