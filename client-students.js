@@ -14,7 +14,7 @@ export class StudentManager {
                     <h3 style="margin: 0;"><i class="fas fa-users"></i> רשימת תלמידים</h3>
                     <div class="search-box" style="width: 250px;">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="filterStudents" placeholder="חיפוש מהיר בטבלה..." autocomplete="off" style="padding: 6px 10px 6px 30px;">
+                        <input type="text" id="filterStudents" placeholder="חיפוש מהיר בטבלה..." autocomplete="off" style="padding: 6px 30px 6px 10px;">
                     </div>
                 </div>
                 
@@ -71,7 +71,6 @@ export class StudentManager {
         const input = document.getElementById('filterStudents');
         const tbody = document.getElementById('studentsTableBody');
 
-        // סינון דינמי
         input.addEventListener('input', (e) => {
             const term = e.target.value.trim().toLowerCase();
             const filtered = this.students.filter(s => 
@@ -83,7 +82,6 @@ export class StudentManager {
             tbody.innerHTML = this.generateTableRows(filtered);
         });
 
-        // כפתורי פעולה בטבלה
         tbody.addEventListener('click', (e) => {
             const btn = e.target.closest('.action-update-btn');
             if (btn) {
