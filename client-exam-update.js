@@ -4,7 +4,22 @@ export class ExamUpdateManager {
         this.container = containerElement;
         this.onSwitchCallback = onSwitchCallback;
         this.currentStudent = null;
+        this.allExams = [];
         this.setupModalEvents();
+        this.setupGlobalEvents();
+    }
+
+    setExams(exams) {
+        this.allExams = exams;
+    }
+
+    setupGlobalEvents() {
+        // סגירת חלוניות חיפוש מבחנים בלחיצה מחוץ לאזור
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.exam-search-container')) {
+                document.querySelectorAll('.exam-search-results').forEach(el => el.classList.add('hidden'));
+            }
+        });
     }
 
     async loadStudentData(studentCode, silent = false) {
@@ -20,7 +35,6 @@ export class ExamUpdateManager {
                 if (!silent) {
                     this.renderPortal();
                 } else {
-                    // עדכון שקט של מונה ההיסטוריה בכפתור בלי לגעת בטופס או במשוב
                     this.updateHistoryButtonCount();
                 }
             } else if (!silent) {
@@ -45,7 +59,6 @@ export class ExamUpdateManager {
         const examsCount = s.exams_details ? s.exams_details.length : 0;
         
         const html = `
-            <!-- כרטיס ראש עליון מרווח ונוח -->
             <div class="card student-top-card">
                 <div class="student-info-left">
                     <div class="avatar"><i class="fas fa-user-graduate"></i></div>
@@ -67,18 +80,17 @@ export class ExamUpdateManager {
                 </div>
             </div>
 
-            <!-- טופס עדכון מבחנים נוח לכמה מבחנים -->
             <div class="card exam-form-card">
                 <h3><i class="fas fa-file-signature"></i> דיווח והזנת מבחנים</h3>
-                <p class="text-muted">ניתן להוסיף שורות ולעדכן כמה מבחנים יחד בפעולה אחת.</p>
+                <p class="text-muted">ניתן לחפש מבחן לפי קוד או נושא, ולהוסיף שורות לעדכון מקביל.</p>
                 
                 <form id="multiExamForm" class="modern-form">
                     <div id="examRowsContainer">
-                        <!-- שורה ראשונית -->
                         <div class="exam-row-item">
-                            <div class="form-group exam-code-group">
-                                <label>קוד מבחן:</label>
-                                <input type="text" class="exam-code-input" required placeholder="לדוגמא: 1א" autocomplete="off">
+                            <div class="form-group exam-code-group exam-search-container">
+                                <label>קוד / חיפוש מבחן:</label>
+                                <input type="text" class="exam-code-input" required placeholder="הקלד קוד או נושא לחיפוש..." autocomplete="off">
+                                <div class="exam-search-results hidden"></div>
                             </div>
                             
                             <div class="form-group exam-status-group">
@@ -102,9 +114,9 @@ export class ExamUpdateManager {
                         </div>
                     </div>
 
-<div>
-    <div id="serverFeedback" class="server-feedback hidden"></div>
-</div>
+                    <div>
+                        <div id="serverFeedback" class="server-feedback hidden"></div>
+                    </div>
 
                     <div class="form-actions-inline">
                         <button type="button" class="btn btn-dashed" id="addRowBtn">
@@ -137,14 +149,52 @@ export class ExamUpdateManager {
 
         const container = document.getElementById('examRowsContainer');
 
-        // בדיקה בזמן אמת בהקלדה האם המבחן קיים בהיסטוריה
+        // טיפול בחיפוש ואזהרות בהקלדה
         container.addEventListener('input', (e) => {
             if (e.target.classList.contains('exam-code-input')) {
                 const input = e.target;
                 const code = input.value.trim();
                 const row = input.closest('.exam-row-item');
-                let warningEl = row.querySelector('.inline-exam-warning');
+                const resultsContainer = row.querySelector('.exam-search-results');
 
+                // טיפול בחיפוש דינמי
+                if (code.length === 0) {
+                    resultsContainer.innerHTML = '';
+                    resultsContainer.classList.add('hidden');
+                } else {
+                    const filtered = this.allExams.filter(ex => {
+                        const codeMatch = ex.exam_code.includes(code);
+                        const details = ex.details || {};
+                        const textMatch = Object.values(details).some(val => 
+                            String(val).includes(code)
+                        );
+                        return codeMatch || textMatch;
+                    }).slice(0, 10); // הצגת עד 10 תוצאות
+
+                    if (filtered.length > 0) {
+                        resultsContainer.innerHTML = filtered.map(ex => {
+                            let desc = '';
+                            if (ex.details) {
+                                // איסוף כל הטקסטים מהפרטים ליצירת תיאור מובן
+                                desc = Object.values(ex.details)
+                                    .filter(val => val !== null && val !== '')
+                                    .join(' | ');
+                            }
+                            return `
+                                <div class="exam-result-item" data-code="${ex.exam_code}">
+                                    <div class="exam-result-desc">${desc}</div>
+                                    <div class="exam-result-code">${ex.exam_code}</div>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        resultsContainer.innerHTML = '<div class="no-results" style="padding:10px;text-align:center;color:#a3aed1;">לא נמצאו מבחנים</div>';
+                    }
+                    resultsContainer.classList.remove('hidden');
+                }
+
+                // בדיקה אם המבחן כבר קיים בהיסטוריה
+                let warningEl = row.querySelector('.inline-exam-warning');
                 const existingExams = this.currentStudent.exams_details || [];
                 const found = existingExams.find(ex => ex.exam_code === code);
 
@@ -162,7 +212,22 @@ export class ExamUpdateManager {
             }
         });
 
+        // בחירת מבחן מהרשימה הנפתחת וקליקים על כפתורי המחיקה
         container.addEventListener('click', (e) => {
+            const resultItem = e.target.closest('.exam-result-item');
+            if (resultItem) {
+                const code = resultItem.dataset.code;
+                const searchContainer = resultItem.closest('.exam-search-container');
+                const input = searchContainer.querySelector('.exam-code-input');
+                
+                input.value = code;
+                searchContainer.querySelector('.exam-search-results').classList.add('hidden');
+                
+                // הפעלת אירוע אינפוט כדי לעדכן את בדיקת ההיסטוריה באופן אוטומטי
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                return; // יציאה כדי לא להמשיך לבדוק כפתורים אחרים
+            }
+
             const toggleBtn = e.target.closest('.toggle-btn');
             if (toggleBtn) {
                 const group = toggleBtn.closest('.toggle-group');
@@ -189,8 +254,9 @@ export class ExamUpdateManager {
         const newRow = document.createElement('div');
         newRow.className = 'exam-row-item';
         newRow.innerHTML = `
-            <div class="form-group exam-code-group">
-                <input type="text" class="exam-code-input" required placeholder="לדוגמא: 2ב" autocomplete="off">
+            <div class="form-group exam-code-group exam-search-container">
+                <input type="text" class="exam-code-input" required placeholder="הקלד קוד או נושא לחיפוש..." autocomplete="off">
+                <div class="exam-search-results hidden"></div>
             </div>
             <div class="form-group exam-status-group">
                 <div class="toggle-group">
@@ -256,14 +322,13 @@ export class ExamUpdateManager {
                 const result = await response.json();
                 this.renderServerFeedback(result);
                 
-                // רענון שקט ברקע לעדכון נתוני ההיסטוריה והמונה בלי לאפס את המסך
                 await this.loadStudentData(this.currentStudent.student_code, true);
                 
-                // איפוס הטופס חזרה לשורה אחת נקייה
                 document.getElementById('examRowsContainer').innerHTML = `
                     <div class="exam-row-item">
-                        <div class="form-group exam-code-group">
-                            <input type="text" class="exam-code-input" required placeholder="לדוגמא: 1א" autocomplete="off">
+                        <div class="form-group exam-code-group exam-search-container">
+                            <input type="text" class="exam-code-input" required placeholder="הקלד קוד או נושא לחיפוש..." autocomplete="off">
+                            <div class="exam-search-results hidden"></div>
                         </div>
                         <div class="form-group exam-status-group">
                             <div class="toggle-group">
