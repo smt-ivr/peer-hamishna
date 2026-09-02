@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מערכת ניהול פדגוגית - SMT</title>
     <link rel="stylesheet" href="/peer/styles.css">
-    <!-- אייקונים -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
-        <!-- תפריט צד -->
         <aside class="sidebar">
             <div class="logo">
                 <h2>ניהול מבחנים</h2>
@@ -22,15 +20,14 @@
             </nav>
         </aside>
         
-        <!-- תוכן מרכזי -->
         <main class="main-content">
             <header class="topbar">
-                <h1>עדכון מבחנים לתלמידים</h1>
+                <h1>ניהול מבחני תלמידים</h1>
             </header>
 
             <div class="content-area">
-                <!-- אזור חיפוש -->
-                <div class="card search-card">
+                <!-- מסך חיפוש תלמיד -->
+                <div id="search-section" class="card search-card">
                     <h3>בחירת תלמיד לעדכון</h3>
                     <p class="text-muted">חפש לפי קוד תלמיד, שם פרטי או שם משפחה</p>
                     <div class="search-box">
@@ -40,15 +37,25 @@
                     </div>
                 </div>
 
-                <!-- אזור פרטי תלמיד וטופס הזנה (מוזרק דרך JS) -->
-                <div id="student-portal" class="student-portal hidden">
-                    <!-- תוכן נטען כאן דינאמית -->
-                </div>
+                <!-- פורטל התלמיד -->
+                <div id="student-portal" class="student-portal hidden"></div>
             </div>
         </main>
     </div>
+
+    <!-- מודל היסטוריית מבחנים -->
+    <div id="historyModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-history"></i> היסטוריית מבחנים מלאה</h3>
+                <button class="close-modal-btn" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body" id="modalHistoryBody">
+                <!-- נטען דינאמית -->
+            </div>
+        </div>
+    </div>
     
-    <!-- ייבוא הקובץ הראשי כמודול -->
     <script type="module" src="/peer/client-app.js"></script>
 </body>
 </html>
