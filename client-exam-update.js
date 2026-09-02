@@ -409,7 +409,7 @@ export class ExamUpdateManager {
         const modal = document.getElementById('historyModal');
         const closeBtn = document.getElementById('closeModalBtn');
 
-        // סגירה בלחיצה על איקס בלבד! הוסר האירוע של לחיצה על הרקע.
+        // סגירה בלחיצה על איקס בלבד! האירוע של לחיצה על הרקע הוסר.
         closeBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
         });
@@ -451,7 +451,8 @@ export class ExamUpdateManager {
                                 let detailsText = 'ללא פרטים';
                                 if (ex.details) {
                                     if (ex.exam_type === 'mishnayot') {
-                                        detailsText = `${ex.details.masechet || ''} - פרק ${ex.details.chapter_name || ''} (${ex.details.total_mishnayot} משניות)`;
+                                        const title = ex.details.chapter_title ? ` - ${ex.details.chapter_title}` : '';
+                                        detailsText = `${ex.details.masechet || ''} - פרק ${ex.details.chapter_name || ''}${title} (${ex.details.total_mishnayot} משניות)`;
                                     } else if (ex.exam_type === 'gemara') {
                                         detailsText = `${ex.details.masechet || ''} (${ex.details.gemara_pages || 0} דפים)`;
                                     } else {
