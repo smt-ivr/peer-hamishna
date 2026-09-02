@@ -1,14 +1,11 @@
-import { ExamUpdateManager } from './exam-update.js';
+import { ExamUpdateManager } from './client-exam-update.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 let allStudents = [];
 let examManager;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // אתחול מנהל המבחנים
-    examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'));
-    
-    // טעינת רשימת התלמידים הראשונית עבור החיפוש המהיר
+    examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
     await fetchStudentsList();
     setupSearchBox();
 });
@@ -20,7 +17,7 @@ async function fetchStudentsList() {
             allStudents = await response.json();
         }
     } catch(error) {
-        console.error('שגיאה בטעינת רשימת התלמידים:', error);
+        console.error('שגיאה בטעינת תלמידים:', error);
     }
 }
 
@@ -36,7 +33,6 @@ function setupSearchBox() {
             return;
         }
 
-        // סינון חכם (Fuzzy Search)
         const filtered = allStudents.filter(s => 
             s.student_code.includes(term) || 
             s.first_name.includes(term) || 
@@ -47,7 +43,6 @@ function setupSearchBox() {
         renderSearchResults(filtered, resultsDropdown, searchInput);
     });
 
-    // סגירת חלונית תוצאות בלחיצה מחוץ לאזור
     document.addEventListener('click', (e) => {
         if(!searchInput.contains(e.target) && !resultsDropdown.contains(e.target)) {
             resultsDropdown.classList.add('hidden');
@@ -57,7 +52,6 @@ function setupSearchBox() {
 
 function renderSearchResults(results, container, inputElement) {
     container.innerHTML = '';
-    
     if(results.length === 0) {
         container.innerHTML = '<div class="no-results">לא נמצאו תלמידים תואמים</div>';
     } else {
@@ -72,16 +66,21 @@ function renderSearchResults(results, container, inputElement) {
                 <div class="result-code">קוד: ${student.student_code}</div>
             `;
             
-            // אירוע בחירת תלמיד
             item.addEventListener('click', () => {
-                inputElement.value = `${student.first_name} ${student.last_name} (קוד: ${student.student_code})`;
+                inputElement.value = '';
                 container.classList.add('hidden');
-                
-                // קריאה לקובץ העדכון המפוצל
+                document.getElementById('search-section').classList.add('hidden');
                 examManager.loadStudentData(student.student_code);
             });
             container.appendChild(item);
         });
     }
     container.classList.remove('hidden');
+}
+
+function onSwitchStudent() {
+    document.getElementById('student-portal').classList.add('hidden');
+    document.getElementById('search-section').classList.remove('hidden');
+    document.getElementById('studentSearch').value = '';
+    document.getElementById('studentSearch').focus();
 }
