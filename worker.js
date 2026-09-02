@@ -1,8 +1,7 @@
 import indexHtml from './index.html';
 import stylesCss from './styles.css';
 import clientAppJs from './client-app.js';
-import examUpdateJs from './exam-update.js'; // הקובץ החדש שלנו
-
+import examUpdateJs from './client-exam-update.js';
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
