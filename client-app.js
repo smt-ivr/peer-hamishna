@@ -1,17 +1,65 @@
 import { ExamUpdateManager } from './client-exam-update.js';
+import { StudentManager } from './client-students.js';
+import { ExamManager } from './client-exams.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 let allStudents = [];
 let allExams = [];
 let examManager;
+let studentManager;
+let examListManager;
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // אתחול המנהלים
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
-    // טעינת תלמידים ומבחנים במקביל לחיסכון בזמן
-    await Promise.all([fetchStudentsList(), fetchExamsList()]);
-    examManager.setExams(allExams);
+    studentManager = new StudentManager(document.getElementById('view-students'), goToStudentUpdate);
+    examListManager = new ExamManager(document.getElementById('view-exams'));
+    
+    setupTabs();
     setupSearchBox();
+
+    // טעינת נתונים
+    await Promise.all([fetchStudentsList(), fetchExamsList()]);
+    
+    examManager.setExams(allExams);
+    studentManager.render(allStudents);
+    examListManager.render(allExams);
 });
+
+function setupTabs() {
+    const menuItems = document.querySelectorAll('.menu-item');
+    const views = document.querySelectorAll('.view-section');
+
+    menuItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = item.getAttribute('data-target');
+            
+            // עדכון כפתורים פעילים
+            menuItems.forEach(mi => mi.classList.remove('active'));
+            item.classList.add('active');
+
+            // החלפת תצוגות
+            views.forEach(view => {
+                if (view.id === targetId) {
+                    view.classList.remove('hidden');
+                    view.classList.add('active');
+                } else {
+                    view.classList.add('hidden');
+                    view.classList.remove('active');
+                }
+            });
+        });
+    });
+}
+
+// פונקציה שעוברת לטאב העדכון וטוענת תלמיד ספציפי (מופעלת מטבלת ניהול תלמידים)
+function goToStudentUpdate(studentCode) {
+    document.querySelector('[data-target="view-update"]').click();
+    document.getElementById('studentSearch').value = '';
+    document.getElementById('search-section').classList.add('hidden');
+    examManager.loadStudentData(studentCode);
+}
 
 async function fetchStudentsList() {
     try {
@@ -54,7 +102,31 @@ function setupSearchBox() {
             `${s.first_name} ${s.last_name}`.includes(term)
         );
 
-        renderSearchResults(filtered, resultsDropdown, searchInput);
+        resultsDropdown.innerHTML = '';
+        if(filtered.length === 0) {
+            resultsDropdown.innerHTML = '<div style="padding:10px;text-align:center;">לא נמצאו תלמידים</div>';
+        } else {
+            filtered.forEach(student => {
+                const item = document.createElement('div');
+                item.className = 'search-result-item';
+                item.innerHTML = `
+                    <div>
+                        <span class="result-name">${student.first_name} ${student.last_name}</span>
+                        <span class="result-class">כיתה ${student.class_grade}</span>
+                    </div>
+                    <div class="result-code">${student.student_code}</div>
+                `;
+                
+                item.addEventListener('click', () => {
+                    searchInput.value = '';
+                    resultsDropdown.classList.add('hidden');
+                    document.getElementById('search-section').classList.add('hidden');
+                    examManager.loadStudentData(student.student_code);
+                });
+                resultsDropdown.appendChild(item);
+            });
+        }
+        resultsDropdown.classList.remove('hidden');
     });
 
     document.addEventListener('click', (e) => {
@@ -62,34 +134,6 @@ function setupSearchBox() {
             resultsDropdown.classList.add('hidden');
         }
     });
-}
-
-function renderSearchResults(results, container, inputElement) {
-    container.innerHTML = '';
-    if(results.length === 0) {
-        container.innerHTML = '<div class="no-results" style="padding:15px;text-align:center;">לא נמצאו תלמידים תואמים</div>';
-    } else {
-        results.forEach(student => {
-            const item = document.createElement('div');
-            item.className = 'search-result-item';
-            item.innerHTML = `
-                <div class="result-details">
-                    <span class="result-name">${student.first_name} ${student.last_name}</span>
-                    <span class="result-class">כיתה ${student.class_grade}</span>
-                </div>
-                <div class="result-code">קוד: ${student.student_code}</div>
-            `;
-            
-            item.addEventListener('click', () => {
-                inputElement.value = '';
-                container.classList.add('hidden');
-                document.getElementById('search-section').classList.add('hidden');
-                examManager.loadStudentData(student.student_code);
-            });
-            container.appendChild(item);
-        });
-    }
-    container.classList.remove('hidden');
 }
 
 function onSwitchStudent() {
