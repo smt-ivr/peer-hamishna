@@ -20,6 +20,9 @@
                 <a href="#" class="menu-item active" data-target="view-update">
                     <i class="fas fa-edit"></i> עדכון והזנת ציונים
                 </a>
+                <a href="#" class="menu-item" data-target="view-history">
+                    <i class="fas fa-history"></i> היסטוריית מבחנים
+                </a>
                 <a href="#" class="menu-item" data-target="view-students">
                     <i class="fas fa-users"></i> ניהול תלמידים
                 </a>
@@ -49,20 +52,23 @@
                     <div id="student-portal" class="student-portal hidden"></div>
                 </div>
 
-                <!-- מסך 2: ניהול תלמידים -->
+                <!-- מסך 2: היסטוריית מבחנים -->
+                <div id="view-history" class="view-section hidden"></div>
+
+                <!-- מסך 3: ניהול תלמידים -->
                 <div id="view-students" class="view-section hidden"></div>
 
-                <!-- מסך 3: ניהול מבחנים -->
+                <!-- מסך 4: ניהול מבחנים -->
                 <div id="view-exams" class="view-section hidden"></div>
             </div>
         </main>
     </div>
 
-    <!-- מודל היסטוריית מבחנים -->
+    <!-- מודל היסטוריית מבחנים של תלמיד בודד -->
     <div id="historyModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fas fa-history"></i> היסטוריית מבחנים</h3>
+                <h3><i class="fas fa-history"></i> היסטוריית מבחנים לתלמיד</h3>
                 <button class="close-modal-btn" id="closeModalBtn">&times;</button>
             </div>
             <div class="modal-body" id="modalHistoryBody">
