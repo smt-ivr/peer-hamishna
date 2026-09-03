@@ -19,41 +19,67 @@ export class ReportManager {
             <div id="printReportModal" class="modal hidden no-print" style="z-index: 9999;">
                 <div class="modal-content" style="max-width: 800px; height: 90vh; background: #e2e8f0;">
                     <div class="modal-header no-print" style="background: white;">
-                        <h3><i class="fas fa-print"></i> תצוגה מקדימה להדפסה</h3>
+                        <h3><i class="fas fa-print"></i> תצוגה מקדימה להדפסה / ייצוא</h3>
                         <div style="display:flex; gap:10px; align-items:center;">
-                            <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="fas fa-file-pdf"></i> הדפס / PDF</button>
+                            <button class="btn btn-outline btn-sm" id="exportReportCsvBtn"><i class="fas fa-file-excel"></i> ייצא נתונים לאקסל</button>
+                            <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="fas fa-file-pdf"></i> הדפס / שמור כ-PDF</button>
                             <button class="close-modal-btn" onclick="document.getElementById('printReportModal').classList.add('hidden')">&times;</button>
                         </div>
                     </div>
-                    <div class="modal-body" id="printReportBody" style="padding: 20px; overflow-y: auto;">
+                    <div class="modal-body" id="printReportBody" style="padding: 20px; overflow-y: auto; background: #e2e8f0;">
                         <!-- הדוחות ייכנסו לכאן -->
                     </div>
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // אירוע לייצוא אקסל מתוך המודל
+            document.getElementById('exportReportCsvBtn').addEventListener('click', () => {
+                if(this.lastRenderedStudents) {
+                    this.exportToExcel(this.lastRenderedStudents);
+                }
+            });
+        }
+    }
+
+    getHebrewDate() {
+        try {
+            return new Intl.DateTimeFormat('he-IL-u-ca-hebrew', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            }).format(new Date());
+        } catch (e) {
+            return new Date().toLocaleDateString('he-IL');
         }
     }
 
     renderView() {
         const html = `
-            <div class="card compact-card" style="margin-bottom: 20px;">
+            <div class="card error-card no-print" style="margin-bottom: 15px; background-color: #fffbeb; border-color: #fde68a; color: #b45309;">
+                <i class="fas fa-tools"></i> <strong>הודעת מערכת:</strong> מודול הפקת הדוחות נמצא בפיתוח ועדיין לא הושלם במלואו. ייתכנו שינויים בעיצוב.
+            </div>
+
+            <div class="card compact-card no-print" style="margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
-                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות וציונים</h3>
+                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות תלמידים (מותאם להדפסה)</h3>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                     <!-- הגדרות דוח -->
                     <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
-                        <h4 style="margin-bottom: 10px; font-size: 0.95rem;"><i class="fas fa-cog"></i> הגדרות תצוגת דוח (מצומצם)</h4>
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <h4 style="margin-bottom: 10px; font-size: 0.95rem;"><i class="fas fa-cog"></i> הגדרות תצוגת דוח</h4>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
                             <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfCode" checked> הצג עמודת קוד מבחן
+                                <input type="checkbox" id="repConfCode" checked> הצג קוד תלמיד בדוח
                             </label>
                             <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfReward" checked> הצג עמודת שווי (₪)
+                                <input type="checkbox" id="repConfExamCode" checked> הצג עמודת קוד מבחן
                             </label>
                             <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfOnlyPassed" checked> סנן מבחנים שלא עברו
+                                גודל דף בהדפסה: 
+                                <select id="repConfSize" style="padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc;">
+                                    <option value="A5">A5 (מומלץ)</option>
+                                    <option value="A4">A4 (רגיל)</option>
+                                </select>
                             </label>
                         </div>
                     </div>
@@ -141,23 +167,23 @@ export class ReportManager {
         });
     }
 
-    // מושך נתונים טריים מהשרת כדי לוודא שהדוח עדכני
     async generateAndShowReport(studentCodesArray) {
         const btn = document.getElementById('generateClassReportBtn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מושך נתונים...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעבד...';
         btn.disabled = true;
 
         try {
             const response = await fetch(`${this.apiBase}/students?full_details=true`);
             if (response.ok) {
                 const freshStudents = await response.json();
-                this.allStudents = freshStudents; // עדכון הזיכרון המקומי
+                this.allStudents = freshStudents; 
                 
                 const selectedStudents = freshStudents.filter(s => studentCodesArray.includes(s.student_code));
+                this.lastRenderedStudents = selectedStudents; // שמירה לטובת ייצוא אקסל
                 this.buildReportHtml(selectedStudents);
             } else {
-                alert('שגיאה במשיכת נתונים טריים מהשרת.');
+                alert('שגיאה במשיכת נתונים מהשרת.');
             }
         } catch (error) {
             alert('שגיאת תקשורת.');
@@ -168,42 +194,41 @@ export class ReportManager {
     }
 
     buildReportHtml(students) {
-        const confCode = document.getElementById('repConfCode').checked;
-        const confReward = document.getElementById('repConfReward').checked;
-        const confOnlyPassed = document.getElementById('repConfOnlyPassed').checked;
-        const currentDate = new Date().toLocaleDateString('he-IL');
+        const confStudentCode = document.getElementById('repConfCode').checked;
+        const confExamCode = document.getElementById('repConfExamCode').checked;
+        const confSize = document.getElementById('repConfSize').value; // 'A4' או 'A5'
+        
+        const hebrewDate = this.getHebrewDate();
+        const sizeClass = confSize === 'A5' ? 'size-a5' : 'size-a4';
 
         let completeHtml = '';
 
         students.forEach((student, index) => {
             let exams = student.exams_details || [];
-            if (confOnlyPassed) exams = exams.filter(e => e.passed);
             const totalReward = student.total_reward || 0;
             const passed = exams.filter(e => e.passed).length;
-
             const pageBreakClass = index < students.length - 1 ? 'page-break' : '';
 
-            let tableHtml = '<p style="text-align:center; color:#666; font-size:0.9rem; padding: 20px;">אין נתונים התואמים להגדרות.</p>';
+            let tableHtml = '<p style="text-align:center; color:#555; padding: 20px;">לא נרשמו מבחנים לתלמיד זה.</p>';
             if (exams.length > 0) {
                 tableHtml = `
-                    <table style="width: 100%; text-align: right; border-collapse: collapse; font-size: 0.8rem;">
+                    <table style="width: 100%; text-align: right; border-collapse: collapse; font-size: 0.85rem; margin-top: 15px;">
                         <thead>
-                            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #ccc;">
-                                ${confCode ? '<th style="padding: 6px 4px; font-weight: bold; border: 1px solid #e2e8f0;">קוד</th>' : ''}
-                                <th style="padding: 6px 4px; font-weight: bold; border: 1px solid #e2e8f0;">תיאור ומפרט</th>
-                                <th style="padding: 6px 4px; font-weight: bold; border: 1px solid #e2e8f0;">סטטוס</th>
-                                ${confReward ? '<th style="padding: 6px 4px; font-weight: bold; border: 1px solid #e2e8f0;">שווי (₪)</th>' : ''}
+                            <tr style="border-bottom: 2px solid #000;">
+                                ${confExamCode ? '<th style="padding: 6px; font-weight: bold; color: #000;">קוד</th>' : ''}
+                                <th style="padding: 6px; font-weight: bold; color: #000;">מבחן</th>
+                                <th style="padding: 6px; font-weight: bold; color: #000;">הישג</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${exams.map(ex => {
                                 let desc = ex.details ? Object.values(ex.details).filter(v => v !== null && v !== '').join(' - ') : ex.exam_code;
+                                const statusText = ex.passed ? '<strong>עבר</strong>' : 'לא עבר';
                                 return `
-                                <tr>
-                                    ${confCode ? `<td style="padding: 4px; border: 1px solid #e2e8f0;"><strong>${ex.exam_code}</strong></td>` : ''}
-                                    <td style="padding: 4px; border: 1px solid #e2e8f0;">${desc}</td>
-                                    <td style="padding: 4px; border: 1px solid #e2e8f0;">${ex.passed ? 'עבר' : 'לא עבר'}</td>
-                                    ${confReward ? `<td style="padding: 4px; border: 1px solid #e2e8f0;">₪${(ex.reward || 0).toFixed(1)}</td>` : ''}
+                                <tr style="border-bottom: 1px solid #ccc;">
+                                    ${confExamCode ? `<td style="padding: 6px; color: #000;">${ex.exam_code}</td>` : ''}
+                                    <td style="padding: 6px; color: #000;">${desc}</td>
+                                    <td style="padding: 6px; color: #000;">${statusText}</td>
                                 </tr>`;
                             }).join('')}
                         </tbody>
@@ -212,35 +237,72 @@ export class ReportManager {
             }
 
             completeHtml += `
-                <div class="print-container ${pageBreakClass}" style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; font-family: sans-serif; color: black; max-width: 800px; margin-left: auto; margin-right: auto;">
-                    <div style="border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div>
-                            <h2 style="margin: 0; color: #2563eb; font-size: 1.4rem;">דוח התקדמות - ${student.first_name} ${student.last_name}</h2>
-                            <div style="font-size: 0.85rem; color: #555; margin-top: 5px;">קוד: <strong>${student.student_code}</strong> | כיתה: <strong>${student.class_grade || '-'}</strong></div>
-                        </div>
-                        <div style="text-align: left; font-size: 0.8rem; color: #666;">
-                            <div>תאריך הפקה: ${currentDate}</div>
+                <div class="print-container ${pageBreakClass} ${sizeClass}" style="background: white; padding: 30px; margin-bottom: 20px; font-family: Arial, sans-serif; color: #000; border: 1px solid #ddd; box-sizing: border-box; position: relative;">
+                    
+                    <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px;">
+                        <h2 style="margin: 0 0 5px 0; font-size: 1.6rem; font-weight: 800;">${student.first_name} ${student.last_name}</h2>
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: normal;">דוח סיכום פאר המשנה</h3>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-top: 15px;">
+                            <span>${confStudentCode ? `קוד: <strong>${student.student_code}</strong>` : ''} | כיתה: <strong>${student.class_grade || '-'}</strong></span>
+                            <span>תאריך הפקה: <strong>${hebrewDate}</strong></span>
                         </div>
                     </div>
                     
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 4px; text-align: center;">
-                            <span style="font-size: 1.2rem; font-weight: bold;">${exams.length}</span><br>
-                            <span style="font-size: 0.75rem; color: #666;">מבחנים רשומים</span>
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 20px; border: 1px solid #000; padding: 10px; border-radius: 4px;">
+                        <div style="text-align: center;">
+                            <span style="font-size: 0.8rem;">מבחנים רשומים</span><br>
+                            <span style="font-size: 1.3rem; font-weight: bold;">${exams.length}</span>
                         </div>
-                        ${confReward ? `
-                        <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px; border-radius: 4px; text-align: center;">
-                            <span style="font-size: 1.2rem; font-weight: bold; color: #2563eb;">₪${totalReward.toFixed(1)}</span><br>
-                            <span style="font-size: 0.75rem; color: #2563eb;">סך הכל מלגה</span>
-                        </div>` : ''}
+                        <div style="border-right: 1px solid #ccc;"></div>
+                        <div style="text-align: center;">
+                            <span style="font-size: 0.8rem;">הצלחות</span><br>
+                            <span style="font-size: 1.3rem; font-weight: bold;">${passed}</span>
+                        </div>
+                        <div style="border-right: 1px solid #ccc;"></div>
+                        <div style="text-align: center;">
+                            <span style="font-size: 0.8rem;">סך מלגה</span><br>
+                            <span style="font-size: 1.3rem; font-weight: bold;">₪${totalReward.toFixed(1)}</span>
+                        </div>
                     </div>
 
                     <div>${tableHtml}</div>
+                    
+                    <div style="margin-top: 30px; text-align: center; font-size: 0.75rem; color: #555; border-top: 1px dashed #ccc; padding-top: 10px;">
+                        הופק באמצעות מערכת ניהול - פאר המשנה
+                    </div>
                 </div>
             `;
         });
 
         document.getElementById('printReportBody').innerHTML = completeHtml;
         document.getElementById('printReportModal').classList.remove('hidden');
+    }
+
+    exportToExcel(students) {
+        let csvContent = '\uFEFF'; // BOM לתמיכה בעברית
+        csvContent += 'קוד תלמיד,שם פרטי,שם משפחה,כיתה,קוד מבחן,פירוט,סטטוס,שווי\n';
+
+        students.forEach(student => {
+            const exams = student.exams_details || [];
+            if (exams.length === 0) {
+                csvContent += `"${student.student_code}","${student.first_name}","${student.last_name}","${student.class_grade || ''}","ללא מבחנים","","",""\n`;
+            } else {
+                exams.forEach(ex => {
+                    let desc = ex.details ? Object.values(ex.details).filter(v => v !== null && v !== '').join(' - ') : ex.exam_code;
+                    let status = ex.passed ? 'עבר' : 'לא עבר';
+                    let reward = ex.reward || 0;
+                    csvContent += `"${student.student_code}","${student.first_name}","${student.last_name}","${student.class_grade || ''}","${ex.exam_code}","${desc}","${status}","${reward}"\n`;
+                });
+            }
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `דוחות_תלמידים_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 }
