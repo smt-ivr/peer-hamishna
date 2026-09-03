@@ -5,7 +5,7 @@ import clientExamUpdateJs from './client-exam-update.js';
 import clientStudentsJs from './client-students.js';
 import clientExamsJs from './client-exams.js';
 import clientHistoryJs from './client-history.js';
-import clientReportsJs from './client-reports.js';
+import clientReportsJs from './client-reports.js'; // התווסף
 
 export default {
   async fetch(request, env, ctx) {
