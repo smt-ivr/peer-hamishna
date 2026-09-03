@@ -156,46 +156,93 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .compact-header .search-box { width: 100% !important; }
 }
 
-/* ---- הגדרות הדפסה עבור דוחות PDF מתקדמים ---- */
+/* =========================================================
+   הגדרות הדפסה קפדניות עבור דוחות PDF מתקדמים - פותר את המסך הלבן!
+   ========================================================= */
 @media print {
-    /* הסתרת כל גוף האפליקציה המקורית בהדפסה למעט המודל המיועד להדפסה */
-    body > *:not(#printReportModal) { display: none !important; }
+    /* הופכים את גוף העמוד ואת ה-HTML למסמך "פתוח" וגלוי שניתן להדפסה */
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+        background-color: white !important;
+        color: black !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* מסתירים לחלוטין את כל התפריטים ואזורי העבודה הרגילים */
+    body > *:not(#printReportModal) { 
+        display: none !important; 
+    }
+    .no-print { 
+        display: none !important; 
+    }
     
+    /* מנטרלים את החלון הקופץ (Modal) כך שיתנהג כמו תוכן רגיל בדף */
     #printReportModal {
-        position: absolute; left: 0; top: 0; margin: 0; padding: 0;
-        width: 100%; height: auto;
+        position: relative !important;
+        display: block !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow: visible !important;
         background: white !important;
+        left: auto !important;
+        top: auto !important;
+    }
+    
+    #printReportModal * {
         visibility: visible !important;
     }
     
-    #printReportModal .modal-content {
-        box-shadow: none !important; border: none !important;
-        width: 100%; max-width: 100%; height: auto; overflow: visible;
-        background: white !important; padding: 0 !important;
-    }
-    
+    #printReportModal .modal-content, 
+    #printReportBodyWrapper,
     #printReportBody {
+        position: relative !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        border: none !important;
         background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
-
-    .no-print { display: none !important; }
     
-    /* הפרדת עמודים חכמה לכל תלמיד - קריטי להדפסת כיתה שלמה! */
-    .page-break { page-break-after: always; }
+    /* שבירת עמודים אוטומטית בין תלמידים להדפסת כיתה שלמה */
+    .page-break { 
+        page-break-after: always !important; 
+        break-after: page !important; 
+    }
     
-    /* כיוון צבעי טבלה ורקעים למדפסות שחור לבן */
+    /* עיצוב המכל הפנימי של התעודה להדפסה */
     .print-container { 
         box-shadow: none !important; 
         margin: 0 auto !important; 
         padding: 0 !important; 
         border: none !important;
+        page-break-inside: avoid !important;
     }
     
-    th { -webkit-print-color-adjust: exact; color-adjust: exact; }
+    th { 
+        -webkit-print-color-adjust: exact !important; 
+        color-adjust: exact !important; 
+    }
     
-    /* קביעת גודל הדף בהדפסה לפי ההגדרות */
-    .print-container[data-size="A5"], .print-container.size-a5 { width: 148mm; min-height: 210mm; }
-    .print-container[data-size="A4"], .print-container.size-a4 { width: 210mm; min-height: 297mm; }
+    /* התאמת מידות הנייר בהתאם להגדרה (A4 או A5) */
+    @page { 
+        margin: 1cm; 
+    }
     
-    @page { margin: 1cm; }
+    /* קביעת רוחב ספציפי כדי לשמור על פרופורציות מושלמות בהדפסה */
+    .print-container[data-size="A5"] { 
+        width: 148mm !important; 
+        height: 210mm !important; 
+    }
+    .print-container[data-size="A4"] { 
+        width: 210mm !important; 
+        height: 297mm !important; 
+    }
 }
