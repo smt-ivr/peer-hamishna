@@ -2,6 +2,7 @@ import { ExamUpdateManager } from './client-exam-update.js';
 import { StudentManager } from './client-students.js';
 import { ExamManager } from './client-exams.js';
 import { HistoryManager } from './client-history.js';
+import { ReportManager } from './client-reports.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 let allStudents = [];
@@ -10,6 +11,7 @@ let examManager;
 let studentManager;
 let examListManager;
 let historyManager;
+let reportManager;
 
 document.addEventListener('DOMContentLoaded', async () => {
     // אתחול המנהלים
@@ -17,6 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     studentManager = new StudentManager(document.getElementById('view-students'), goToStudentUpdate);
     examListManager = new ExamManager(document.getElementById('view-exams'));
     historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE);
+    reportManager = new ReportManager(document.getElementById('view-reports'), API_BASE);
     
     setupTabs();
     setupSearchBox();
@@ -27,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     examManager.setExams(allExams);
     studentManager.render(allStudents);
     examListManager.render(allExams);
+    reportManager.setStudents(allStudents);
     // טעינה ראשונית של היסטוריה ברקע
     historyManager.loadAndRender(allStudents, allExams);
 });
@@ -50,7 +54,6 @@ function setupTabs() {
                     view.classList.remove('hidden');
                     view.classList.add('active');
                     
-                    // רענון טאב היסטוריה ברגע שנכנסים אליו כדי להציג את העדכון החדש ביותר
                     if (targetId === 'view-history') {
                         historyManager.loadAndRender(allStudents, allExams);
                     }
