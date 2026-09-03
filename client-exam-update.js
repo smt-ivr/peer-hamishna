@@ -53,6 +53,19 @@ export class ExamUpdateManager {
         }
     }
 
+    // פונקציית עזר להצגת פרטי המבחן
+    formatExamDesc(ex) {
+        if (!ex.details) return 'ללא פרטים נוספים';
+        if (ex.exam_type === 'mishnayot') {
+            const title = ex.details.chapter_title ? ` - ${ex.details.chapter_title}` : '';
+            return `${ex.details.masechet || ''} - פרק ${ex.details.chapter_name || ''}${title} (${ex.details.total_mishnayot} משניות)`;
+        } else if (ex.exam_type === 'gemara') {
+            return `${ex.details.masechet || ''} | ${ex.details.from_page || ''} עד ${ex.details.to_page || ''}`;
+        } else {
+            return Object.values(ex.details).filter(val => val !== null && val !== '').join(' | ');
+        }
+    }
+
     renderPortal() {
         const s = this.currentStudent;
         const exams = s.exams_details || [];
@@ -104,6 +117,7 @@ export class ExamUpdateManager {
                         <div class="exam-row-item">
                             <div class="form-group exam-code-group exam-search-container">
                                 <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
+                                <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
                                 <div class="exam-search-results hidden"></div>
                             </div>
                             
@@ -174,8 +188,16 @@ export class ExamUpdateManager {
                 const input = e.target;
                 const code = input.value.trim();
                 const row = input.closest('.exam-row-item');
-                const resultsContainer = row.querySelector('.exam-search-results');
+                const searchContainer = row.querySelector('.exam-search-container');
+                const resultsContainer = searchContainer.querySelector('.exam-search-results');
                 const warningContainer = row.querySelector('.warning-container');
+                const detailsDiv = searchContainer.querySelector('.exam-selected-details');
+
+                // עדכון שדה הפירוט אם יש התאמה מדויקת
+                const exactExam = this.allExams.find(ex => ex.exam_code === code);
+                if (detailsDiv) {
+                    detailsDiv.innerText = exactExam ? this.formatExamDesc(exactExam) : '';
+                }
 
                 if (code.length === 0) {
                     resultsContainer.innerHTML = '';
@@ -192,12 +214,7 @@ export class ExamUpdateManager {
 
                     if (filtered.length > 0) {
                         resultsContainer.innerHTML = filtered.map(ex => {
-                            let desc = '';
-                            if (ex.details) {
-                                desc = Object.values(ex.details)
-                                    .filter(val => val !== null && val !== '')
-                                    .join(' | ');
-                            }
+                            let desc = this.formatExamDesc(ex);
                             return `
                                 <div class="exam-result-item" data-code="${ex.exam_code}">
                                     <div class="exam-result-desc">${desc}</div>
@@ -235,6 +252,7 @@ export class ExamUpdateManager {
                 input.value = code;
                 searchContainer.querySelector('.exam-search-results').classList.add('hidden');
                 
+                // הזרקת אירוע כדי לעדכן את כיתוב המבחן ואת הסטטוס אם קיים
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 return;
             }
@@ -268,6 +286,7 @@ export class ExamUpdateManager {
         newRow.innerHTML = `
             <div class="form-group exam-code-group exam-search-container">
                 <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
+                <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
                 <div class="exam-search-results hidden"></div>
             </div>
             <div class="warning-container"></div>
@@ -342,6 +361,7 @@ export class ExamUpdateManager {
                     <div class="exam-row-item">
                         <div class="form-group exam-code-group exam-search-container">
                             <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
+                            <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
                             <div class="exam-search-results hidden"></div>
                         </div>
                         <div class="warning-container"></div>
@@ -409,7 +429,6 @@ export class ExamUpdateManager {
         const modal = document.getElementById('historyModal');
         const closeBtn = document.getElementById('closeModalBtn');
 
-        // סגירה בלחיצה על איקס בלבד! האירוע של לחיצה על הרקע הוסר.
         closeBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
         });
@@ -448,17 +467,7 @@ export class ExamUpdateManager {
                         </thead>
                         <tbody>
                             ${exams.map(ex => {
-                                let detailsText = 'ללא פרטים';
-                                if (ex.details) {
-                                    if (ex.exam_type === 'mishnayot') {
-                                        const title = ex.details.chapter_title ? ` - ${ex.details.chapter_title}` : '';
-                                        detailsText = `${ex.details.masechet || ''} - פרק ${ex.details.chapter_name || ''}${title} (${ex.details.total_mishnayot} משניות)`;
-                                    } else if (ex.exam_type === 'gemara') {
-                                        detailsText = `${ex.details.masechet || ''} (${ex.details.gemara_pages || 0} דפים)`;
-                                    } else {
-                                        detailsText = Object.values(ex.details).join(', ');
-                                    }
-                                }
+                                let detailsText = this.formatExamDesc(ex);
                                 
                                 const typeLabel = ex.exam_type === 'mishnayot' ? 'משניות' : (ex.exam_type === 'gemara' ? 'גמרא' : 'כללי');
                                 const typeClass = ex.exam_type === 'mishnayot' ? 'type-mishnayot' : 'type-gemara';
