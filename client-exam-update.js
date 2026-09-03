@@ -53,7 +53,6 @@ export class ExamUpdateManager {
         }
     }
 
-    // פונקציית עזר להצגת פרטי המבחן
     formatExamDesc(ex) {
         if (!ex.details) return 'ללא פרטים נוספים';
         if (ex.exam_type === 'mishnayot') {
@@ -105,10 +104,11 @@ export class ExamUpdateManager {
                 <div class="form-header-actions compact-header">
                     <div class="header-title-row">
                         <h3><i class="fas fa-file-signature"></i> דיווח והזנת מבחנים</h3>
-                        <p class="text-muted">הקלד קוד או נושא, והוסף שורות לפי הצורך.</p>
+                        <p class="text-muted" style="margin-bottom: 4px;">הקלד קוד במערכת ובחר עבר/לא עבר. ניתן להוסיף שורות נוספות לפי הצורך.</p>
+                        <p style="color: #b45309; font-size: 0.8rem; font-weight: 500;"><i class="fas fa-info-circle"></i> שים לב: השינויים לא נשמרים עד לחיצה על כפתור השמירה שמשמאל.</p>
                     </div>
-                    <button type="submit" form="multiExamForm" class="btn btn-primary" id="submitExamsBtn">
-                        <i class="fas fa-save"></i> שמור עדכון במערכת
+                    <button type="submit" form="multiExamForm" class="btn btn-primary" id="submitExamsBtn" disabled>
+                        <i class="fas fa-save"></i> שמור עדכונים במערכת
                     </button>
                 </div>
                 
@@ -161,10 +161,21 @@ export class ExamUpdateManager {
     }
 
     updateSaveButtonCount() {
-        const rowsCount = document.querySelectorAll('.exam-row-item').length;
+        const rows = Array.from(document.querySelectorAll('.exam-row-item'));
+        const validRowsCount = rows.filter(row => {
+            const input = row.querySelector('.exam-code-input');
+            return input && input.value.trim() !== '';
+        }).length;
+
         const btn = document.getElementById('submitExamsBtn');
         if (btn) {
-            btn.innerHTML = `<i class="fas fa-save"></i> שמור ${rowsCount} ${rowsCount === 1 ? 'עדכון' : 'עדכונים'} במערכת`;
+            if (validRowsCount > 0) {
+                btn.innerHTML = `<i class="fas fa-save"></i> שמור ${validRowsCount} ${validRowsCount === 1 ? 'עדכון' : 'עדכונים'} במערכת`;
+                btn.disabled = false;
+            } else {
+                btn.innerHTML = `<i class="fas fa-save"></i> שמור עדכונים במערכת`;
+                btn.disabled = true;
+            }
         }
     }
 
@@ -193,7 +204,6 @@ export class ExamUpdateManager {
                 const warningContainer = row.querySelector('.warning-container');
                 const detailsDiv = searchContainer.querySelector('.exam-selected-details');
 
-                // עדכון שדה הפירוט אם יש התאמה מדויקת
                 const exactExam = this.allExams.find(ex => ex.exam_code === code);
                 if (detailsDiv) {
                     detailsDiv.innerText = exactExam ? this.formatExamDesc(exactExam) : '';
@@ -239,6 +249,9 @@ export class ExamUpdateManager {
                     row.classList.remove('has-warning');
                     warningContainer.innerHTML = '';
                 }
+
+                // עדכון הכפתור הראשי באופן מיידי בעת ההקלדה
+                this.updateSaveButtonCount();
             }
         });
 
@@ -252,7 +265,6 @@ export class ExamUpdateManager {
                 input.value = code;
                 searchContainer.querySelector('.exam-search-results').classList.add('hidden');
                 
-                // הזרקת אירוע כדי לעדכן את כיתוב המבחן ואת הסטטוס אם קיים
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 return;
             }
@@ -390,8 +402,7 @@ export class ExamUpdateManager {
             feedbackBox.innerHTML = '<i class="fas fa-exclamation-triangle"></i> שגיאת תקשורת במערכת, הנתונים לא נשמרו.';
             feedbackBox.classList.remove('hidden');
         } finally {
-            submitBtn.disabled = false;
-            this.updateSaveButtonCount();
+            this.updateSaveButtonCount(); // יעדכן בחזרה למצב מנוטרל לאחר האיפוס
         }
     }
 
@@ -468,7 +479,6 @@ export class ExamUpdateManager {
                         <tbody>
                             ${exams.map(ex => {
                                 let detailsText = this.formatExamDesc(ex);
-                                
                                 const typeLabel = ex.exam_type === 'mishnayot' ? 'משניות' : (ex.exam_type === 'gemara' ? 'גמרא' : 'כללי');
                                 const typeClass = ex.exam_type === 'mishnayot' ? 'type-mishnayot' : 'type-gemara';
 
