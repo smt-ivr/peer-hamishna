@@ -60,7 +60,7 @@ export class ReportManager {
     renderView() {
         const html = `
             <div class="card error-card no-print" style="margin-bottom: 15px; background-color: #fffbeb; border-color: #fde68a; color: #b45309;">
-                <i class="fas fa-tools"></i> <strong>הודעת מערכת:</strong> מודול הפקת הדוחות נמצא בפיתוח, אך הוא שמיש ופעיל.
+                <i class="fas fa-tools"></i> <strong>הודעת מערכת:</strong> מודול הפקת הדוחות נמצא בפיתוח ראשוני, ועדיין יש בעיות בעיצוב.
             </div>
 
             <div class="card compact-card no-print" style="margin-bottom: 20px;">
