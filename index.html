@@ -9,7 +9,7 @@
 </head>
 <body>
     <div class="app-container">
-        <aside class="sidebar">
+        <aside class="sidebar no-print">
             <div class="logo">
                 <h2>ניהול מבחני פאר המשנה</h2>
             </div>
@@ -23,6 +23,9 @@
                 <a href="#" class="menu-item" data-target="view-history">
                     <i class="fas fa-history"></i> היסטוריית מבחנים
                 </a>
+                <a href="#" class="menu-item" data-target="view-reports">
+                    <i class="fas fa-file-invoice"></i> ניהול דוחות
+                </a>
                 <a href="#" class="menu-item" data-target="view-students">
                     <i class="fas fa-users"></i> ניהול תלמידים
                 </a>
@@ -33,13 +36,13 @@
         </aside>
         
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar no-print">
                 <h1>ניהול מבחני פאר המשנה</h1>
             </header>
 
             <div class="content-area">
                 <!-- מסך 1: עדכון ציונים -->
-                <div id="view-update" class="view-section active">
+                <div id="view-update" class="view-section active no-print">
                     <div id="search-section" class="card compact-card">
                         <h3>בחירת תלמיד לעדכון</h3>
                         <p class="text-muted">חפש לפי קוד תלמיד או שם</p>
@@ -53,19 +56,22 @@
                 </div>
 
                 <!-- מסך 2: היסטוריית מבחנים -->
-                <div id="view-history" class="view-section hidden"></div>
+                <div id="view-history" class="view-section hidden no-print"></div>
 
-                <!-- מסך 3: ניהול תלמידים -->
-                <div id="view-students" class="view-section hidden"></div>
+                <!-- מסך 3: ניהול דוחות -->
+                <div id="view-reports" class="view-section hidden"></div>
 
-                <!-- מסך 4: ניהול מבחנים -->
-                <div id="view-exams" class="view-section hidden"></div>
+                <!-- מסך 4: ניהול תלמידים -->
+                <div id="view-students" class="view-section hidden no-print"></div>
+
+                <!-- מסך 5: ניהול מבחנים -->
+                <div id="view-exams" class="view-section hidden no-print"></div>
             </div>
         </main>
     </div>
 
-    <!-- מודל היסטוריית מבחנים של תלמיד בודד -->
-    <div id="historyModal" class="modal hidden">
+    <!-- מודל היסטוריית מבחנים -->
+    <div id="historyModal" class="modal hidden no-print">
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fas fa-history"></i> היסטוריית מבחנים לתלמיד</h3>
