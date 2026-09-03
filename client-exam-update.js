@@ -67,7 +67,6 @@ export class ExamUpdateManager {
         const passedCount = exams.filter(e => e.passed).length;
         const failedCount = examsCount - passedCount;
         
-        // החלת תכונות flex על הקונטיינר הראשי כדי לאפשר גלילה פנימית מסודרת
         this.container.style.display = 'flex';
         this.container.style.flexDirection = 'column';
         this.container.style.flex = '1';
@@ -117,7 +116,8 @@ export class ExamUpdateManager {
                 </div>
                 
                 <form id="multiExamForm" class="modern-form" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                    <div id="examRowsContainer" style="flex: 1; overflow-y: auto; padding-left: 5px; padding-right: 5px; margin-bottom: 10px;">
+                    <!-- הוספנו padding-bottom גבוה כדי שהתפריט בשורות התחתונות לא ייחתך -->
+                    <div id="examRowsContainer" style="flex: 1; overflow-y: auto; padding-left: 5px; padding-right: 5px; padding-bottom: 150px; margin-bottom: 10px;">
                         ${this.generateEmptyRowHtml()}
                     </div>
 
@@ -137,8 +137,9 @@ export class ExamUpdateManager {
         return `
             <div class="exam-row-item">
                 <div class="form-group exam-code-group exam-search-container">
+                    <!-- הפירוט של המבחן הועבר אל מעל תיבת החיפוש -->
+                    <div class="exam-selected-details" style="font-size:0.85rem; color:var(--primary-color); font-weight:600; margin-bottom:4px; min-height:18px;"></div>
                     <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
-                    <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
                     <div class="exam-search-results hidden"></div>
                 </div>
                 
