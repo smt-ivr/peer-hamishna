@@ -67,8 +67,14 @@ export class ExamUpdateManager {
         const passedCount = exams.filter(e => e.passed).length;
         const failedCount = examsCount - passedCount;
         
+        // החלת תכונות flex על הקונטיינר הראשי כדי לאפשר גלילה פנימית מסודרת
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
+        this.container.style.flex = '1';
+        this.container.style.minHeight = '0';
+
         const html = `
-            <div class="card student-top-card compact-card">
+            <div class="card student-top-card compact-card" style="flex-shrink: 0;">
                 <div class="student-info-left">
                     <div class="avatar"><i class="fas fa-user-graduate"></i></div>
                     <div>
@@ -93,8 +99,8 @@ export class ExamUpdateManager {
                 </div>
             </div>
 
-            <div class="card exam-form-card compact-card">
-                <div class="form-header-actions compact-header" style="align-items: center;">
+            <div class="card exam-form-card compact-card" style="display: flex; flex-direction: column; flex: 1; min-height: 0; margin-bottom: 0;">
+                <div class="form-header-actions compact-header" style="align-items: center; flex-shrink: 0;">
                     <div class="header-title-row">
                         <h3><i class="fas fa-file-signature"></i> דיווח והזנת מבחנים</h3>
                         <p class="text-muted" style="margin-bottom: 2px;">בחר קוד וסטטוס (עבר/לא עבר). חובה לבחור את הסטטוס.</p>
@@ -110,12 +116,12 @@ export class ExamUpdateManager {
                     </div>
                 </div>
                 
-                <form id="multiExamForm" class="modern-form">
-                    <div id="examRowsContainer">
+                <form id="multiExamForm" class="modern-form" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                    <div id="examRowsContainer" style="flex: 1; overflow-y: auto; padding-left: 5px; padding-right: 5px; margin-bottom: 10px;">
                         ${this.generateEmptyRowHtml()}
                     </div>
 
-                    <div>
+                    <div style="flex-shrink: 0;">
                         <div id="serverFeedback" class="server-feedback hidden"></div>
                     </div>
                 </form>
@@ -127,7 +133,6 @@ export class ExamUpdateManager {
         this.updateSaveButtonCount();
     }
 
-    // שים לב: ללא מחלקת active כברירת מחדל בכפתורי עבר/לא עבר
     generateEmptyRowHtml() {
         return `
             <div class="exam-row-item">
