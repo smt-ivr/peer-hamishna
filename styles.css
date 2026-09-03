@@ -156,3 +156,18 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .compact-header { flex-direction: column; gap: 10px; align-items: flex-start; }
     .compact-header .search-box { width: 100% !important; }
 }
+/* ---- הגדרות הדפסה עבור דוחות PDF ---- */
+@media print {
+    body { background-color: white; color: black; }
+    .no-print, .sidebar, .topbar, .menu { display: none !important; }
+    .app-container, .main-content, .content-area { 
+        display: block !important; 
+        height: auto !important; 
+        overflow: visible !important; 
+        padding: 0 !important; 
+        margin: 0 !important; 
+    }
+    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
+    #view-reports { display: block !important; }
+    .print-table th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; color-adjust: exact; }
+}
