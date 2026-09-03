@@ -5,6 +5,7 @@ import clientExamUpdateJs from './client-exam-update.js';
 import clientStudentsJs from './client-students.js';
 import clientExamsJs from './client-exams.js';
 import clientHistoryJs from './client-history.js';
+import clientReportsJs from './client-reports.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -31,6 +32,9 @@ export default {
     }
     if (path === '/peer/client-history.js') {
       return new Response(clientHistoryJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });
+    }
+    if (path === '/peer/client-reports.js') {
+      return new Response(clientReportsJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });
     }
 
     return new Response('404 - Not Found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
