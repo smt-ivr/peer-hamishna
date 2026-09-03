@@ -155,19 +155,32 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .exam-row-item { grid-template-columns: 1fr; gap: 6px; padding: 10px; }
     .compact-header { flex-direction: column; gap: 10px; align-items: flex-start; }
     .compact-header .search-box { width: 100% !important; }
-}
-/* ---- הגדרות הדפסה עבור דוחות PDF ---- */
+/* ---- הגדרות הדפסה עבור דוחות PDF מתקדמים ---- */
 @media print {
-    body { background-color: white; color: black; }
-    .no-print, .sidebar, .topbar, .menu { display: none !important; }
-    .app-container, .main-content, .content-area { 
-        display: block !important; 
-        height: auto !important; 
-        overflow: visible !important; 
-        padding: 0 !important; 
-        margin: 0 !important; 
+    /* הסתרת כל גוף האפליקציה המקורית בהדפסה */
+    body > *:not(#printReportModal) { display: none !important; }
+    
+    /* הגדרות המודל כדי שיתפוס את כל דף ה-PDF ללא גבולות */
+    #printReportModal {
+        position: absolute; left: 0; top: 0; margin: 0; padding: 0;
+        width: 100%; height: auto;
+        background: white !important;
+        visibility: visible !important;
     }
-    .card { border: none !important; box-shadow: none !important; padding: 0 !important; }
-    #view-reports { display: block !important; }
-    .print-table th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; color-adjust: exact; }
+    
+    /* ביטול עיצוב של מודל נפתח (צילומים ומסגרות) */
+    #printReportModal .modal-content {
+        box-shadow: none !important; border: none !important;
+        width: 100%; max-width: 100%; height: auto; overflow: visible;
+        background: white !important; padding: 0 !important;
+    }
+    
+    .no-print { display: none !important; }
+    
+    /* הפרדת עמודים חכמה לכל תלמיד - קריטי להדפסת כיתה שלמה! */
+    .page-break { page-break-after: always; }
+    
+    /* כיוון צבעי טבלה ורקעים למדפסות */
+    .print-container { box-shadow: none !important; margin: 0 !important; padding: 10px 0 !important; }
+    th { -webkit-print-color-adjust: exact; color-adjust: exact; background-color: #f1f5f9 !important; }
 }
