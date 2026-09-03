@@ -43,7 +43,6 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 /* חיפוש כללי */
 .search-box { position: relative; max-width: 100%; }
 .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; z-index: 2; }
-/* תוקן הריפוד של טקסט החיפוש בהתאמה לימין (35px מימין במקום משמאל) */
 #studentSearch { width: 100%; padding: 8px 35px 8px 12px; border: 1px solid var(--border-color); border-radius: var(--border-radius); font-size: 0.9rem; outline: none; transition: 0.2s; }
 #studentSearch:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
 .search-results-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-color); border-radius: var(--border-radius); margin-top: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 10; }
@@ -155,12 +154,13 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .exam-row-item { grid-template-columns: 1fr; gap: 6px; padding: 10px; }
     .compact-header { flex-direction: column; gap: 10px; align-items: flex-start; }
     .compact-header .search-box { width: 100% !important; }
+}
+
 /* ---- הגדרות הדפסה עבור דוחות PDF מתקדמים ---- */
 @media print {
-    /* הסתרת כל גוף האפליקציה המקורית בהדפסה */
+    /* הסתרת כל גוף האפליקציה המקורית בהדפסה למעט המודל המיועד להדפסה */
     body > *:not(#printReportModal) { display: none !important; }
     
-    /* הגדרות המודל כדי שיתפוס את כל דף ה-PDF ללא גבולות */
     #printReportModal {
         position: absolute; left: 0; top: 0; margin: 0; padding: 0;
         width: 100%; height: auto;
@@ -168,19 +168,34 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
         visibility: visible !important;
     }
     
-    /* ביטול עיצוב של מודל נפתח (צילומים ומסגרות) */
     #printReportModal .modal-content {
         box-shadow: none !important; border: none !important;
         width: 100%; max-width: 100%; height: auto; overflow: visible;
         background: white !important; padding: 0 !important;
     }
     
+    #printReportBody {
+        background: white !important;
+    }
+
     .no-print { display: none !important; }
     
     /* הפרדת עמודים חכמה לכל תלמיד - קריטי להדפסת כיתה שלמה! */
     .page-break { page-break-after: always; }
     
-    /* כיוון צבעי טבלה ורקעים למדפסות */
-    .print-container { box-shadow: none !important; margin: 0 !important; padding: 10px 0 !important; }
-    th { -webkit-print-color-adjust: exact; color-adjust: exact; background-color: #f1f5f9 !important; }
+    /* כיוון צבעי טבלה ורקעים למדפסות שחור לבן */
+    .print-container { 
+        box-shadow: none !important; 
+        margin: 0 auto !important; 
+        padding: 0 !important; 
+        border: none !important;
+    }
+    
+    th { -webkit-print-color-adjust: exact; color-adjust: exact; }
+    
+    /* קביעת גודל הדף בהדפסה לפי ההגדרות */
+    .print-container[data-size="A5"], .print-container.size-a5 { width: 148mm; min-height: 210mm; }
+    .print-container[data-size="A4"], .print-container.size-a4 { width: 210mm; min-height: 297mm; }
+    
+    @page { margin: 1cm; }
 }
