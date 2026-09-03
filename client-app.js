@@ -1,6 +1,7 @@
 import { ExamUpdateManager } from './client-exam-update.js';
 import { StudentManager } from './client-students.js';
 import { ExamManager } from './client-exams.js';
+import { HistoryManager } from './client-history.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 let allStudents = [];
@@ -8,12 +9,14 @@ let allExams = [];
 let examManager;
 let studentManager;
 let examListManager;
+let historyManager;
 
 document.addEventListener('DOMContentLoaded', async () => {
     // אתחול המנהלים
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
     studentManager = new StudentManager(document.getElementById('view-students'), goToStudentUpdate);
     examListManager = new ExamManager(document.getElementById('view-exams'));
+    historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE);
     
     setupTabs();
     setupSearchBox();
@@ -24,6 +27,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     examManager.setExams(allExams);
     studentManager.render(allStudents);
     examListManager.render(allExams);
+    // טעינה ראשונית של היסטוריה ברקע
+    historyManager.loadAndRender(allStudents, allExams);
 });
 
 function setupTabs() {
@@ -44,6 +49,11 @@ function setupTabs() {
                 if (view.id === targetId) {
                     view.classList.remove('hidden');
                     view.classList.add('active');
+                    
+                    // רענון טאב היסטוריה ברגע שנכנסים אליו כדי להציג את העדכון החדש ביותר
+                    if (targetId === 'view-history') {
+                        historyManager.loadAndRender(allStudents, allExams);
+                    }
                 } else {
                     view.classList.add('hidden');
                     view.classList.remove('active');
@@ -53,7 +63,6 @@ function setupTabs() {
     });
 }
 
-// פונקציה שעוברת לטאב העדכון וטוענת תלמיד ספציפי (מופעלת מטבלת ניהול תלמידים)
 function goToStudentUpdate(studentCode) {
     document.querySelector('[data-target="view-update"]').click();
     document.getElementById('studentSearch').value = '';
@@ -63,7 +72,6 @@ function goToStudentUpdate(studentCode) {
 
 async function fetchStudentsList() {
     try {
-        // הוספנו כאן את הפרמטר ?full_details=true כדי למשוך את כל המידע המלא מהשרת
         const response = await fetch(`${API_BASE}/students?full_details=true`);
         if(response.ok) {
             allStudents = await response.json();
