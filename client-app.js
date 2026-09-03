@@ -7,16 +7,32 @@ import { ReportManager } from './client-reports.js';
 const API_BASE = 'https://smti.uk/peer/api';
 let allStudents = [];
 let allExams = [];
+
 let examManager;
 let studentManager;
 let examListManager;
 let historyManager;
 let reportManager;
+let refreshAllData;
 
 document.addEventListener('DOMContentLoaded', async () => {
+    
+    // פונקציית רענון גלובלית שנקראת מתוך רכיבים לאחר ביצוע שינוי בשרת
+    refreshAllData = async () => {
+        await Promise.all([fetchStudentsList(), fetchExamsList()]);
+        examManager.setExams(allExams);
+        studentManager.render(allStudents);
+        examListManager.render(allExams);
+        reportManager.setStudents(allStudents);
+        historyManager.loadAndRender(allStudents, allExams);
+    };
+
     // אתחול המנהלים
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
-    studentManager = new StudentManager(document.getElementById('view-students'), goToStudentUpdate);
+    
+    // שים לב להזרקת API_BASE ו-refreshAllData
+    studentManager = new StudentManager(document.getElementById('view-students'), API_BASE, goToStudentUpdate, refreshAllData);
+    
     examListManager = new ExamManager(document.getElementById('view-exams'));
     historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE);
     reportManager = new ReportManager(document.getElementById('view-reports'), API_BASE);
@@ -24,15 +40,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupTabs();
     setupSearchBox();
 
-    // טעינת נתונים
-    await Promise.all([fetchStudentsList(), fetchExamsList()]);
-    
-    examManager.setExams(allExams);
-    studentManager.render(allStudents);
-    examListManager.render(allExams);
-    reportManager.setStudents(allStudents);
-    // טעינה ראשונית של היסטוריה ברקע
-    historyManager.loadAndRender(allStudents, allExams);
+    // טעינת נתונים ראשונית בעליית האתר
+    await refreshAllData();
 });
 
 function setupTabs() {
