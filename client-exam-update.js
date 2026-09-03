@@ -97,11 +97,11 @@ export class ExamUpdateManager {
                 <div class="form-header-actions compact-header" style="align-items: center;">
                     <div class="header-title-row">
                         <h3><i class="fas fa-file-signature"></i> דיווח והזנת מבחנים</h3>
-                        <p class="text-muted" style="margin-bottom: 2px;">בחר קוד וסטטוס (עבר/לא עבר). שורות ריקות יסוננו אוטומטית.</p>
+                        <p class="text-muted" style="margin-bottom: 2px;">בחר קוד וסטטוס (עבר/לא עבר). חובה לבחור את הסטטוס.</p>
                         <p style="color: #b45309; font-size: 0.8rem; font-weight: 500;"><i class="fas fa-info-circle"></i> שים לב: הנתונים לא נשמרים עד לחיצה על לחצן השמירה.</p>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <button type="button" class="btn btn-dashed btn-sm" id="addRowBtn">
+                        <button type="button" class="btn btn-dashed btn-sm" id="addRowBtn" style="margin: 0; border-color: var(--primary-color); color: var(--primary-color);">
                             <i class="fas fa-plus"></i> הוסף שורה
                         </button>
                         <button type="submit" form="multiExamForm" class="btn btn-primary" id="submitExamsBtn" disabled>
@@ -127,6 +127,7 @@ export class ExamUpdateManager {
         this.updateSaveButtonCount();
     }
 
+    // שים לב: ללא מחלקת active כברירת מחדל בכפתורי עבר/לא עבר
     generateEmptyRowHtml() {
         return `
             <div class="exam-row-item">
@@ -140,7 +141,6 @@ export class ExamUpdateManager {
                 
                 <div class="form-group exam-status-group">
                     <div class="toggle-group">
-                        <!-- ללא מחלקת active כברירת מחדל -->
                         <button type="button" class="toggle-btn pass-btn" data-value="true">
                             <i class="fas fa-check"></i> עבר
                         </button>
@@ -162,7 +162,7 @@ export class ExamUpdateManager {
     updateSaveButtonCount() {
         const rows = Array.from(document.querySelectorAll('.exam-row-item'));
         let validCount = 0;
-        let hasPartialInvalid = false; // בודק האם יש שורה שמולאה חלקית בלבד (קוד ללא סטטוס או סטטוס ללא קוד)
+        let hasPartialInvalid = false; 
 
         rows.forEach(row => {
             const input = row.querySelector('.exam-code-input');
@@ -172,13 +172,12 @@ export class ExamUpdateManager {
             if (code !== '' && hasStatus) {
                 validCount++;
             } else if (code !== '' || hasStatus) {
-                hasPartialInvalid = true; // שורה לא שלמה, חוסמים את השמירה כדי למנוע טעויות
+                hasPartialInvalid = true; 
             }
         });
 
         const btn = document.getElementById('submitExamsBtn');
         if (btn) {
-            // מאפשרים שמירה אם יש לפחות שורה אחת תקינה, ואין שורות חלקיות באוויר (שורות ריקות לחלוטין מותרות)
             if (validCount > 0 && !hasPartialInvalid) {
                 btn.innerHTML = `<i class="fas fa-save"></i> שמור ${validCount} ${validCount === 1 ? 'עדכון' : 'עדכונים'} במערכת`;
                 btn.disabled = false;
@@ -214,7 +213,6 @@ export class ExamUpdateManager {
                 const warningContainer = row.querySelector('.warning-container');
                 const detailsDiv = searchContainer.querySelector('.exam-selected-details');
 
-                // עדכון שדה הפירוט אם יש התאמה מדויקת
                 const exactExam = this.allExams.find(ex => ex.exam_code === code);
                 if (detailsDiv) {
                     detailsDiv.innerText = exactExam ? this.formatExamDesc(exactExam) : '';
@@ -229,9 +227,7 @@ export class ExamUpdateManager {
                     const filtered = this.allExams.filter(ex => {
                         const codeMatch = ex.exam_code.includes(code);
                         const details = ex.details || {};
-                        const textMatch = Object.values(details).some(val => 
-                            String(val).includes(code)
-                        );
+                        const textMatch = Object.values(details).some(val => String(val).includes(code));
                         return codeMatch || textMatch;
                     }).slice(0, 10);
 
@@ -285,7 +281,7 @@ export class ExamUpdateManager {
                 const group = toggleBtn.closest('.toggle-group');
                 group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
                 toggleBtn.classList.add('active');
-                this.updateSaveButtonCount(); // הפעלה של בדיקת החוקיות
+                this.updateSaveButtonCount();
             }
 
             const removeBtn = e.target.closest('.remove-row-btn');
@@ -307,7 +303,6 @@ export class ExamUpdateManager {
         const container = document.getElementById('examRowsContainer');
         const newRow = document.createElement('div');
         newRow.innerHTML = this.generateEmptyRowHtml();
-        // הוספת האלמנטים הפנימיים לתוך קונטיינר
         while (newRow.firstChild) {
             container.appendChild(newRow.firstChild);
         }
@@ -330,7 +325,6 @@ export class ExamUpdateManager {
         const rows = document.querySelectorAll('.exam-row-item');
         const examsPayload = [];
 
-        // מסננים החוצה שורות ריקות, ושולחים רק שורות תקינות שיש בהן סטטוס
         rows.forEach(row => {
             const code = row.querySelector('.exam-code-input').value.trim();
             const activeToggle = row.querySelector('.toggle-btn.active');
@@ -359,10 +353,7 @@ export class ExamUpdateManager {
             if (response.ok) {
                 const result = await response.json();
                 this.renderServerFeedback(result);
-                
                 await this.loadStudentData(this.currentStudent.student_code, true);
-                
-                // איפוס לטופס נקי (שורת אחת ריקה)
                 document.getElementById('examRowsContainer').innerHTML = this.generateEmptyRowHtml();
             } else {
                 throw new Error('שגיאת מערכת');
@@ -373,35 +364,31 @@ export class ExamUpdateManager {
             feedbackBox.classList.remove('hidden');
         } finally {
             this.updateRemoveButtonsState();
-            this.updateSaveButtonCount(); // יכבה חזרה את הלחצן
+            this.updateSaveButtonCount();
         }
     }
 
     renderServerFeedback(res) {
         const box = document.getElementById('serverFeedback');
         let html = '<h4 style="margin-bottom:6px;">סיכום עדכון:</h4><div class="feedback-lists">';
-
         if (res.updated && res.updated.length > 0) {
             html += `<div class="feedback-group success-group">
                 <strong><i class="fas fa-check-circle"></i> נקלט בהצלחה (${res.updated.length}):</strong>
                 <ul>${res.updated.map(item => `<li>מבחן ${item.exam_code} - ${item.status}</li>`).join('')}</ul>
             </div>`;
         }
-
         if (res.skipped && res.skipped.length > 0) {
             html += `<div class="feedback-group warning-group">
                 <strong><i class="fas fa-info-circle"></i> דולגו (${res.skipped.length}):</strong>
                 <ul>${res.skipped.map(item => `<li>מבחן ${item.exam_code}: ${item.reason}</li>`).join('')}</ul>
             </div>`;
         }
-
         if (res.errors && res.errors.length > 0) {
             html += `<div class="feedback-group error-group">
                 <strong><i class="fas fa-times-circle"></i> שגיאות (${res.errors.length}):</strong>
                 <ul>${res.errors.map(item => `<li>מבחן ${item.exam_code}: ${item.reason}</li>`).join('')}</ul>
             </div>`;
         }
-
         html += '</div>';
         box.innerHTML = html;
         box.className = 'server-feedback active';
