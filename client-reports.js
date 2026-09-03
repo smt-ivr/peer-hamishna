@@ -33,7 +33,6 @@ export class ReportManager {
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // אירוע לייצוא אקסל מתוך המודל
             document.getElementById('exportReportCsvBtn').addEventListener('click', () => {
                 if(this.lastRenderedStudents) {
                     this.exportToExcel(this.lastRenderedStudents);
@@ -72,12 +71,12 @@ export class ReportManager {
                                 <input type="checkbox" id="repConfCode" checked> הצג קוד תלמיד בדוח
                             </label>
                             <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfExamCode" checked> הצג עמודת קוד מבחן
+                                <input type="checkbox" id="repConfExamCode" checked> הצג עמודת קוד מבחן בטבלה
                             </label>
                             <label style="font-size: 0.85rem; cursor: pointer;">
                                 גודל דף בהדפסה: 
-                                <select id="repConfSize" style="padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc;">
-                                    <option value="A5">A5 (מומלץ)</option>
+                                <select id="repConfSize" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
+                                    <option value="A5">A5 (מומלץ - קומפקטי)</option>
                                     <option value="A4">A4 (רגיל)</option>
                                 </select>
                             </label>
@@ -170,7 +169,7 @@ export class ReportManager {
     async generateAndShowReport(studentCodesArray) {
         const btn = document.getElementById('generateClassReportBtn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעבד...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מושך נתונים...';
         btn.disabled = true;
 
         try {
@@ -180,7 +179,7 @@ export class ReportManager {
                 this.allStudents = freshStudents; 
                 
                 const selectedStudents = freshStudents.filter(s => studentCodesArray.includes(s.student_code));
-                this.lastRenderedStudents = selectedStudents; // שמירה לטובת ייצוא אקסל
+                this.lastRenderedStudents = selectedStudents; 
                 this.buildReportHtml(selectedStudents);
             } else {
                 alert('שגיאה במשיכת נתונים מהשרת.');
@@ -196,10 +195,9 @@ export class ReportManager {
     buildReportHtml(students) {
         const confStudentCode = document.getElementById('repConfCode').checked;
         const confExamCode = document.getElementById('repConfExamCode').checked;
-        const confSize = document.getElementById('repConfSize').value; // 'A4' או 'A5'
+        const confSize = document.getElementById('repConfSize').value; 
         
         const hebrewDate = this.getHebrewDate();
-        const sizeClass = confSize === 'A5' ? 'size-a5' : 'size-a4';
 
         let completeHtml = '';
 
@@ -223,9 +221,9 @@ export class ReportManager {
                         <tbody>
                             ${exams.map(ex => {
                                 let desc = ex.details ? Object.values(ex.details).filter(v => v !== null && v !== '').join(' - ') : ex.exam_code;
-                                const statusText = ex.passed ? '<strong>עבר</strong>' : 'לא עבר';
+                                const statusText = ex.passed ? '<strong>עבר</strong>' : '<span style="color:#555; text-decoration:underline;">לא עבר</span>';
                                 return `
-                                <tr style="border-bottom: 1px solid #ccc;">
+                                <tr style="border-bottom: 1px dashed #ccc;">
                                     ${confExamCode ? `<td style="padding: 6px; color: #000;">${ex.exam_code}</td>` : ''}
                                     <td style="padding: 6px; color: #000;">${desc}</td>
                                     <td style="padding: 6px; color: #000;">${statusText}</td>
@@ -236,12 +234,15 @@ export class ReportManager {
                 `;
             }
 
+            // הקצאת רוחב מדויק בהתאם להגדרה (בהדפסה ייכנס לעמוד)
+            const styleSize = confSize === 'A5' ? 'max-width: 148mm;' : 'max-width: 210mm;';
+
             completeHtml += `
-                <div class="print-container ${pageBreakClass} ${sizeClass}" style="background: white; padding: 30px; margin-bottom: 20px; font-family: Arial, sans-serif; color: #000; border: 1px solid #ddd; box-sizing: border-box; position: relative;">
+                <div class="print-container ${pageBreakClass}" data-size="${confSize}" style="background: white; padding: 20px 30px; margin: 0 auto 20px auto; font-family: Arial, sans-serif; color: #000; border: 1px solid #ddd; ${styleSize}">
                     
-                    <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px;">
+                    <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
                         <h2 style="margin: 0 0 5px 0; font-size: 1.6rem; font-weight: 800;">${student.first_name} ${student.last_name}</h2>
-                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: normal;">דוח סיכום פאר המשנה</h3>
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: normal;">דוח סיכום מבחנים</h3>
                         <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-top: 15px;">
                             <span>${confStudentCode ? `קוד: <strong>${student.student_code}</strong>` : ''} | כיתה: <strong>${student.class_grade || '-'}</strong></span>
                             <span>תאריך הפקה: <strong>${hebrewDate}</strong></span>
@@ -267,8 +268,8 @@ export class ReportManager {
 
                     <div>${tableHtml}</div>
                     
-                    <div style="margin-top: 30px; text-align: center; font-size: 0.75rem; color: #555; border-top: 1px dashed #ccc; padding-top: 10px;">
-                        הופק באמצעות מערכת ניהול - פאר המשנה
+                    <div style="margin-top: 30px; text-align: center; font-size: 0.75rem; color: #555; border-top: 1px solid #000; padding-top: 10px;">
+                        הופק באמצעות מערכת ניהול דוחות
                     </div>
                 </div>
             `;
@@ -279,7 +280,7 @@ export class ReportManager {
     }
 
     exportToExcel(students) {
-        let csvContent = '\uFEFF'; // BOM לתמיכה בעברית
+        let csvContent = '\uFEFF'; 
         csvContent += 'קוד תלמיד,שם פרטי,שם משפחה,כיתה,קוד מבחן,פירוט,סטטוס,שווי\n';
 
         students.forEach(student => {
