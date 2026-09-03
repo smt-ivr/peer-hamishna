@@ -55,14 +55,7 @@ export class ExamUpdateManager {
 
     formatExamDesc(ex) {
         if (!ex.details) return 'ללא פרטים נוספים';
-        if (ex.exam_type === 'mishnayot') {
-            const title = ex.details.chapter_title ? ` - ${ex.details.chapter_title}` : '';
-            return `${ex.details.masechet || ''} - פרק ${ex.details.chapter_name || ''}${title} (${ex.details.total_mishnayot} משניות)`;
-        } else if (ex.exam_type === 'gemara') {
-            return `${ex.details.masechet || ''} | ${ex.details.from_page || ''} עד ${ex.details.to_page || ''}`;
-        } else {
-            return Object.values(ex.details).filter(val => val !== null && val !== '').join(' | ');
-        }
+        return Object.values(ex.details).filter(val => val !== null && val !== '').join(' | ');
     }
 
     renderPortal() {
@@ -81,7 +74,7 @@ export class ExamUpdateManager {
                     <div>
                         <h2>${s.first_name} ${s.last_name}</h2>
                         <div class="profile-badges">
-                            <span class="badge">כיתה: ${s.class_grade}</span>
+                            <span class="badge">כיתה: ${s.class_grade || '-'}</span>
                             <span class="badge">קוד: ${s.student_code}</span>
                             <span class="badge badge-info">מבחנים: ${examsCount}</span>
                             <span class="badge badge-success">עברו: ${passedCount}</span>
@@ -101,55 +94,29 @@ export class ExamUpdateManager {
             </div>
 
             <div class="card exam-form-card compact-card">
-                <div class="form-header-actions compact-header">
+                <div class="form-header-actions compact-header" style="align-items: center;">
                     <div class="header-title-row">
                         <h3><i class="fas fa-file-signature"></i> דיווח והזנת מבחנים</h3>
-                        <p class="text-muted" style="margin-bottom: 4px;">הקלד קוד במערכת ובחר עבר/לא עבר. ניתן להוסיף שורות נוספות לפי הצורך.</p>
-                        <p style="color: #b45309; font-size: 0.8rem; font-weight: 500;"><i class="fas fa-info-circle"></i> שים לב: השינויים לא נשמרים עד לחיצה על כפתור השמירה שמשמאל.</p>
+                        <p class="text-muted" style="margin-bottom: 2px;">בחר קוד וסטטוס (עבר/לא עבר). שורות ריקות יסוננו אוטומטית.</p>
+                        <p style="color: #b45309; font-size: 0.8rem; font-weight: 500;"><i class="fas fa-info-circle"></i> שים לב: הנתונים לא נשמרים עד לחיצה על לחצן השמירה.</p>
                     </div>
-                    <button type="submit" form="multiExamForm" class="btn btn-primary" id="submitExamsBtn" disabled>
-                        <i class="fas fa-save"></i> שמור עדכונים במערכת
-                    </button>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" class="btn btn-dashed btn-sm" id="addRowBtn">
+                            <i class="fas fa-plus"></i> הוסף שורה
+                        </button>
+                        <button type="submit" form="multiExamForm" class="btn btn-primary" id="submitExamsBtn" disabled>
+                            <i class="fas fa-save"></i> שמור עדכונים במערכת
+                        </button>
+                    </div>
                 </div>
                 
                 <form id="multiExamForm" class="modern-form">
                     <div id="examRowsContainer">
-                        <div class="exam-row-item">
-                            <div class="form-group exam-code-group exam-search-container">
-                                <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
-                                <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
-                                <div class="exam-search-results hidden"></div>
-                            </div>
-                            
-                            <div class="warning-container"></div>
-                            
-                            <div class="form-group exam-status-group">
-                                <div class="toggle-group">
-                                    <button type="button" class="toggle-btn pass-btn active" data-value="true">
-                                        <i class="fas fa-check"></i> עבר
-                                    </button>
-                                    <button type="button" class="toggle-btn fail-btn" data-value="false">
-                                        <i class="fas fa-times"></i> לא עבר
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group action-group">
-                                <button type="button" class="btn-icon-danger remove-row-btn" disabled title="הסר שורה">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
+                        ${this.generateEmptyRowHtml()}
                     </div>
 
                     <div>
                         <div id="serverFeedback" class="server-feedback hidden"></div>
-                    </div>
-
-                    <div class="form-actions-inline">
-                        <button type="button" class="btn btn-dashed btn-sm" id="addRowBtn">
-                            <i class="fas fa-plus"></i> הוסף שורה חדשה
-                        </button>
                     </div>
                 </form>
             </div>
@@ -160,17 +127,60 @@ export class ExamUpdateManager {
         this.updateSaveButtonCount();
     }
 
+    generateEmptyRowHtml() {
+        return `
+            <div class="exam-row-item">
+                <div class="form-group exam-code-group exam-search-container">
+                    <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
+                    <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
+                    <div class="exam-search-results hidden"></div>
+                </div>
+                
+                <div class="warning-container"></div>
+                
+                <div class="form-group exam-status-group">
+                    <div class="toggle-group">
+                        <!-- ללא מחלקת active כברירת מחדל -->
+                        <button type="button" class="toggle-btn pass-btn" data-value="true">
+                            <i class="fas fa-check"></i> עבר
+                        </button>
+                        <button type="button" class="toggle-btn fail-btn" data-value="false">
+                            <i class="fas fa-times"></i> לא עבר
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group action-group">
+                    <button type="button" class="btn-icon-danger remove-row-btn" disabled title="הסר שורה">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     updateSaveButtonCount() {
         const rows = Array.from(document.querySelectorAll('.exam-row-item'));
-        const validRowsCount = rows.filter(row => {
+        let validCount = 0;
+        let hasPartialInvalid = false; // בודק האם יש שורה שמולאה חלקית בלבד (קוד ללא סטטוס או סטטוס ללא קוד)
+
+        rows.forEach(row => {
             const input = row.querySelector('.exam-code-input');
-            return input && input.value.trim() !== '';
-        }).length;
+            const code = input ? input.value.trim() : '';
+            const hasStatus = row.querySelector('.toggle-btn.active') !== null;
+            
+            if (code !== '' && hasStatus) {
+                validCount++;
+            } else if (code !== '' || hasStatus) {
+                hasPartialInvalid = true; // שורה לא שלמה, חוסמים את השמירה כדי למנוע טעויות
+            }
+        });
 
         const btn = document.getElementById('submitExamsBtn');
         if (btn) {
-            if (validRowsCount > 0) {
-                btn.innerHTML = `<i class="fas fa-save"></i> שמור ${validRowsCount} ${validRowsCount === 1 ? 'עדכון' : 'עדכונים'} במערכת`;
+            // מאפשרים שמירה אם יש לפחות שורה אחת תקינה, ואין שורות חלקיות באוויר (שורות ריקות לחלוטין מותרות)
+            if (validCount > 0 && !hasPartialInvalid) {
+                btn.innerHTML = `<i class="fas fa-save"></i> שמור ${validCount} ${validCount === 1 ? 'עדכון' : 'עדכונים'} במערכת`;
                 btn.disabled = false;
             } else {
                 btn.innerHTML = `<i class="fas fa-save"></i> שמור עדכונים במערכת`;
@@ -204,6 +214,7 @@ export class ExamUpdateManager {
                 const warningContainer = row.querySelector('.warning-container');
                 const detailsDiv = searchContainer.querySelector('.exam-selected-details');
 
+                // עדכון שדה הפירוט אם יש התאמה מדויקת
                 const exactExam = this.allExams.find(ex => ex.exam_code === code);
                 if (detailsDiv) {
                     detailsDiv.innerText = exactExam ? this.formatExamDesc(exactExam) : '';
@@ -212,6 +223,8 @@ export class ExamUpdateManager {
                 if (code.length === 0) {
                     resultsContainer.innerHTML = '';
                     resultsContainer.classList.add('hidden');
+                    row.querySelector('.toggle-btn.pass-btn').classList.remove('active');
+                    row.querySelector('.toggle-btn.fail-btn').classList.remove('active');
                 } else {
                     const filtered = this.allExams.filter(ex => {
                         const codeMatch = ex.exam_code.includes(code);
@@ -244,13 +257,12 @@ export class ExamUpdateManager {
                 if (code && found) {
                     row.classList.add('has-warning');
                     const statusText = found.passed ? 'עבר' : 'לא עבר';
-                    warningContainer.innerHTML = `<i class="fas fa-exclamation-triangle"></i> המבחן כבר עודכן (${statusText})`;
+                    warningContainer.innerHTML = `<i class="fas fa-exclamation-triangle"></i> כבר עודכן (${statusText})`;
                 } else {
                     row.classList.remove('has-warning');
                     warningContainer.innerHTML = '';
                 }
 
-                // עדכון הכפתור הראשי באופן מיידי בעת ההקלדה
                 this.updateSaveButtonCount();
             }
         });
@@ -264,7 +276,6 @@ export class ExamUpdateManager {
                 
                 input.value = code;
                 searchContainer.querySelector('.exam-search-results').classList.add('hidden');
-                
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 return;
             }
@@ -274,6 +285,7 @@ export class ExamUpdateManager {
                 const group = toggleBtn.closest('.toggle-group');
                 group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
                 toggleBtn.classList.add('active');
+                this.updateSaveButtonCount(); // הפעלה של בדיקת החוקיות
             }
 
             const removeBtn = e.target.closest('.remove-row-btn');
@@ -294,31 +306,11 @@ export class ExamUpdateManager {
     addExamRow() {
         const container = document.getElementById('examRowsContainer');
         const newRow = document.createElement('div');
-        newRow.className = 'exam-row-item';
-        newRow.innerHTML = `
-            <div class="form-group exam-code-group exam-search-container">
-                <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
-                <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
-                <div class="exam-search-results hidden"></div>
-            </div>
-            <div class="warning-container"></div>
-            <div class="form-group exam-status-group">
-                <div class="toggle-group">
-                    <button type="button" class="toggle-btn pass-btn active" data-value="true">
-                        <i class="fas fa-check"></i> עבר
-                    </button>
-                    <button type="button" class="toggle-btn fail-btn" data-value="false">
-                        <i class="fas fa-times"></i> לא עבר
-                    </button>
-                </div>
-            </div>
-            <div class="form-group action-group">
-                <button type="button" class="btn-icon-danger remove-row-btn" title="הסר שורה">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        `;
-        container.appendChild(newRow);
+        newRow.innerHTML = this.generateEmptyRowHtml();
+        // הוספת האלמנטים הפנימיים לתוך קונטיינר
+        while (newRow.firstChild) {
+            container.appendChild(newRow.firstChild);
+        }
         this.updateRemoveButtonsState();
         this.updateSaveButtonCount();
     }
@@ -338,11 +330,12 @@ export class ExamUpdateManager {
         const rows = document.querySelectorAll('.exam-row-item');
         const examsPayload = [];
 
+        // מסננים החוצה שורות ריקות, ושולחים רק שורות תקינות שיש בהן סטטוס
         rows.forEach(row => {
             const code = row.querySelector('.exam-code-input').value.trim();
             const activeToggle = row.querySelector('.toggle-btn.active');
-            const passed = activeToggle.dataset.value === 'true';
-            if (code) {
+            if (code && activeToggle) {
+                const passed = activeToggle.dataset.value === 'true';
                 examsPayload.push({ exam_code: code, passed: passed });
             }
         });
@@ -369,31 +362,8 @@ export class ExamUpdateManager {
                 
                 await this.loadStudentData(this.currentStudent.student_code, true);
                 
-                document.getElementById('examRowsContainer').innerHTML = `
-                    <div class="exam-row-item">
-                        <div class="form-group exam-code-group exam-search-container">
-                            <input type="text" class="exam-code-input" required placeholder="חיפוש קוד או נושא..." autocomplete="off">
-                            <div class="exam-selected-details" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px; min-height:18px;"></div>
-                            <div class="exam-search-results hidden"></div>
-                        </div>
-                        <div class="warning-container"></div>
-                        <div class="form-group exam-status-group">
-                            <div class="toggle-group">
-                                <button type="button" class="toggle-btn pass-btn active" data-value="true">
-                                    <i class="fas fa-check"></i> עבר
-                                </button>
-                                <button type="button" class="toggle-btn fail-btn" data-value="false">
-                                    <i class="fas fa-times"></i> לא עבר
-                                </button>
-                            </div>
-                        </div>
-                        <div class="form-group action-group">
-                            <button type="button" class="btn-icon-danger remove-row-btn" disabled title="הסר שורה">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
+                // איפוס לטופס נקי (שורת אחת ריקה)
+                document.getElementById('examRowsContainer').innerHTML = this.generateEmptyRowHtml();
             } else {
                 throw new Error('שגיאת מערכת');
             }
@@ -402,7 +372,8 @@ export class ExamUpdateManager {
             feedbackBox.innerHTML = '<i class="fas fa-exclamation-triangle"></i> שגיאת תקשורת במערכת, הנתונים לא נשמרו.';
             feedbackBox.classList.remove('hidden');
         } finally {
-            this.updateSaveButtonCount(); // יעדכן בחזרה למצב מנוטרל לאחר האיפוס
+            this.updateRemoveButtonsState();
+            this.updateSaveButtonCount(); // יכבה חזרה את הלחצן
         }
     }
 
@@ -439,10 +410,11 @@ export class ExamUpdateManager {
     setupModalEvents() {
         const modal = document.getElementById('historyModal');
         const closeBtn = document.getElementById('closeModalBtn');
-
-        closeBtn.addEventListener('click', () => {
-            modal.classList.add('hidden');
-        });
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+        }
     }
 
     openHistoryModal() {
@@ -470,7 +442,6 @@ export class ExamUpdateManager {
                         <thead>
                             <tr>
                                 <th>קוד</th>
-                                <th>סוג</th>
                                 <th>פרטים</th>
                                 <th>סטטוס</th>
                                 <th>כסף (₪)</th>
@@ -479,13 +450,9 @@ export class ExamUpdateManager {
                         <tbody>
                             ${exams.map(ex => {
                                 let detailsText = this.formatExamDesc(ex);
-                                const typeLabel = ex.exam_type === 'mishnayot' ? 'משניות' : (ex.exam_type === 'gemara' ? 'גמרא' : 'כללי');
-                                const typeClass = ex.exam_type === 'mishnayot' ? 'type-mishnayot' : 'type-gemara';
-
                                 return `
                                 <tr>
                                     <td><strong>${ex.exam_code}</strong></td>
-                                    <td><span class="type-badge ${typeClass}">${typeLabel}</span></td>
                                     <td class="exam-details-cell" title="${detailsText}">${detailsText}</td>
                                     <td>
                                         <span class="status-pill ${ex.passed ? 'success' : 'danger'}">
@@ -501,7 +468,6 @@ export class ExamUpdateManager {
                 </div>
             `;
         }
-
         modal.classList.remove('hidden');
     }
 
