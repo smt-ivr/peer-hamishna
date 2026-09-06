@@ -16,7 +16,7 @@ export class StudentManager {
             <div class="card compact-card" style="display: flex; flex-direction: column; height: 100%;">
                 <div class="compact-header" style="flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <h3 style="margin: 0;"><i class="fas fa-users"></i> ניהול תלמידים</h3>
+                        <h3 style="margin: 0;"><i class="fas fa-users text-primary"></i> ניהול תלמידים</h3>
                         <span class="badge badge-primary" style="font-size: 0.85rem; padding: 4px 10px;">סה"כ רשומים: ${this.students.length}</span>
                     </div>
                     <div style="display: flex; gap: 10px;">
@@ -25,13 +25,13 @@ export class StudentManager {
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; background: var(--bg-color); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);"><i class="fas fa-filter"></i> סינון:</span>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                    <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);"><i class="fas fa-filter"></i> סינון:</span>
                     <div class="search-box" style="flex: 1; min-width: 200px;">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="filterStudentsText" placeholder="חיפוש חופשי (שם, קוד)..." autocomplete="off" style="padding: 6px 30px 6px 10px; width: 100%;">
+                        <input type="text" id="filterStudentsText" placeholder="חיפוש חופשי (שם, קוד)..." autocomplete="off" style="padding: 8px 30px 8px 10px; width: 100%;">
                     </div>
-                    <select id="filterStudentsClass" style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white; font-size: 0.9rem; color: var(--text-main); min-width: 120px;">
+                    <select id="filterStudentsClass" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; outline: none; background: white; font-size: 0.9rem; color: var(--text-main); min-width: 120px;">
                         <option value="">כל הכיתות</option>
                         ${Array.from(this.classes).map(c => `<option value="${c}">כיתה ${c}</option>`).join('')}
                     </select>
@@ -60,10 +60,10 @@ export class StudentManager {
             <div id="studentProfileModal" class="modal hidden">
                 <div class="modal-content" style="max-width: 600px; height: auto;">
                     <div class="modal-header">
-                        <h3><i class="fas fa-id-card"></i> כרטיס תלמיד אישי</h3>
+                        <h3><i class="fas fa-id-card text-primary"></i> כרטיס תלמיד אישי</h3>
                         <button class="close-modal-btn" onclick="document.getElementById('studentProfileModal').classList.add('hidden')">&times;</button>
                     </div>
-                    <div class="modal-body" id="studentProfileBody" style="padding: 20px;"></div>
+                    <div class="modal-body" id="studentProfileBody" style="padding: 25px;"></div>
                 </div>
             </div>
 
@@ -74,54 +74,53 @@ export class StudentManager {
                         <h3 id="studentFormTitle">הוספת תלמיד</h3>
                         <button class="close-modal-btn" onclick="document.getElementById('studentFormModal').classList.add('hidden')">&times;</button>
                     </div>
-                    <div class="modal-body" style="padding: 20px;">
-                        <form id="studentForm" class="modern-form">
+                    <div class="modal-body" style="padding: 25px;">
+                        <form id="studentForm">
                             <input type="hidden" id="formOriginalCode">
                             
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                                 <div>
-                                    <label style="display:block; margin-bottom:5px; font-size:0.85rem; font-weight:500;">שם פרטי</label>
-                                    <input type="text" id="formFirstName" required style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:4px; outline:none;">
+                                    <label style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-main);">שם פרטי</label>
+                                    <input type="text" id="formFirstName" required class="exam-code-input" style="padding:10px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; margin-bottom:5px; font-size:0.85rem; font-weight:500;">שם משפחה</label>
-                                    <input type="text" id="formLastName" required style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:4px; outline:none;">
+                                    <label style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-main);">שם משפחה</label>
+                                    <input type="text" id="formLastName" required class="exam-code-input" style="padding:10px;">
                                 </div>
                             </div>
                             
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
                                 <div>
-                                    <label style="display:block; margin-bottom:5px; font-size:0.85rem; font-weight:500;">כיתה</label>
-                                    <input type="text" id="formClassGrade" style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:4px; outline:none;">
+                                    <label style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-main);">כיתה</label>
+                                    <input type="text" id="formClassGrade" class="exam-code-input" style="padding:10px;">
                                 </div>
                                 <div>
-                                    <label style="display:block; margin-bottom:5px; font-size:0.85rem; font-weight:500;">טלפון (אופציונלי)</label>
-                                    <input type="text" id="formPhone" placeholder="0501234567" style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:4px; outline:none;">
+                                    <label style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-main);">טלפון (אופציונלי)</label>
+                                    <input type="text" id="formPhone" placeholder="0501234567" class="exam-code-input" style="padding:10px;">
                                 </div>
                             </div>
                             
-                            <!-- אזור ניהול קוד התלמיד -->
-                            <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 15px; border-radius: 6px; margin-bottom: 25px;">
+                            <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 18px; border-radius: 8px; margin-bottom: 25px;">
                                 <div id="addCodeSection">
-                                    <label style="display:block; margin-bottom:5px; font-size:0.85rem; font-weight:500;">קוד תלמיד (מזהה ייחודי)</label>
-                                    <input type="text" id="formStudentCode" placeholder="הקש קוד רצוי..." style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:4px; outline:none; margin-bottom:10px;">
-                                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-main);">
-                                        <input type="checkbox" id="formAutoCode"> הקצה קוד תלמיד עוקב אוטומטית
+                                    <label style="display:block; margin-bottom:8px; font-size:0.9rem; font-weight:700; color:var(--primary-color);">קוד תלמיד (מזהה ייחודי)</label>
+                                    <input type="text" id="formStudentCode" placeholder="הקש קוד רצוי..." class="exam-code-input" style="padding:10px; margin-bottom:12px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; color: var(--text-main); font-weight: 500;">
+                                        <input type="checkbox" id="formAutoCode" style="width: 16px; height: 16px;"> הקצה קוד תלמיד עוקב אוטומטית
                                     </label>
                                 </div>
                                 
                                 <div id="editCodeSection" class="hidden" style="display: flex; justify-content: space-between; align-items: center;">
                                     <div>
                                         <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">קוד תלמיד נוכחי:</span>
-                                        <strong id="displayCurrentCode" style="font-size: 1.2rem; color: var(--primary-color);"></strong>
+                                        <strong id="displayCurrentCode" style="font-size: 1.3rem; color: var(--primary-color);"></strong>
                                     </div>
-                                    <button type="button" class="btn btn-secondary btn-sm" id="btnChangeCode">
+                                    <button type="button" class="btn btn-secondary" id="btnChangeCode">
                                         <i class="fas fa-exchange-alt"></i> החלף קוד (פעולה מתקדמת)
                                     </button>
                                 </div>
                             </div>
                             
-                            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                            <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                                 <button type="button" class="btn btn-outline" onclick="document.getElementById('studentFormModal').classList.add('hidden')">ביטול</button>
                                 <button type="submit" class="btn btn-primary" id="studentFormSubmitBtn"><i class="fas fa-save"></i> שמור פרטים במערכת</button>
                             </div>
@@ -136,7 +135,7 @@ export class StudentManager {
     }
 
     generateTableRows(data) {
-        if(data.length === 0) return '<tr><td colspan="6" class="text-center text-muted" style="padding: 20px;">לא נמצאו תלמידים</td></tr>';
+        if(data.length === 0) return '<tr><td colspan="6" class="text-center text-muted" style="padding: 30px;">לא נמצאו תלמידים</td></tr>';
         
         return data.map(s => {
             const exams = s.exams_details || [];
@@ -144,13 +143,13 @@ export class StudentManager {
             const totalReward = s.total_reward || 0;
             return `
                 <tr>
-                    <td><strong>${s.student_code}</strong></td>
-                    <td>${s.first_name} ${s.last_name}</td>
+                    <td><strong style="color:var(--primary-color);">${s.student_code}</strong></td>
+                    <td style="font-weight: 600;">${s.first_name} ${s.last_name}</td>
                     <td><span class="badge badge-info">${s.class_grade || '-'}</span></td>
-                    <td><span class="reward-badge" style="background:#eff6ff;">₪${totalReward.toFixed(1)}</span></td>
+                    <td><span class="reward-badge">₪${totalReward.toFixed(1)}</span></td>
                     <td><span class="status-pill success">${passed} / ${exams.length}</span></td>
                     <td style="text-align: left;">
-                        <div style="display: inline-flex; gap: 6px;">
+                        <div style="display: inline-flex; gap: 8px;">
                             <button class="btn btn-outline btn-sm action-view-btn" data-code="${s.student_code}" title="כרטיס תלמיד"><i class="fas fa-eye"></i></button>
                             <button class="btn btn-secondary btn-sm action-edit-btn" data-code="${s.student_code}" title="ערוך פרטים"><i class="fas fa-pen"></i></button>
                             <button class="btn btn-primary btn-sm action-update-btn" data-code="${s.student_code}" title="מעבר לעדכון מבחנים"><i class="fas fa-edit"></i> ציונים</button>
@@ -231,7 +230,7 @@ export class StudentManager {
         if (studentCode) {
             const student = this.students.find(s => s.student_code === studentCode);
             if (student) {
-                title.innerHTML = '<i class="fas fa-pen"></i> עריכת פרטי תלמיד';
+                title.innerHTML = '<i class="fas fa-pen text-primary"></i> עריכת פרטי תלמיד';
                 document.getElementById('formOriginalCode').value = student.student_code;
                 document.getElementById('formFirstName').value = student.first_name;
                 document.getElementById('formLastName').value = student.last_name;
@@ -245,7 +244,7 @@ export class StudentManager {
                 codeInput.required = false;
             }
         } else {
-            title.innerHTML = '<i class="fas fa-user-plus"></i> רישום תלמיד חדש';
+            title.innerHTML = '<i class="fas fa-user-plus text-primary"></i> רישום תלמיד חדש';
             addSection.classList.remove('hidden');
             editSection.classList.add('hidden');
             codeInput.required = false;
@@ -274,7 +273,7 @@ export class StudentManager {
         const submitBtn = document.getElementById('studentFormSubmitBtn');
         const origText = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן נתונים...';
 
         try {
             if (isEdit) {
@@ -288,15 +287,15 @@ export class StudentManager {
                     document.getElementById('studentFormModal').classList.add('hidden');
                     if (this.onRefreshCallback) this.onRefreshCallback();
                 } else {
-                    const err = await response.json();
-                    alert('שגיאה בעדכון: ' + (err.message || err.error || 'לא ידועה'));
+                    const err = await response.json().catch(() => ({}));
+                    await window.showCustomAlert('שגיאה בעדכון: ' + (err.message || err.error || 'לא ידועה'), true);
                 }
             } else {
                 const autoCode = document.getElementById('formAutoCode').checked;
                 if (!autoCode) {
                     const code = document.getElementById('formStudentCode').value.trim();
                     if (!code) {
-                        alert('יש להזין קוד תלמיד רצוי או לסמן "הקצה קוד תלמיד עוקב אוטומטית".');
+                        await window.showCustomAlert('יש להזין קוד תלמיד רצוי או לסמן "הקצה קוד תלמיד עוקב אוטומטית".', true);
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = origText;
                         return;
@@ -312,20 +311,20 @@ export class StudentManager {
                 
                 if (response.ok) {
                     const result = await response.json();
-                    alert(`התלמיד נוצר בהצלחה! קוד התלמיד במערכת הוא: ${result.student_code}`);
+                    await window.showCustomAlert(`התלמיד נוצר בהצלחה!\nקוד התלמיד במערכת הוא: ${result.student_code}`);
                     document.getElementById('studentFormModal').classList.add('hidden');
                     if (this.onRefreshCallback) this.onRefreshCallback();
                 } else {
-                    const err = await response.json();
+                    const err = await response.json().catch(() => ({}));
                     if (response.status === 400 && err.error && err.error.includes("exists")) {
-                        alert('שגיאה: קוד התלמיד כבר קיים במערכת. בחר קוד אחר.');
+                        await window.showCustomAlert('שגיאה: קוד התלמיד כבר קיים במערכת. אנא בחר קוד אחר.', true);
                     } else {
-                        alert('שגיאה ביצירה: ' + (err.message || err.error || 'לא ידועה'));
+                        await window.showCustomAlert('שגיאה ביצירה: ' + (err.message || err.error || 'לא ידועה'), true);
                     }
                 }
             }
         } catch (error) {
-            alert('שגיאת תקשורת במערכת בעת השמירה.');
+            await window.showCustomAlert('שגיאת תקשורת במערכת בעת השמירה.', true);
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = origText;
@@ -333,12 +332,14 @@ export class StudentManager {
     }
 
     async changeStudentCode(oldCode) {
-        const newCode = prompt(`הזן את קוד התלמיד החדש שיחליף את הקוד הקודם (${oldCode}):`);
-        if (!newCode || newCode.trim() === '') return;
+        // שימוש ב-Custom Prompt החדש במקום בהודעת דפדפן
+        const newCode = await window.showCustomPrompt(`הזן את קוד התלמיד החדש שיחליף את הקוד הקודם (${oldCode}):`);
+        if (newCode === null || newCode.trim() === '') return;
         
         const finalNewCode = newCode.trim();
         if (finalNewCode === oldCode) {
-            return alert('הקוד החדש זהה לקוד הישן. לא בוצע שינוי.');
+            await window.showCustomAlert('הקוד החדש זהה לקוד הישן. לא בוצע שום שינוי.', true);
+            return;
         }
 
         try {
@@ -349,19 +350,19 @@ export class StudentManager {
             });
 
             if (response.ok) {
-                alert(`מעולה! קוד התלמיד עודכן בהצלחה ל-${finalNewCode} בכל רישומי המערכת.`);
+                await window.showCustomAlert(`מעולה! קוד התלמיד עודכן בהצלחה ל-${finalNewCode} בכל רישומי המערכת.`);
                 document.getElementById('studentFormModal').classList.add('hidden');
                 if (this.onRefreshCallback) this.onRefreshCallback();
             } else {
-                const err = await response.json();
+                const err = await response.json().catch(() => ({}));
                 if (response.status === 409 || (err.error && err.error.includes('exists'))) {
-                    alert('שגיאה: קוד התלמיד החדש שבחרת כבר תפוס על ידי תלמיד אחר במערכת.');
+                    await window.showCustomAlert('שגיאה: קוד התלמיד החדש שבחרת כבר תפוס על ידי תלמיד אחר במערכת.', true);
                 } else {
-                    alert('אירעה שגיאה בשינוי הקוד: ' + (err.message || err.error || 'נסה שוב מאוחר יותר.'));
+                    await window.showCustomAlert('אירעה שגיאה בשינוי הקוד: ' + (err.message || err.error || 'נסה שוב מאוחר יותר.'), true);
                 }
             }
         } catch (error) {
-            alert('שגיאת תקשורת במערכת. פעולת שינוי הקוד לא בוצעה.');
+            await window.showCustomAlert('שגיאת תקשורת במערכת. פעולת שינוי הקוד לא בוצעה.', true);
         }
     }
 
@@ -398,39 +399,39 @@ export class StudentManager {
         const joinedDate = student.created_at ? new Date(student.created_at).toLocaleDateString('he-IL') : 'לא ידוע';
         
         body.innerHTML = `
-            <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
-                <div style="width: 65px; height: 65px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0;">
+            <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid var(--border-color);">
+                <div class="avatar" style="width: 70px; height: 70px; font-size: 2rem;">
                     <i class="fas fa-user-graduate"></i>
                 </div>
                 <div style="flex: 1;">
-                    <h2 style="margin: 0 0 6px 0; font-size: 1.4rem;">${student.first_name} ${student.last_name}</h2>
+                    <h2 style="margin: 0 0 8px 0; font-size: 1.5rem; color: #1e293b;">${student.first_name} ${student.last_name}</h2>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <span class="badge badge-info">קוד: ${student.student_code}</span>
+                        <span class="badge badge-primary">קוד: ${student.student_code}</span>
                         <span class="badge badge-info">כיתה: ${student.class_grade || '-'}</span>
-                        <span class="badge badge-info">הצטרף: ${joinedDate}</span>
+                        <span class="badge badge-info"><i class="far fa-calendar-alt"></i> הצטרף: ${joinedDate}</span>
                     </div>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px;">
-                <div style="background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; text-align: center;">
-                    <div style="font-size: 1.6rem; font-weight: bold; color: var(--primary-color);">₪${totalReward.toFixed(1)}</div>
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">סך הכל נצבר</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px;">
+                <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; text-align: center;">
+                    <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary-color);">₪${totalReward.toFixed(1)}</div>
+                    <div style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500; margin-top: 4px;">סך הכל נצבר</div>
                 </div>
-                <div style="background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; text-align: center;">
-                    <div style="font-size: 1.6rem; font-weight: bold; color: var(--text-main);">${exams.length}</div>
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">סך הכל מבחנים שדווחו</div>
+                <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; text-align: center;">
+                    <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-main);">${exams.length}</div>
+                    <div style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500; margin-top: 4px;">סך הכל מבחנים שדווחו</div>
                 </div>
-                <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 15px; text-align: center;">
-                    <div style="font-size: 1.6rem; font-weight: bold; color: #059669;">${passed}</div>
-                    <div style="font-size: 0.85rem; color: #059669;">עברו בהצלחה</div>
+                <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 20px; text-align: center;">
+                    <div style="font-size: 1.8rem; font-weight: 800; color: #059669;">${passed}</div>
+                    <div style="font-size: 0.9rem; color: #059669; font-weight: 500; margin-top: 4px;">עברו בהצלחה</div>
                 </div>
-                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 15px; text-align: center;">
-                    <div style="font-size: 1.6rem; font-weight: bold; color: #dc2626;">${failed}</div>
-                    <div style="font-size: 0.85rem; color: #dc2626;">לא עברו</div>
+                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; text-align: center;">
+                    <div style="font-size: 1.8rem; font-weight: 800; color: #dc2626;">${failed}</div>
+                    <div style="font-size: 0.9rem; color: #dc2626; font-weight: 500; margin-top: 4px;">לא עברו</div>
                 </div>
             </div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+            <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                 <button class="btn btn-secondary" onclick="document.getElementById('studentProfileModal').classList.add('hidden'); document.querySelector('.action-edit-btn[data-code=\\'${student.student_code}\\']').click();">
                     <i class="fas fa-pen"></i> ערוך פרטים
                 </button>
