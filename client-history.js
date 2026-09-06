@@ -38,12 +38,12 @@ export class HistoryManager {
         const html = `
             <div class="card compact-card" style="display: flex; flex-direction: column; height: 100%;">
                 <div class="compact-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-                    <h3 style="margin: 0;"><i class="fas fa-history text-primary"></i> היסטוריית עדכונים כללית</h3>
+                    <h3 style="margin: 0;"><i class="fas fa-history"></i> היסטוריית עדכונים כללית</h3>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <button class="btn btn-outline btn-sm" id="exportHistoryBtn"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
                         <div class="search-box" style="width: 250px;">
                             <i class="fas fa-search search-icon"></i>
-                            <input type="text" id="filterHistory" placeholder="חיפוש תלמיד או מבחן..." autocomplete="off" style="padding: 8px 30px 8px 10px;">
+                            <input type="text" id="filterHistory" placeholder="חיפוש תלמיד או מבחן..." autocomplete="off" style="padding: 6px 30px 6px 10px;">
                         </div>
                     </div>
                 </div>
@@ -70,7 +70,7 @@ export class HistoryManager {
     }
 
     generateRows(data) {
-        if (data.length === 0) return '<tr><td colspan="5" class="text-center text-muted" style="padding:30px;">לא נמצאו רשומות</td></tr>';
+        if (data.length === 0) return '<tr><td colspan="5" class="text-center text-muted" style="padding:20px;">לא נמצאו רשומות</td></tr>';
 
         return data.map(row => {
             const studentName = this.studentsMap[row.student_code] || 'לא ידוע';
@@ -80,9 +80,9 @@ export class HistoryManager {
             
             return `
                 <tr>
-                    <td dir="ltr" style="text-align: right; color: var(--text-muted); font-size: 0.85rem;">${formattedDate}</td>
-                    <td><strong style="color:var(--primary-color);">${row.student_code}</strong> - ${studentName}</td>
-                    <td title="${examDesc}"><strong>${row.exam_code}</strong> <span class="text-muted" style="font-size:0.8rem;">(${examDesc})</span></td>
+                    <td dir="ltr" style="text-align: right; color: var(--text-muted); font-size: 0.8rem;">${formattedDate}</td>
+                    <td><strong>${row.student_code}</strong> - ${studentName}</td>
+                    <td title="${examDesc}"><strong>${row.exam_code}</strong> <span class="text-muted" style="font-size:0.75rem;">(${examDesc})</span></td>
                     <td>
                         <span class="status-pill ${row.passed ? 'success' : 'danger'}">
                             <i class="fas ${row.passed ? 'fa-check' : 'fa-times'}"></i> ${row.passed ? 'עבר' : 'לא עבר'}
@@ -117,9 +117,7 @@ export class HistoryManager {
             if (deleteBtn) {
                 const studentCode = deleteBtn.dataset.student;
                 const examCode = deleteBtn.dataset.exam;
-                
-                // שימוש בהודעת האישור המעוצבת החדשה
-                const confirmed = await window.showCustomConfirm(`האם אתה בטוח שברצונך למחוק את רישום המבחן (${examCode}) לתלמיד ${studentCode}?`);
+                const confirmed = await window.customConfirm(`האם אתה בטוח שברצונך למחוק את רישום המבחן (${examCode}) לתלמיד ${studentCode}?`);
                 if (confirmed) {
                     await this.deleteRecord(studentCode, examCode, deleteBtn);
                 }
@@ -163,12 +161,12 @@ export class HistoryManager {
                 this.historyData = this.historyData.filter(r => !(r.student_code === studentCode && r.exam_code === examCode));
                 document.getElementById('filterHistory').dispatchEvent(new Event('input'));
             } else {
-                await window.showCustomAlert('שגיאה במחיקת הרשומה.', true);
+                await window.customAlert('שגיאה במחיקת הרשומה.', true);
                 btnElement.innerHTML = '<i class="fas fa-trash"></i>';
                 btnElement.disabled = false;
             }
         } catch (error) {
-            await window.showCustomAlert('שגיאת תקשורת במערכת.', true);
+            await window.customAlert('שגיאת תקשורת במערכת.', true);
             btnElement.innerHTML = '<i class="fas fa-trash"></i>';
             btnElement.disabled = false;
         }
