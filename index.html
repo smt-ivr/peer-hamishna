@@ -8,9 +8,24 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
+    <!-- מסך התחברות -->
+    <div id="auth-overlay" class="modal" style="display: flex; z-index: 9999; background: var(--sidebar-bg);">
+        <div class="modal-content" style="max-width: 400px; height: auto; text-align: center; padding: 40px 30px;">
+            <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false" style="margin-bottom: 20px;">
+            <h2 style="margin-bottom: 10px;">התחברות למערכת</h2>
+            <p class="text-muted" style="margin-bottom: 20px;">המערכת דורשת הרשאות גישה</p>
+            <div class="form-group">
+                <input type="password" id="apiKeyInput" placeholder="הזן סיסמת מערכת (API Key)" class="exam-code-input" style="text-align: center; font-size: 1.1rem; padding: 10px;">
+            </div>
+            <button id="loginBtn" class="btn btn-primary" style="width: 100%; margin-top: 15px; justify-content: center; height: 40px; font-size: 1rem;">כניסה למערכת</button>
+            <div id="loginError" class="text-danger" style="margin-top: 15px; display: none; font-weight: 500;"></div>
+        </div>
+    </div>
+
     <div class="app-container">
         <aside class="sidebar no-print">
             <div class="logo">
+                <img src="https://smt-tel-manager.netlify.app/smt.png" alt="SMT Logo" class="smt-logo" draggable="false">
                 <h2>ניהול מבחני פאר המשנה</h2>
             </div>
             <div class="developer-credit">
@@ -31,6 +46,10 @@
                 </a>
                 <a href="#" class="menu-item" data-target="view-exams">
                     <i class="fas fa-file-alt"></i> ניהול מבחנים
+                </a>
+                <div style="flex: 1;"></div> <!-- מרווח לדחיפת כפתור ההתנתקות למטה -->
+                <a href="#" class="menu-item" id="logoutBtn" style="color: #ef4444; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <i class="fas fa-sign-out-alt"></i> התנתק
                 </a>
             </nav>
         </aside>
