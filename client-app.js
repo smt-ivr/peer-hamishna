@@ -6,80 +6,79 @@ import { ReportManager } from './client-reports.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 
-// --- מערכת הודעות (Modals) מעוצבת תחליף ל-Alert, Confirm, Prompt ---
-window.showCustomAlert = function(message, isError = false) {
+// --- מודולים מעוצבים המחליפים את ה-Alert, Confirm, Prompt של הדפדפן ---
+window.customAlert = function(message, isError = false) {
     return new Promise((resolve) => {
-        const overlay = document.getElementById('customAlertOverlay');
-        document.getElementById('customAlertIcon').innerHTML = isError ? '<i class="fas fa-times-circle text-danger"></i>' : '<i class="fas fa-check-circle text-success" style="color:#10b981;"></i>';
-        document.getElementById('customAlertTitle').innerText = isError ? 'שגיאת מערכת' : 'הודעת מערכת';
-        document.getElementById('customAlertMessage').innerText = message;
+        const overlay = document.getElementById('customModalOverlay');
+        document.getElementById('customModalIcon').innerHTML = isError ? '<i class="fas fa-times-circle" style="color:var(--danger);"></i>' : '<i class="fas fa-check-circle" style="color:var(--success);"></i>';
+        document.getElementById('customModalTitle').innerText = isError ? 'שגיאה' : 'הודעת מערכת';
+        document.getElementById('customModalMessage').innerText = message;
+        document.getElementById('customModalInputContainer').classList.add('hidden');
         
-        const btnContainer = document.getElementById('customAlertButtons');
-        btnContainer.innerHTML = '<button class="btn btn-primary" id="customAlertOkBtn" style="min-width: 120px;">הבנתי</button>';
+        const btnContainer = document.getElementById('customModalButtons');
+        btnContainer.innerHTML = '<button class="btn btn-primary" id="customModalOkBtn" style="min-width: 100px;">אישור</button>';
         
         overlay.classList.remove('hidden');
-        document.getElementById('customAlertOkBtn').focus();
         
-        document.getElementById('customAlertOkBtn').onclick = () => {
+        document.getElementById('customModalOkBtn').onclick = () => {
             overlay.classList.add('hidden');
             resolve(true);
         };
     });
 };
 
-window.showCustomConfirm = function(message) {
+window.customConfirm = function(message) {
     return new Promise((resolve) => {
-        const overlay = document.getElementById('customAlertOverlay');
-        document.getElementById('customAlertIcon').innerHTML = '<i class="fas fa-question-circle text-warning"></i>';
-        document.getElementById('customAlertTitle').innerText = 'אישור פעולה';
-        document.getElementById('customAlertMessage').innerText = message;
+        const overlay = document.getElementById('customModalOverlay');
+        document.getElementById('customModalIcon').innerHTML = '<i class="fas fa-question-circle" style="color:var(--warning);"></i>';
+        document.getElementById('customModalTitle').innerText = 'אישור פעולה';
+        document.getElementById('customModalMessage').innerText = message;
+        document.getElementById('customModalInputContainer').classList.add('hidden');
         
-        const btnContainer = document.getElementById('customAlertButtons');
+        const btnContainer = document.getElementById('customModalButtons');
         btnContainer.innerHTML = `
-            <button class="btn btn-outline" id="customAlertCancelBtn" style="min-width: 100px;">ביטול</button>
-            <button class="btn btn-primary" id="customAlertConfirmBtn" style="min-width: 100px;">אישור</button>
+            <button class="btn btn-outline" id="customModalCancelBtn" style="min-width: 80px;">ביטול</button>
+            <button class="btn btn-primary" id="customModalConfirmBtn" style="min-width: 80px;">אישור</button>
         `;
         
         overlay.classList.remove('hidden');
         
-        document.getElementById('customAlertCancelBtn').onclick = () => {
+        document.getElementById('customModalCancelBtn').onclick = () => {
             overlay.classList.add('hidden');
             resolve(false);
         };
-        document.getElementById('customAlertConfirmBtn').onclick = () => {
+        document.getElementById('customModalConfirmBtn').onclick = () => {
             overlay.classList.add('hidden');
             resolve(true);
         };
     });
 };
 
-window.showCustomPrompt = function(message, defaultValue = '') {
+window.customPrompt = function(message, defaultValue = '') {
     return new Promise((resolve) => {
-        const overlay = document.getElementById('customAlertOverlay');
-        document.getElementById('customAlertIcon').innerHTML = '<i class="fas fa-edit text-primary"></i>';
-        document.getElementById('customAlertTitle').innerText = 'הזנת נתונים';
-        document.getElementById('customAlertMessage').innerText = message;
+        const overlay = document.getElementById('customModalOverlay');
+        document.getElementById('customModalIcon').innerHTML = '<i class="fas fa-edit" style="color:var(--primary-color);"></i>';
+        document.getElementById('customModalTitle').innerText = 'הזנת נתונים';
+        document.getElementById('customModalMessage').innerText = message;
+        document.getElementById('customModalInputContainer').classList.remove('hidden');
+        const input = document.getElementById('customModalInput');
+        input.value = defaultValue;
         
-        const btnContainer = document.getElementById('customAlertButtons');
+        const btnContainer = document.getElementById('customModalButtons');
         btnContainer.innerHTML = `
-            <div style="width: 100%; display: flex; flex-direction: column; gap: 15px;">
-                <input type="text" id="customPromptInput" class="exam-code-input" value="${defaultValue}" style="width: 100%; text-align: center; border: 2px solid var(--border-color); font-weight: bold; font-size: 1.1rem;">
-                <div style="display: flex; gap: 10px; justify-content: center;">
-                    <button class="btn btn-outline" id="customAlertCancelBtn" style="flex: 1;">ביטול</button>
-                    <button class="btn btn-primary" id="customAlertConfirmBtn" style="flex: 1;">אישור ושמירה</button>
-                </div>
-            </div>
+            <button class="btn btn-outline" id="customModalCancelBtn" style="flex:1;">ביטול</button>
+            <button class="btn btn-primary" id="customModalConfirmBtn" style="flex:1;">שמור</button>
         `;
         
         overlay.classList.remove('hidden');
-        setTimeout(() => document.getElementById('customPromptInput').focus(), 50);
+        setTimeout(() => input.focus(), 50);
         
-        document.getElementById('customAlertCancelBtn').onclick = () => {
+        document.getElementById('customModalCancelBtn').onclick = () => {
             overlay.classList.add('hidden');
             resolve(null);
         };
-        document.getElementById('customAlertConfirmBtn').onclick = () => {
-            const val = document.getElementById('customPromptInput').value;
+        document.getElementById('customModalConfirmBtn').onclick = () => {
+            const val = input.value;
             overlay.classList.add('hidden');
             resolve(val);
         };
@@ -100,10 +99,10 @@ window.fetch = async function(...args) {
 
         try {
             const response = await originalFetch(resource, config);
-            if (!response.ok && resource.indexOf('/auth-check') === -1) { // לא נקפיץ הודעה על בדיקת הרשאות ראשונית
+            if (!response.ok && resource.indexOf('/auth-check') === -1) { 
                 response.clone().json().then(data => {
                     if (data && data.message) {
-                        window.showCustomAlert(data.message, true);
+                        window.customAlert(data.message, true);
                     }
                 }).catch(() => {});
             }
@@ -129,16 +128,24 @@ let refreshAllData;
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loginBtn').addEventListener('click', performLogin);
     document.getElementById('logoutBtn').addEventListener('click', performLogout);
-    await checkAuthAndInit();
+    
+    // אם ה-IP כבר סומן במחשב (בזכרון קשיח LocalStorage), נריץ רק בדיקה סמויה
+    if (localStorage.getItem('peer_ip_allowed') === 'true') {
+        document.getElementById('auth-overlay').classList.add('hidden');
+        await initApp(); // טוען את האתר מיד
+    } else {
+        await checkAuthAndInit(); // מציג אנימציית טעינה ובודק
+    }
 });
 
 async function checkAuthAndInit() {
-    // אם ה-IP אושר ב-Session הנוכחי, נדלג על הבדיקה כדי לחסוך קריאות ולזרז את המערכת
-    if (sessionStorage.getItem('peer_ip_allowed') === 'true') {
-        document.getElementById('auth-overlay').classList.add('hidden');
-        await initApp();
-        return;
-    }
+    const overlay = document.getElementById('auth-overlay');
+    const loading = document.getElementById('auth-loading');
+    const form = document.getElementById('auth-form');
+    
+    overlay.classList.remove('hidden');
+    loading.classList.remove('hidden');
+    form.classList.add('hidden');
 
     try {
         const response = await fetch(`${API_BASE}/auth-check`);
@@ -146,14 +153,13 @@ async function checkAuthAndInit() {
 
         if (data.is_authorized) {
             if (data.is_ip_allowed) {
-                sessionStorage.setItem('peer_ip_allowed', 'true');
+                localStorage.setItem('peer_ip_allowed', 'true');
             }
-            document.getElementById('auth-overlay').classList.add('hidden');
-            document.getElementById('loginError').style.display = 'none';
+            overlay.classList.add('hidden');
             await initApp();
         } else {
-            document.getElementById('auth-overlay').classList.remove('hidden');
-            document.getElementById('authMessage').innerText = 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
+            loading.classList.add('hidden');
+            form.classList.remove('hidden');
             if (data.message) {
                 const errDiv = document.getElementById('loginError');
                 errDiv.innerText = data.message;
@@ -161,8 +167,9 @@ async function checkAuthAndInit() {
             }
         }
     } catch (e) {
-        document.getElementById('auth-overlay').classList.remove('hidden');
-        document.getElementById('loginError').innerText = 'שגיאת תקשורת בבדיקת ההרשאות.';
+        loading.classList.add('hidden');
+        form.classList.remove('hidden');
+        document.getElementById('loginError').innerText = 'שגיאת תקשורת בבדיקת הרשאות.';
         document.getElementById('loginError').style.display = 'block';
     }
 }
@@ -172,19 +179,19 @@ async function performLogin() {
     if (!key) return;
     
     const btn = document.getElementById('loginBtn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מאמת נתונים...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מאמת...';
     btn.disabled = true;
     
     localStorage.setItem('peer_api_key', key);
     await checkAuthAndInit();
     
-    btn.innerHTML = 'המשך למערכת';
+    btn.innerHTML = 'כניסה למערכת';
     btn.disabled = false;
 }
 
 function performLogout() {
     localStorage.removeItem('peer_api_key');
-    sessionStorage.removeItem('peer_ip_allowed');
+    localStorage.removeItem('peer_ip_allowed'); // מוחק גם את הרשאת ה-IP
     location.reload();
 }
 
@@ -281,7 +288,7 @@ function setupSearchBox() {
 
         resultsDropdown.innerHTML = '';
         if(filtered.length === 0) {
-            resultsDropdown.innerHTML = '<div style="padding:15px;text-align:center;color:var(--text-muted);">לא נמצאו תלמידים</div>';
+            resultsDropdown.innerHTML = '<div style="padding:10px;text-align:center;">לא נמצאו תלמידים</div>';
         } else {
             filtered.forEach(student => {
                 const item = document.createElement('div');
