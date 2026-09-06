@@ -19,7 +19,7 @@ export class ReportManager {
             <div id="printReportModal" class="modal hidden no-print" style="z-index: 9999;">
                 <div class="modal-content" style="max-width: 850px; height: 90vh; background: #e2e8f0;">
                     <div class="modal-header no-print" style="background: white;">
-                        <h3><i class="fas fa-print"></i> תצוגה מקדימה להדפסה / ייצוא</h3>
+                        <h3><i class="fas fa-print text-primary"></i> תצוגה מקדימה להדפסה / ייצוא</h3>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <button class="btn btn-outline btn-sm" id="exportReportCsvBtn" title="ייצא טבלה לאקסל"><i class="fas fa-file-excel"></i> ייצוא אקסל</button>
                             <button class="btn btn-secondary btn-sm" id="directDownloadPdfBtn" title="הורד קובץ ישירות"><i class="fas fa-file-pdf"></i> הורד קובץ PDF</button>
@@ -28,19 +28,16 @@ export class ReportManager {
                         </div>
                     </div>
                     <div class="modal-body" id="printReportBodyWrapper" style="padding: 20px; overflow-y: auto; background: #e2e8f0;">
-                        <!-- עוטף מיוחד ל-PDF -->
                         <div id="printReportBody"></div>
                     </div>
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // ייצוא לאקסל
             document.getElementById('exportReportCsvBtn').addEventListener('click', () => {
                 if(this.lastRenderedStudents) this.exportToExcel(this.lastRenderedStudents);
             });
 
-            // הורדת PDF ישירה (מבלי להדפיס)
             document.getElementById('directDownloadPdfBtn').addEventListener('click', async () => {
                 await this.downloadDirectPdf();
             });
@@ -59,29 +56,28 @@ export class ReportManager {
 
     renderView() {
         const html = `
-            <div class="card error-card no-print" style="margin-bottom: 15px; background-color: #fffbeb; border-color: #fde68a; color: #b45309;">
+            <div class="card error-card no-print" style="margin-bottom: 15px; background-color: #fffbeb; border-color: #fde68a; color: #b45309; padding: 12px; border-radius: 8px;">
                 <i class="fas fa-tools"></i> <strong>הודעת מערכת:</strong> מודול הפקת הדוחות נמצא בפיתוח ראשוני, ועדיין יש בעיות בעיצוב.
             </div>
 
             <div class="card compact-card no-print" style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
-                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות תלמידים רשמיים</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px;">
+                    <h3 style="margin: 0;"><i class="fas fa-file-invoice text-primary"></i> הפקת דוחות תלמידים רשמיים</h3>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                    <!-- הגדרות דוח -->
-                    <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
-                        <h4 style="margin-bottom: 10px; font-size: 0.95rem;"><i class="fas fa-cog"></i> הגדרות תצוגת דוח</h4>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfCode" checked> הצג קוד תלמיד בדוח
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h4 style="margin-bottom: 15px; font-size: 1rem; color: #1e293b;"><i class="fas fa-cog"></i> הגדרות תצוגת דוח</h4>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <label style="font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="repConfCode" checked style="width: 16px; height: 16px;"> הצג קוד תלמיד בדוח
                             </label>
-                            <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfExamCode" checked> הצג עמודת קוד מבחן בטבלה
+                            <label style="font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="repConfExamCode" checked style="width: 16px; height: 16px;"> הצג עמודת קוד מבחן בטבלה
                             </label>
-                            <label style="font-size: 0.85rem; cursor: pointer;">
+                            <label style="font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-top: 5px;">
                                 גודל דף: 
-                                <select id="repConfSize" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
+                                <select id="repConfSize" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; outline: none;">
                                     <option value="A5">A5 (מומלץ וקומפקטי)</option>
                                     <option value="A4">A4 (גדול)</option>
                                 </select>
@@ -89,21 +85,20 @@ export class ReportManager {
                         </div>
                     </div>
 
-                    <!-- הפקה -->
                     <div style="display: flex; flex-direction: column; gap: 15px;">
-                        <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
-                            <h4 style="margin-bottom: 10px; font-size: 0.95rem;">דוח לתלמיד בודד</h4>
+                        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <h4 style="margin-bottom: 12px; font-size: 1rem; color: #1e293b;">דוח לתלמיד בודד</h4>
                             <div class="search-box">
                                 <i class="fas fa-search search-icon"></i>
-                                <input type="text" id="reportStudentSearch" placeholder="חיפוש קוד או שם..." autocomplete="off" style="width: 100%; padding: 6px 30px 6px 10px;">
+                                <input type="text" id="reportStudentSearch" placeholder="חיפוש קוד או שם..." autocomplete="off" style="width: 100%; padding: 10px 40px 10px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
                                 <div id="reportSearchResults" class="search-results-dropdown hidden"></div>
                             </div>
                         </div>
 
-                        <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
-                            <h4 style="margin-bottom: 10px; font-size: 0.95rem;">דוח מרוכז לכיתה שלמה</h4>
+                        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <h4 style="margin-bottom: 12px; font-size: 1rem; color: #1e293b;">דוח מרוכז לכיתה שלמה</h4>
                             <div style="display: flex; gap: 10px;">
-                                <select id="reportClassSelect" style="flex:1; padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; background: white;">
+                                <select id="reportClassSelect" style="flex:1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: white;">
                                     <option value="">-- בחר כיתה --</option>
                                     ${Array.from(this.classes).map(c => `<option value="${c}">כיתה ${c}</option>`).join('')}
                                 </select>
@@ -139,7 +134,7 @@ export class ReportManager {
 
             resultsDropdown.innerHTML = '';
             if (filtered.length === 0) {
-                resultsDropdown.innerHTML = '<div style="padding:10px;text-align:center;">לא נמצאו תלמידים</div>';
+                resultsDropdown.innerHTML = '<div style="padding:15px;text-align:center;color:#64748b;">לא נמצאו תלמידים</div>';
             } else {
                 filtered.forEach(student => {
                     const item = document.createElement('div');
@@ -163,11 +158,11 @@ export class ReportManager {
             }
         });
 
-        document.getElementById('generateClassReportBtn').addEventListener('click', () => {
+        document.getElementById('generateClassReportBtn').addEventListener('click', async () => {
             const cls = document.getElementById('reportClassSelect').value;
-            if (!cls) return alert('נא לבחור כיתה');
+            if (!cls) return await window.showCustomAlert('נא לבחור כיתה לפני הפקת הדוח.', true);
             const studentCodes = this.allStudents.filter(s => s.class_grade === cls).map(s => s.student_code);
-            if (studentCodes.length === 0) return alert('לא נמצאו תלמידים בכיתה זו');
+            if (studentCodes.length === 0) return await window.showCustomAlert('לא נמצאו תלמידים בכיתה זו.', true);
             this.generateAndShowReport(studentCodes);
         });
     }
@@ -188,10 +183,10 @@ export class ReportManager {
                 this.lastRenderedStudents = selectedStudents; 
                 this.buildReportHtml(selectedStudents);
             } else {
-                alert('שגיאה במשיכת נתונים מהשרת.');
+                await window.showCustomAlert('שגיאה במשיכת הנתונים העדכניים מהשרת.', true);
             }
         } catch (error) {
-            alert('שגיאת תקשורת.');
+            await window.showCustomAlert('שגיאת תקשורת במערכת.', true);
         } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -245,7 +240,6 @@ export class ReportManager {
 
             const styleSize = confSize === 'A5' ? 'width: 148mm; min-height: 210mm;' : 'width: 210mm; min-height: 297mm;';
 
-            // עיצוב תעודה רשמית ונקייה בשחור לבן
             completeHtml += `
                 <div class="print-container ${pageBreakClass}" data-size="${confSize}" style="background: white; padding: 15px; margin: 0 auto 20px auto; font-family: Arial, sans-serif; color: #000; box-sizing: border-box; position: relative; ${styleSize}">
                     <div style="border: 3px double #000; padding: 20px; box-sizing: border-box; height: 100%;">
@@ -332,7 +326,6 @@ export class ReportManager {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין קובץ...';
         btn.disabled = true;
 
-        // ייבוא דינמי של ספריית PDF במידה ולא קיימת
         if (typeof window.html2pdf === 'undefined') {
             try {
                 await new Promise((resolve, reject) => {
@@ -343,7 +336,7 @@ export class ReportManager {
                     document.head.appendChild(script);
                 });
             } catch (err) {
-                alert("שגיאה בטעינת כלי ה-PDF. ייתכן שיש חסימת רשת. אנא השתמש בכפתור ה'הדפסה' ושמור כ-PDF.");
+                await window.showCustomAlert("שגיאה בטעינת כלי ה-PDF. ייתכן שיש חסימת רשת. אנא השתמש בכפתור ה'הדפסה' ושמור כ-PDF.", true);
                 btn.innerHTML = origText;
                 btn.disabled = false;
                 return;
@@ -351,7 +344,7 @@ export class ReportManager {
         }
 
         const element = document.getElementById('printReportBody');
-        const confSize = document.getElementById('repConfSize').value.toLowerCase(); // a4 או a5
+        const confSize = document.getElementById('repConfSize').value.toLowerCase(); 
 
         const opt = {
             margin:       5,
