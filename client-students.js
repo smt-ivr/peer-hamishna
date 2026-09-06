@@ -192,14 +192,12 @@ export class StudentManager {
             this.saveStudent();
         });
 
-        // החלפת מצב יצירת קוד אוטומטי
         document.getElementById('formAutoCode').addEventListener('change', (e) => {
             const codeInput = document.getElementById('formStudentCode');
             codeInput.disabled = e.target.checked;
             if (e.target.checked) codeInput.value = '';
         });
 
-        // כפתור החלפת קוד תלמיד (במצב עריכה)
         document.getElementById('btnChangeCode').addEventListener('click', () => {
             const currentCode = document.getElementById('formOriginalCode').value;
             this.changeStudentCode(currentCode);
@@ -231,7 +229,6 @@ export class StudentManager {
         const codeInput = document.getElementById('formStudentCode');
 
         if (studentCode) {
-            // מצב עריכה
             const student = this.students.find(s => s.student_code === studentCode);
             if (student) {
                 title.innerHTML = '<i class="fas fa-pen"></i> עריכת פרטי תלמיד';
@@ -248,11 +245,10 @@ export class StudentManager {
                 codeInput.required = false;
             }
         } else {
-            // מצב הוספה
             title.innerHTML = '<i class="fas fa-user-plus"></i> רישום תלמיד חדש';
             addSection.classList.remove('hidden');
             editSection.classList.add('hidden');
-            codeInput.required = false; // ייבדק ידנית אם תיבת הסימון לא מסומנת
+            codeInput.required = false;
             codeInput.disabled = false;
         }
 
@@ -282,7 +278,6 @@ export class StudentManager {
 
         try {
             if (isEdit) {
-                // עדכון תלמיד קיים (ללא שינוי קוד - PUT /students/{student_code})
                 const response = await fetch(`${this.apiBase}/students/${originalCode}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -294,10 +289,9 @@ export class StudentManager {
                     if (this.onRefreshCallback) this.onRefreshCallback();
                 } else {
                     const err = await response.json();
-                    alert('שגיאה בעדכון: ' + (err.error || 'לא ידועה'));
+                    alert('שגיאה בעדכון: ' + (err.message || err.error || 'לא ידועה'));
                 }
             } else {
-                // יצירת תלמיד חדש (POST /students)
                 const autoCode = document.getElementById('formAutoCode').checked;
                 if (!autoCode) {
                     const code = document.getElementById('formStudentCode').value.trim();
@@ -326,7 +320,7 @@ export class StudentManager {
                     if (response.status === 400 && err.error && err.error.includes("exists")) {
                         alert('שגיאה: קוד התלמיד כבר קיים במערכת. בחר קוד אחר.');
                     } else {
-                        alert('שגיאה ביצירה: ' + (err.error || 'לא ידועה'));
+                        alert('שגיאה ביצירה: ' + (err.message || err.error || 'לא ידועה'));
                     }
                 }
             }
@@ -340,7 +334,7 @@ export class StudentManager {
 
     async changeStudentCode(oldCode) {
         const newCode = prompt(`הזן את קוד התלמיד החדש שיחליף את הקוד הקודם (${oldCode}):`);
-        if (!newCode || newCode.trim() === '') return; // המשתמש לחץ ביטול או השאיר ריק
+        if (!newCode || newCode.trim() === '') return;
         
         const finalNewCode = newCode.trim();
         if (finalNewCode === oldCode) {
@@ -357,14 +351,13 @@ export class StudentManager {
             if (response.ok) {
                 alert(`מעולה! קוד התלמיד עודכן בהצלחה ל-${finalNewCode} בכל רישומי המערכת.`);
                 document.getElementById('studentFormModal').classList.add('hidden');
-                // רענון כללי כדי שכל המסכים יכירו את הקוד החדש
                 if (this.onRefreshCallback) this.onRefreshCallback();
             } else {
                 const err = await response.json();
                 if (response.status === 409 || (err.error && err.error.includes('exists'))) {
                     alert('שגיאה: קוד התלמיד החדש שבחרת כבר תפוס על ידי תלמיד אחר במערכת.');
                 } else {
-                    alert('אירעה שגיאה בשינוי הקוד: ' + (err.error || 'נסה שוב מאוחר יותר.'));
+                    alert('אירעה שגיאה בשינוי הקוד: ' + (err.message || err.error || 'נסה שוב מאוחר יותר.'));
                 }
             }
         } catch (error) {
