@@ -4,44 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ניהול מבחני פאר המשנה</title>
+    <!-- הסמלון שהוסף -->
+    <link rel="icon" type="image/png" href="https://smt-tel-manager.netlify.app/smt.png">
     <link rel="stylesheet" href="/peer/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- מסך התחברות עם טשטוש רקע מתקדם -->
-    <div id="auth-overlay" class="modal" style="display: flex; z-index: 9999; background: rgba(248, 250, 252, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
-        <div class="modal-content auth-box" style="max-width: 420px; height: auto; text-align: center; padding: 40px 30px; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.8);">
-            <div style="background: var(--primary-color); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);">
-                <i class="fas fa-lock" style="color: white; font-size: 1.5rem;"></i>
+    <!-- מסך התחברות ובדיקת הרשאות (מעל האתר) -->
+    <div id="auth-overlay" class="modal hidden" style="display: flex; z-index: 9999; background: rgba(248, 250, 252, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+        <div class="modal-content" style="max-width: 380px; height: auto; text-align: center; padding: 30px; border-radius: 8px;">
+            <!-- מצב טעינה -->
+            <div id="auth-loading">
+                <i class="fas fa-spinner fa-spin fa-3x" style="color: var(--primary-color); margin-bottom: 15px;"></i>
+                <h3 style="color: var(--text-main);">מוודא הרשאות גישה...</h3>
             </div>
-            <h2 style="margin-bottom: 10px; font-weight: 700; color: #1e293b;">אבטחת מערכת</h2>
-            <p id="authMessage" class="text-muted" style="margin-bottom: 25px; font-size: 0.95rem;">כתובת ה-IP אינה מורשית, נדרשת סיסמה</p>
-            <div class="form-group">
-                <input type="password" id="apiKeyInput" placeholder="הזן מפתח גישה..." class="exam-code-input" style="text-align: center; font-size: 1.1rem; padding: 12px; border-radius: 8px; background: #f1f5f9;">
+            <!-- מצב הזנת סיסמה -->
+            <div id="auth-form" class="hidden">
+                <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false" style="width: 100px; margin: 0 auto 15px auto; display: block;">
+                <h2 style="margin-bottom: 10px;">אבטחת מערכת</h2>
+                <p id="authMessage" class="text-muted" style="margin-bottom: 20px;">כתובת ה-IP אינה מורשית, נדרשת סיסמה</p>
+                <input type="password" id="apiKeyInput" placeholder="הזן מפתח גישה..." class="exam-code-input" style="text-align: center; font-size: 1.1rem; padding: 10px; margin-bottom: 15px;">
+                <button id="loginBtn" class="btn btn-primary" style="width: 100%; justify-content: center; height: 38px;">כניסה למערכת</button>
+                <div id="loginError" style="color: #ef4444; font-size: 0.85rem; margin-top: 15px; display: none;"></div>
             </div>
-            <button id="loginBtn" class="btn btn-primary" style="width: 100%; margin-top: 20px; justify-content: center; height: 46px; font-size: 1.05rem; border-radius: 8px;">המשך למערכת</button>
-            <div id="loginError" class="text-danger" style="margin-top: 15px; display: none; font-weight: 500; font-size: 0.9rem;"></div>
         </div>
     </div>
 
-    <!-- מודל קופץ גלובלי להודעות (מחליף Alert/Confirm/Prompt) -->
-    <div id="customAlertOverlay" class="modal hidden" style="z-index: 10000; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); background: rgba(15, 23, 42, 0.4);">
-        <div class="modal-content" style="max-width: 400px; height: auto; text-align: center; padding: 30px; border-radius: 12px; border: none; box-shadow: 0 15px 35px rgba(0,0,0,0.2);">
-            <div id="customAlertIcon" style="font-size: 3.5rem; margin-bottom: 15px;"></div>
-            <h3 id="customAlertTitle" style="margin-bottom: 10px; font-size: 1.2rem; color: #1e293b;"></h3>
-            <p id="customAlertMessage" style="margin-bottom: 25px; color: #64748b; line-height: 1.5; font-size: 0.95rem;"></p>
-            <div id="customAlertButtons" style="display: flex; gap: 10px; justify-content: center;"></div>
+    <!-- מודל הודעות גלובלי (מחליף Alert, Confirm, Prompt) -->
+    <div id="customModalOverlay" class="modal hidden" style="z-index: 10000; background: rgba(15, 23, 42, 0.5);">
+        <div class="modal-content" style="max-width: 380px; height: auto; text-align: center; padding: 25px; border-radius: 6px;">
+            <div id="customModalIcon" style="font-size: 2.5rem; margin-bottom: 10px;"></div>
+            <h3 id="customModalTitle" style="margin-bottom: 10px; font-size: 1.1rem;"></h3>
+            <p id="customModalMessage" style="margin-bottom: 20px; font-size: 0.9rem; color: var(--text-muted);"></p>
+            <div id="customModalInputContainer" class="hidden" style="margin-bottom: 20px;">
+                <input type="text" id="customModalInput" class="exam-code-input" style="text-align: center; font-size: 1rem; padding: 8px;">
+            </div>
+            <div id="customModalButtons" style="display: flex; gap: 10px; justify-content: center;"></div>
         </div>
     </div>
 
     <div class="app-container">
+        <!-- סרגל הצד (Sidebar) המעודכן לבהיר -->
         <aside class="sidebar no-print">
             <div class="logo">
-                <h2 style="margin-bottom: 5px;">פאר המשנה</h2>
-                <div class="developer-credit">
-                    <span style="display: block; font-size: 0.75rem; margin-bottom: 6px;">פיתוח והקמת מערכות</span>
+                <!-- קונטיינר עם גובה קבוע כדי שהלוגו לא יקפוץ בטעינה -->
+                <div style="min-height: 80px; display: flex; align-items: center; justify-content: center; margin-bottom: 5px;">
                     <img src="https://smt-tel-manager.netlify.app/smt.png" alt="SMT Logo" class="smt-logo" draggable="false">
                 </div>
+                <h2>ניהול מבחני פאר המשנה</h2>
+            </div>
+            <div class="developer-credit">
+                פותח ע"י שימי טרייטל
             </div>
             <nav class="menu">
                 <a href="#" class="menu-item active" data-target="view-update">
@@ -59,17 +72,18 @@
                 <a href="#" class="menu-item" data-target="view-exams">
                     <i class="fas fa-file-alt"></i> ניהול מבחנים
                 </a>
-                <div style="flex: 1;"></div> 
-                <a href="#" class="menu-item" id="logoutBtn" style="color: #ef4444; border-top: 1px solid var(--border-color); margin-top: auto;">
-                    <i class="fas fa-sign-out-alt"></i> ניתוק מאובטח
+                <div style="flex: 1;"></div>
+                <a href="#" class="menu-item" id="logoutBtn" style="color: #ef4444; border-top: 1px solid var(--border-color);">
+                    <i class="fas fa-sign-out-alt"></i> התנתק
                 </a>
             </nav>
         </aside>
         
         <main class="main-content">
             <header class="topbar no-print">
-                <h1 style="color: var(--primary-color); font-weight: 700;">מערכת ניהול נתונים</h1>
+                <h1>ניהול מבחני פאר המשנה</h1>
             </header>
+
             <div class="content-area">
                 <div id="view-update" class="view-section active no-print">
                     <div id="search-section" class="card compact-card">
@@ -92,7 +106,7 @@
     </div>
 
     <div id="historyModal" class="modal hidden no-print">
-        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fas fa-history"></i> היסטוריית מבחנים לתלמיד</h3>
                 <button class="close-modal-btn" id="closeModalBtn">&times;</button>
