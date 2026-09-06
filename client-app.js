@@ -6,15 +6,93 @@ import { ReportManager } from './client-reports.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 
-// --- מעטפת Fetch גלובלית לטיפול ב-API Key ושגיאות השרת ---
+// --- מערכת הודעות (Modals) מעוצבת תחליף ל-Alert, Confirm, Prompt ---
+window.showCustomAlert = function(message, isError = false) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('customAlertOverlay');
+        document.getElementById('customAlertIcon').innerHTML = isError ? '<i class="fas fa-times-circle text-danger"></i>' : '<i class="fas fa-check-circle text-success" style="color:#10b981;"></i>';
+        document.getElementById('customAlertTitle').innerText = isError ? 'שגיאת מערכת' : 'הודעת מערכת';
+        document.getElementById('customAlertMessage').innerText = message;
+        
+        const btnContainer = document.getElementById('customAlertButtons');
+        btnContainer.innerHTML = '<button class="btn btn-primary" id="customAlertOkBtn" style="min-width: 120px;">הבנתי</button>';
+        
+        overlay.classList.remove('hidden');
+        document.getElementById('customAlertOkBtn').focus();
+        
+        document.getElementById('customAlertOkBtn').onclick = () => {
+            overlay.classList.add('hidden');
+            resolve(true);
+        };
+    });
+};
+
+window.showCustomConfirm = function(message) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('customAlertOverlay');
+        document.getElementById('customAlertIcon').innerHTML = '<i class="fas fa-question-circle text-warning"></i>';
+        document.getElementById('customAlertTitle').innerText = 'אישור פעולה';
+        document.getElementById('customAlertMessage').innerText = message;
+        
+        const btnContainer = document.getElementById('customAlertButtons');
+        btnContainer.innerHTML = `
+            <button class="btn btn-outline" id="customAlertCancelBtn" style="min-width: 100px;">ביטול</button>
+            <button class="btn btn-primary" id="customAlertConfirmBtn" style="min-width: 100px;">אישור</button>
+        `;
+        
+        overlay.classList.remove('hidden');
+        
+        document.getElementById('customAlertCancelBtn').onclick = () => {
+            overlay.classList.add('hidden');
+            resolve(false);
+        };
+        document.getElementById('customAlertConfirmBtn').onclick = () => {
+            overlay.classList.add('hidden');
+            resolve(true);
+        };
+    });
+};
+
+window.showCustomPrompt = function(message, defaultValue = '') {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('customAlertOverlay');
+        document.getElementById('customAlertIcon').innerHTML = '<i class="fas fa-edit text-primary"></i>';
+        document.getElementById('customAlertTitle').innerText = 'הזנת נתונים';
+        document.getElementById('customAlertMessage').innerText = message;
+        
+        const btnContainer = document.getElementById('customAlertButtons');
+        btnContainer.innerHTML = `
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="customPromptInput" class="exam-code-input" value="${defaultValue}" style="width: 100%; text-align: center; border: 2px solid var(--border-color); font-weight: bold; font-size: 1.1rem;">
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button class="btn btn-outline" id="customAlertCancelBtn" style="flex: 1;">ביטול</button>
+                    <button class="btn btn-primary" id="customAlertConfirmBtn" style="flex: 1;">אישור ושמירה</button>
+                </div>
+            </div>
+        `;
+        
+        overlay.classList.remove('hidden');
+        setTimeout(() => document.getElementById('customPromptInput').focus(), 50);
+        
+        document.getElementById('customAlertCancelBtn').onclick = () => {
+            overlay.classList.add('hidden');
+            resolve(null);
+        };
+        document.getElementById('customAlertConfirmBtn').onclick = () => {
+            const val = document.getElementById('customPromptInput').value;
+            overlay.classList.add('hidden');
+            resolve(val);
+        };
+    });
+};
+
+// --- מעטפת Fetch גלובלית ---
 const originalFetch = window.fetch;
 window.fetch = async function(...args) {
     let [resource, config] = args;
     if (typeof resource === 'string' && resource.startsWith(API_BASE)) {
         config = config || {};
         config.headers = config.headers || {};
-        
-        // הוספת מפתח אימות אם קיים
         const key = localStorage.getItem('peer_api_key');
         if (key) {
             config.headers['x-api-key'] = key;
@@ -22,14 +100,12 @@ window.fetch = async function(...args) {
 
         try {
             const response = await originalFetch(resource, config);
-            
-            // תפיסת שגיאות וקריאת הודעת השרת להקפצת Toast בכל המערכת
-            if (!response.ok) {
+            if (!response.ok && resource.indexOf('/auth-check') === -1) { // לא נקפיץ הודעה על בדיקת הרשאות ראשונית
                 response.clone().json().then(data => {
                     if (data && data.message) {
-                        showGlobalToast(data.message);
+                        window.showCustomAlert(data.message, true);
                     }
-                }).catch(() => {}); // התעלמות אם לא הוחזר JSON
+                }).catch(() => {});
             }
             return response;
         } catch (err) {
@@ -39,17 +115,6 @@ window.fetch = async function(...args) {
     return originalFetch(...args);
 };
 
-// פונקציית הודעות שגיאה גלובלית 
-function showGlobalToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'global-toast';
-    toast.innerHTML = `<i class="fas fa-exclamation-circle"></i> <span>${message}</span>`;
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 300);
-    }, 5000);
-}
 
 let allStudents = [];
 let allExams = [];
@@ -62,26 +127,33 @@ let reportManager;
 let refreshAllData;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    
-    // אירועי התחברות והתנתקות
     document.getElementById('loginBtn').addEventListener('click', performLogin);
     document.getElementById('logoutBtn').addEventListener('click', performLogout);
-
-    // בדיקת אימות מול השרת לפני טעינת שאר הנתונים
     await checkAuthAndInit();
 });
 
 async function checkAuthAndInit() {
+    // אם ה-IP אושר ב-Session הנוכחי, נדלג על הבדיקה כדי לחסוך קריאות ולזרז את המערכת
+    if (sessionStorage.getItem('peer_ip_allowed') === 'true') {
+        document.getElementById('auth-overlay').classList.add('hidden');
+        await initApp();
+        return;
+    }
+
     try {
         const response = await fetch(`${API_BASE}/auth-check`);
         const data = await response.json();
 
         if (data.is_authorized) {
+            if (data.is_ip_allowed) {
+                sessionStorage.setItem('peer_ip_allowed', 'true');
+            }
             document.getElementById('auth-overlay').classList.add('hidden');
             document.getElementById('loginError').style.display = 'none';
             await initApp();
         } else {
             document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('authMessage').innerText = 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
             if (data.message) {
                 const errDiv = document.getElementById('loginError');
                 errDiv.innerText = data.message;
@@ -100,23 +172,23 @@ async function performLogin() {
     if (!key) return;
     
     const btn = document.getElementById('loginBtn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> בודק...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מאמת נתונים...';
     btn.disabled = true;
     
     localStorage.setItem('peer_api_key', key);
     await checkAuthAndInit();
     
-    btn.innerHTML = 'כניסה למערכת';
+    btn.innerHTML = 'המשך למערכת';
     btn.disabled = false;
 }
 
 function performLogout() {
     localStorage.removeItem('peer_api_key');
+    sessionStorage.removeItem('peer_ip_allowed');
     location.reload();
 }
 
 async function initApp() {
-    // פונקציית רענון גלובלית שנקראת מתוך רכיבים לאחר ביצוע שינוי בשרת
     refreshAllData = async () => {
         await Promise.all([fetchStudentsList(), fetchExamsList()]);
         if(examManager) examManager.setExams(allExams);
@@ -126,7 +198,6 @@ async function initApp() {
         if(historyManager) historyManager.loadAndRender(allStudents, allExams);
     };
 
-    // אתחול המנהלים
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
     studentManager = new StudentManager(document.getElementById('view-students'), API_BASE, goToStudentUpdate, refreshAllData);
     examListManager = new ExamManager(document.getElementById('view-exams'));
@@ -135,8 +206,6 @@ async function initApp() {
     
     setupTabs();
     setupSearchBox();
-
-    // טעינת נתונים ראשונית בעליית האתר
     await refreshAllData();
 }
 
@@ -149,19 +218,14 @@ function setupTabs() {
             e.preventDefault();
             const targetId = item.getAttribute('data-target');
             
-            // עדכון כפתורים פעילים
             menuItems.forEach(mi => mi.classList.remove('active'));
             item.classList.add('active');
 
-            // החלפת תצוגות
             views.forEach(view => {
                 if (view.id === targetId) {
                     view.classList.remove('hidden');
                     view.classList.add('active');
-                    
-                    if (targetId === 'view-history') {
-                        historyManager.loadAndRender(allStudents, allExams);
-                    }
+                    if (targetId === 'view-history') historyManager.loadAndRender(allStudents, allExams);
                 } else {
                     view.classList.add('hidden');
                     view.classList.remove('active');
@@ -181,9 +245,7 @@ function goToStudentUpdate(studentCode) {
 async function fetchStudentsList() {
     try {
         const response = await fetch(`${API_BASE}/students?full_details=true`);
-        if(response.ok) {
-            allStudents = await response.json();
-        }
+        if(response.ok) allStudents = await response.json();
     } catch(error) {
         console.error('שגיאה בטעינת תלמידים:', error);
     }
@@ -192,9 +254,7 @@ async function fetchStudentsList() {
 async function fetchExamsList() {
     try {
         const response = await fetch(`${API_BASE}/exams`);
-        if(response.ok) {
-            allExams = await response.json();
-        }
+        if(response.ok) allExams = await response.json();
     } catch(error) {
         console.error('שגיאה בטעינת מבחנים:', error);
     }
@@ -221,7 +281,7 @@ function setupSearchBox() {
 
         resultsDropdown.innerHTML = '';
         if(filtered.length === 0) {
-            resultsDropdown.innerHTML = '<div style="padding:10px;text-align:center;">לא נמצאו תלמידים</div>';
+            resultsDropdown.innerHTML = '<div style="padding:15px;text-align:center;color:var(--text-muted);">לא נמצאו תלמידים</div>';
         } else {
             filtered.forEach(student => {
                 const item = document.createElement('div');
