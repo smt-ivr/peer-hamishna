@@ -156,7 +156,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // אם ה-IP כבר מאושר בזיכרון, מדלגים על הבדיקה ונכנסים מיד
     if (localStorage.getItem('peer_ip_allowed') === 'true') {
-        // מביאים נתונים ברקע כדי לעדכן את הסרגל העליון אם צריך
         fetchAuthAndSetupUI();
         await initApp();
     } else {
@@ -225,7 +224,6 @@ async function checkAuthAndInit() {
             updateTopbarInfo(data);
             await initApp();
         } else {
-            // ה-IP אינו מורשה - שמירת peer_ip_allowed לא קיימת, הצגת הודעת השרת בחלונית הסיסמה
             authMessage.innerText = data.message || 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
             
             apiKeyInput.disabled = false;
@@ -435,5 +433,5 @@ function onSwitchStudent() {
     document.getElementById('student-portal').classList.add('hidden');
     document.getElementById('search-section').classList.remove('hidden');
     document.getElementById('studentSearch').value = '';
-    document.getElementById('studentSearch'].focus();
+    document.getElementById('studentSearch').focus();
 }
