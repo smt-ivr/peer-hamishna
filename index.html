@@ -7,43 +7,43 @@
     <link rel="icon" type="image/png" href="https://smt-tel-manager.netlify.app/smt.png">
     <link rel="stylesheet" href="/peer/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- מנגנון מניעת הבהוב: אם ה-IP כבר מאושר בזיכרון, מסתיר את המסך מיד עוד לפני רינדור העמוד -->
+    <script>
+        if (localStorage.getItem('peer_ip_allowed') === 'true') {
+            document.write('<style>#auth-overlay { display: none !important; } #mainContainer { filter: none !important; pointer-events: auto !important; }</style>');
+        }
+    </script>
 </head>
 <body>
-    <!-- מסך התחברות ובדיקת הרשאות (מעל האתר) -->
+    <!-- מסך התחברות ובדיקת הרשאות (חלונית מאוחדת) -->
     <div id="auth-overlay" class="modal" style="display: flex; z-index: 9999; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);">
         <div class="modal-content auth-card">
-            <!-- מצב טעינה ובדיקת IP ראשונית -->
-            <div id="auth-loading">
-                <i class="fas fa-spinner fa-spin fa-3x" style="color: var(--primary-color); margin-bottom: 15px;"></i>
-                <h3 style="color: var(--text-main);">בודק הרשאות גישה ו-IP...</h3>
+            <div class="auth-logo-wrapper">
+                <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false">
+            </div>
+            <h2>אבטחת מערכת</h2>
+            <!-- הטקסט משתנה דינמית: בהתחלה בודק IP, ואם נכשל מציג את הודעת השרת -->
+            <p id="authMessage" class="text-muted" style="margin-bottom: 25px; font-size: 0.95rem;">
+                <i class="fas fa-spinner fa-spin" style="margin-left: 6px; color: var(--primary-color);"></i> בודק הרשאות גישה ו-IP...
+            </p>
+            
+            <div class="auth-input-group">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="apiKeyInput" placeholder="סיסמת גישה..." class="auth-input" autocomplete="off" disabled>
             </div>
             
-            <!-- מצב טופס הזנת סיסמה (מוסתר עד שהשרת מעדכן שה-IP לא מאושר) -->
-            <div id="auth-form" class="hidden">
-                <div class="auth-logo-wrapper">
-                    <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false">
-                </div>
-                <h2>אבטחת מערכת</h2>
-                <p id="authMessage" class="text-muted" style="margin-bottom: 25px; font-size: 0.95rem;">כתובת ה-IP אינה מורשית, נדרשת סיסמה</p>
-                
-                <div class="auth-input-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="apiKeyInput" placeholder="סיסמת גישה..." class="auth-input" autocomplete="off">
-                </div>
-                
-                <button id="loginBtn" class="btn btn-primary auth-btn">
-                    <span>כניסה למערכת</span>
-                    <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
-                </button>
-                
-                <div id="loginError" class="auth-error hidden">
-                    <i class="fas fa-exclamation-circle"></i> <span id="loginErrorText">סיסמה שגויה</span>
-                </div>
+            <button id="loginBtn" class="btn btn-primary auth-btn" disabled>
+                <span>מאמת נתונים...</span>
+            </button>
+            
+            <div id="loginError" class="auth-error hidden">
+                <i class="fas fa-exclamation-circle"></i> <span id="loginErrorText">סיסמה שגויה</span>
             </div>
         </div>
     </div>
 
-    <!-- עוטף האתר (מוצג בטשטוש כל עוד אין אישור) -->
+    <!-- עוטף האתר (מוצג בטשטוש עד לכניסה מאושרת) -->
     <div class="app-container blurred-bg" id="mainContainer">
         
         <aside class="sidebar no-print">
@@ -87,7 +87,7 @@
         
         <main class="main-content">
             <header class="topbar no-print">
-                <h1>מערכת ניהול מבחנים</h1>
+                <h1>ניהול מבחנים</h1>
             </header>
 
             <div class="content-area">
