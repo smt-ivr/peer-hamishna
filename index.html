@@ -23,7 +23,6 @@
                 <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false">
             </div>
             <h2>אבטחת מערכת</h2>
-            <!-- הטקסט משתנה דינמית: בהתחלה בודק IP, ואם נכשל מציג את הודעת השרת -->
             <p id="authMessage" class="text-muted" style="margin-bottom: 25px; font-size: 0.95rem;">
                 <i class="fas fa-spinner fa-spin" style="margin-left: 6px; color: var(--primary-color);"></i> בודק הרשאות גישה ו-IP...
             </p>
@@ -88,6 +87,8 @@
         <main class="main-content">
             <header class="topbar no-print">
                 <h1>ניהול מבחנים</h1>
+                <!-- אזור הנתונים החדש בסרגל העליון (באמצע) -->
+                <div id="topbar-info" class="topbar-info-container"></div>
             </header>
 
             <div class="content-area">
