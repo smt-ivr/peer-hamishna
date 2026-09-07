@@ -27,6 +27,24 @@ window.customAlert = function(message, isError = false) {
     });
 };
 
+// פונקציה להצגת חלונית הודעה עם כפתור "קראתי"
+window.showReadMessageModal = function(messageText) {
+    const overlay = document.getElementById('customModalOverlay');
+    document.getElementById('customModalIcon').innerHTML = '<i class="fas fa-info-circle" style="color:var(--primary-color);"></i>';
+    document.getElementById('customModalTitle').innerText = 'הודעת מערכת';
+    document.getElementById('customModalMessage').innerText = messageText;
+    document.getElementById('customModalInputContainer').classList.add('hidden');
+    
+    const btnContainer = document.getElementById('customModalButtons');
+    btnContainer.innerHTML = '<button class="btn btn-primary" id="msgReadBtn" style="min-width: 120px; justify-content: center;">קראתי</button>';
+    
+    overlay.classList.remove('hidden');
+    
+    document.getElementById('msgReadBtn').onclick = () => {
+        overlay.classList.add('hidden');
+    };
+};
+
 window.customConfirm = function(message) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('customModalOverlay');
@@ -136,14 +154,59 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // אם ה-IP כבר מאושר בזיכרון, נכנסים ישר בלי בדיקת שרת נוספת
+    // אם ה-IP כבר מאושר בזיכרון, מדלגים על הבדיקה ונכנסים מיד
     if (localStorage.getItem('peer_ip_allowed') === 'true') {
+        // מביאים נתונים ברקע כדי לעדכן את הסרגל העליון אם צריך
+        fetchAuthAndSetupUI();
         await initApp();
     } else {
-        // אם אין בזיכרון, מבצעים בדיקה מול השרת
         await checkAuthAndInit();
     }
 });
+
+// פונקציה לעדכון הנתונים בסרגל העליון בהתאם לפרמטרים הנדרשים
+function updateTopbarInfo(data) {
+    const container = document.getElementById('topbar-info');
+    if (!container) return;
+
+    let html = '';
+
+    // 1. שם מ-client_name או IP מ-client_ip
+    const identifier = data.client_name || data.client_ip;
+    if (identifier) {
+        html += `<span class="topbar-badge"><i class="fas fa-user-circle"></i> ${identifier}</span>`;
+    }
+
+    // 2. אם is_key_valid מופיע כ"כן"
+    if (data.is_key_valid === 'כן') {
+        html += `<span class="topbar-badge"><i class="fas fa-key" style="color:var(--primary-color);"></i> התחברות באמצעות סיסמא</span>`;
+    }
+
+    // 3. רמת הרשאה (admin או read_only בבולט)
+    if (data.access_level === 'admin') {
+        html += `<span class="topbar-badge" style="color:var(--success); border-color:#a7f3d0; background:#ecfdf5;"><i class="fas fa-shield-alt"></i> הרשאה מלאה</span>`;
+    } else if (data.access_level === 'read_only') {
+        html += `<span class="topbar-badge" style="color:var(--warning); border-color:#fde68a; background:#fffbeb;"><strong>הרשאה לצפייה בלבד</strong></span>`;
+    }
+
+    container.innerHTML = html;
+
+    // 4. אם קיים פרמטר message - הקפצת חלונית עם כפתור "קראתי"
+    if (data.message && !window._hasShownServerMsg) {
+        window._hasShownServerMsg = true;
+        window.showReadMessageModal(data.message);
+    }
+}
+
+async function fetchAuthAndSetupUI() {
+    try {
+        const response = await fetch(`${API_BASE}/auth-check`);
+        if (response.ok) {
+            const data = await response.json();
+            updateTopbarInfo(data);
+        }
+    } catch(e) {}
+}
 
 async function checkAuthAndInit() {
     const authMessage = document.getElementById('authMessage');
@@ -159,15 +222,18 @@ async function checkAuthAndInit() {
                 localStorage.setItem('peer_ip_allowed', 'true');
             }
             hideAuthOverlay();
+            updateTopbarInfo(data);
             await initApp();
         } else {
-            // ה-IP אינו מורשה - נעדכן את הטקסט בתוך החלונית ונפתח את השדה להזנה
+            // ה-IP אינו מורשה - שמירת peer_ip_allowed לא קיימת, הצגת הודעת השרת בחלונית הסיסמה
             authMessage.innerText = data.message || 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
             
             apiKeyInput.disabled = false;
             loginBtn.disabled = false;
             loginBtn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
             apiKeyInput.focus();
+            
+            updateTopbarInfo(data);
         }
     } catch (e) {
         authMessage.innerText = 'שגיאת תקשורת בבדיקת הרשאות מול השרת.';
@@ -214,6 +280,7 @@ async function performLogin() {
             }
             
             hideAuthOverlay();
+            updateTopbarInfo(data);
             await initApp();
         } else {
             errText.innerText = data.message || 'סיסמה שגויה, נסה שוב.';
@@ -368,5 +435,5 @@ function onSwitchStudent() {
     document.getElementById('student-portal').classList.add('hidden');
     document.getElementById('search-section').classList.remove('hidden');
     document.getElementById('studentSearch').value = '';
-    document.getElementById('studentSearch').focus();
+    document.getElementById('studentSearch'].focus();
 }
