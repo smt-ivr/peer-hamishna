@@ -17,7 +17,7 @@
 body { background-color: var(--bg-color); color: var(--text-main); font-size: 14px; }
 .app-container { display: flex; height: 100vh; overflow: hidden; }
 
-/* תפריט צד מעודכן */
+/* תפריט צד */
 .sidebar { width: 220px; background-color: var(--sidebar-bg); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 0; }
 .site-title { padding: 20px 15px; border-bottom: 1px solid var(--border-color); text-align: center; }
 .site-title h2 { font-size: 1.1rem; color: var(--primary-color); margin: 0; font-weight: 700; line-height: 1.3; }
@@ -37,10 +37,64 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
 .logout-btn i { color: #ef4444 !important; }
 .logout-btn:hover { background-color: #fef2f2 !important; color: #dc2626 !important; border-right-color: #dc2626 !important; }
 
-/* אזור מרכזי */
+/* אזור מרכזי וסרגל עליון */
 .main-content { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.topbar { padding: 12px 25px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; }
-.topbar h1 { font-size: 1.1rem; margin: 0; }
+.topbar { padding: 12px 25px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px; }
+.topbar h1 { font-size: 1.1rem; margin: 0; white-space: nowrap; }
+
+/* ----------------------------------------------------
+   עיצוב מתקדם ויוקרתי לתגים בסרגל העליון (Topbar Badges)
+   ---------------------------------------------------- */
+.topbar-info-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: auto; /* דוחף את כל האזור לצד שמאל */
+}
+
+.topbar-badge {
+    background: #ffffff;
+    color: var(--text-main);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    transition: all 0.2s ease;
+}
+
+.topbar-badge:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.04);
+}
+
+/* עיצוב משודרג להרשאה מלאה (Admin) */
+.topbar-badge.admin-badge, 
+.topbar-badge:has(.fa-shield-alt) {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+    font-weight: 600;
+}
+
+/* עיצוב משודרג להרשאה לצפייה בלבד (Read-only) */
+.topbar-badge.readonly-badge,
+.topbar-badge:has(strong) {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+/* עיצוב מותאם לתגית משתמש/IP ותגית סיסמה */
+.topbar-badge i {
+    font-size: 0.95rem;
+}
+
 .content-area { flex: 1; padding: 15px 25px; overflow-y: hidden; display: flex; flex-direction: column; }
 .view-section { display: flex; flex-direction: column; height: 100%; }
 .view-section.hidden { display: none !important; }
@@ -256,7 +310,6 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     font-weight: 500;
 }
 
-/* אנימציית שגיאה (רעידה כמו באייפון) */
 @keyframes shakeError {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
@@ -279,6 +332,9 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .developer-credit { margin: 0; }
     .logout-btn { border-top: none; }
     
+    .topbar { flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 15px; }
+    .topbar-info-container { margin-left: 0; width: 100%; justify-content: flex-start; }
+    
     .content-area { padding: 10px; overflow-y: visible; }
     .exam-row-item { grid-template-columns: 1fr; gap: 6px; padding: 10px; }
     .compact-header { flex-direction: column; gap: 10px; align-items: flex-start; }
@@ -298,25 +354,4 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     @page { margin: 1cm; }
     .print-container[data-size="A5"] { width: 148mm !important; height: 210mm !important; }
     .print-container[data-size="A4"] { width: 210mm !important; height: 297mm !important; }
-}
-/* עיצוב התגים בסרגל העליון */
-.topbar-info-container {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.topbar-badge {
-    background: #f1f5f9;
-    color: var(--text-main);
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border: 1px solid var(--border-color);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
