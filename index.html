@@ -3,48 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ניהול פאר המשנה</title>
+    <title>מערכת ניהול מבחנים</title>
     <link rel="icon" type="image/png" href="https://smt-tel-manager.netlify.app/smt.png">
     <link rel="stylesheet" href="/peer/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <!-- מסך התחברות ובדיקת הרשאות (מעל האתר) -->
-    <div id="auth-overlay" class="modal hidden" style="display: flex; z-index: 9999; background: rgba(248, 250, 252, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
-        <div class="modal-content" style="max-width: 380px; height: auto; text-align: center; padding: 30px; border-radius: 8px;">
-            <div id="auth-loading">
-                <i class="fas fa-spinner fa-spin fa-3x" style="color: var(--primary-color); margin-bottom: 15px;"></i>
-                <h3 style="color: var(--text-main);">מוודא הרשאות גישה...</h3>
+    <div id="auth-overlay" class="modal" style="display: flex; z-index: 9999; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);">
+        <div class="modal-content auth-card">
+            <div class="auth-header">
+                <div class="logo-wrapper auth-logo-wrapper">
+                    <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false">
+                </div>
+                <h2>כניסה למערכת</h2>
+                <p class="text-muted" style="margin-bottom: 25px; font-size: 0.95rem;">המערכת מוגנת. אנא הזן סיסמת גישה כדי להמשיך.</p>
             </div>
-            <div id="auth-form" class="hidden">
-                <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false" style="width: 100px; margin: 0 auto 15px auto; display: block;">
-                <h2 style="margin-bottom: 10px;">אבטחת מערכת</h2>
-                <p id="authMessage" class="text-muted" style="margin-bottom: 20px;">כתובת ה-IP אינה מורשית, נדרשת סיסמה</p>
-                <input type="password" id="apiKeyInput" placeholder="הזן מפתח גישה..." class="exam-code-input" style="text-align: center; font-size: 1.1rem; padding: 10px; margin-bottom: 15px;">
-                <button id="loginBtn" class="btn btn-primary" style="width: 100%; justify-content: center; height: 38px;">כניסה למערכת</button>
-                <div id="loginError" style="color: #ef4444; font-size: 0.85rem; margin-top: 15px; display: none;"></div>
+            
+            <div class="auth-input-group">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="apiKeyInput" placeholder="סיסמת גישה..." class="auth-input" autocomplete="off">
+            </div>
+            
+            <button id="loginBtn" class="btn btn-primary auth-btn">
+                <span>היכנס למערכת</span>
+                <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
+            </button>
+            
+            <div id="loginError" class="auth-error hidden">
+                <i class="fas fa-exclamation-circle"></i> <span id="loginErrorText">סיסמה שגויה</span>
             </div>
         </div>
     </div>
 
-    <!-- מודל הודעות גלובלי (מחליף Alert, Confirm, Prompt) -->
-    <div id="customModalOverlay" class="modal hidden" style="z-index: 10000; background: rgba(15, 23, 42, 0.5);">
-        <div class="modal-content" style="max-width: 380px; height: auto; text-align: center; padding: 25px; border-radius: 6px;">
-            <div id="customModalIcon" style="font-size: 2.5rem; margin-bottom: 10px;"></div>
-            <h3 id="customModalTitle" style="margin-bottom: 10px; font-size: 1.1rem;"></h3>
-            <p id="customModalMessage" style="margin-bottom: 20px; font-size: 0.9rem; color: var(--text-muted);"></p>
-            <div id="customModalInputContainer" class="hidden" style="margin-bottom: 20px;">
-                <input type="text" id="customModalInput" class="exam-code-input" style="text-align: center; font-size: 1rem; padding: 8px;">
-            </div>
-            <div id="customModalButtons" style="display: flex; gap: 10px; justify-content: center;"></div>
-        </div>
-    </div>
-
-    <div class="app-container">
-        <!-- סרגל הצד (Sidebar) המעודכן -->
+    <!-- עוטף האתר (מקבל את אפקט הטשטוש) -->
+    <div class="app-container blurred-bg" id="mainContainer">
+        
         <aside class="sidebar no-print">
             <div class="site-title">
-                <h2>ניהול פאר המשנה</h2>
+                <h2>מערכת ניהול מבחנים</h2>
             </div>
             
             <nav class="menu">
@@ -83,7 +80,7 @@
         
         <main class="main-content">
             <header class="topbar no-print">
-                <h1>ניהול פאר המשנה</h1>
+                <h1>מערכת ניהול מבחנים</h1>
             </header>
 
             <div class="content-area">
@@ -107,6 +104,19 @@
         </main>
     </div>
 
+    <!-- מודל הודעות גלובלי -->
+    <div id="customModalOverlay" class="modal hidden" style="z-index: 10000; background: rgba(15, 23, 42, 0.5);">
+        <div class="modal-content" style="max-width: 380px; height: auto; text-align: center; padding: 25px; border-radius: 6px;">
+            <div id="customModalIcon" style="font-size: 2.5rem; margin-bottom: 10px;"></div>
+            <h3 id="customModalTitle" style="margin-bottom: 10px; font-size: 1.1rem;"></h3>
+            <p id="customModalMessage" style="margin-bottom: 20px; font-size: 0.9rem; color: var(--text-muted);"></p>
+            <div id="customModalInputContainer" class="hidden" style="margin-bottom: 20px;">
+                <input type="text" id="customModalInput" class="exam-code-input" style="text-align: center; font-size: 1rem; padding: 8px;">
+            </div>
+            <div id="customModalButtons" style="display: flex; gap: 10px; justify-content: center;"></div>
+        </div>
+    </div>
+
     <div id="historyModal" class="modal hidden no-print">
         <div class="modal-content">
             <div class="modal-header">
@@ -116,6 +126,14 @@
             <div class="modal-body" id="modalHistoryBody"></div>
         </div>
     </div>
+    
+    <!-- מנגנון למניעת הבהוב החלונית (FOUC) - מופעל ישירות לפני טעינת שאר האתר -->
+    <script>
+        if (localStorage.getItem('peer_ip_allowed') === 'true') {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('mainContainer').classList.remove('blurred-bg');
+        }
+    </script>
     
     <script type="module" src="/peer/client-app.js"></script>
 </body>
