@@ -136,8 +136,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // בטעינה הראשונה נבדוק אוטומטית את הרשאות ה-IP או המפתח מול השרת
-    await checkAuthAndInit();
+    // בדיקה האם ה-IP כבר סומן כמאושר בזיכרון המקומי
+    if (localStorage.getItem('peer_ip_allowed') === 'true') {
+        hideAuthOverlay();
+        await initApp();
+    } else {
+        // אם אין אישור שמור בזיכרון, פונים לשרת לבדיקת ה-IP
+        await checkAuthAndInit();
+    }
 });
 
 async function checkAuthAndInit() {
@@ -162,7 +168,7 @@ async function checkAuthAndInit() {
             hideAuthOverlay();
             await initApp();
         } else {
-            // ה-IP אינו מורשית או אין הרשאה - מציגים את טופס הסיסמה ואת הודעת השרת
+            // ה-IP אינו מורשה - הצגת טופס הסיסמה וההודעה מהשרת
             loading.classList.add('hidden');
             form.classList.remove('hidden');
             
