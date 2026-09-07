@@ -299,3 +299,24 @@ body { background-color: var(--bg-color); color: var(--text-main); font-size: 14
     .print-container[data-size="A5"] { width: 148mm !important; height: 210mm !important; }
     .print-container[data-size="A4"] { width: 210mm !important; height: 297mm !important; }
 }
+/* עיצוב התגים בסרגל העליון */
+.topbar-info-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.topbar-badge {
+    background: #f1f5f9;
+    color: var(--text-main);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
