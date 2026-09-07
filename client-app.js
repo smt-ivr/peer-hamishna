@@ -136,26 +136,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // בדיקה האם ה-IP כבר סומן כמאושר בזיכרון המקומי
+    // אם ה-IP כבר מאושר בזיכרון, נכנסים ישר בלי בדיקת שרת נוספת
     if (localStorage.getItem('peer_ip_allowed') === 'true') {
-        hideAuthOverlay();
         await initApp();
     } else {
-        // אם אין אישור שמור בזיכרון, פונים לשרת לבדיקת ה-IP
+        // אם אין בזיכרון, מבצעים בדיקה מול השרת
         await checkAuthAndInit();
     }
 });
 
 async function checkAuthAndInit() {
-    const overlay = document.getElementById('auth-overlay');
-    const loading = document.getElementById('auth-loading');
-    const form = document.getElementById('auth-form');
     const authMessage = document.getElementById('authMessage');
-    
-    overlay.style.display = 'flex';
-    loading.classList.remove('hidden');
-    form.classList.add('hidden');
-    document.getElementById('mainContainer').classList.add('blurred-bg');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const loginBtn = document.getElementById('loginBtn');
 
     try {
         const response = await fetch(`${API_BASE}/auth-check`);
@@ -168,23 +161,20 @@ async function checkAuthAndInit() {
             hideAuthOverlay();
             await initApp();
         } else {
-            // ה-IP אינו מורשה - הצגת טופס הסיסמה וההודעה מהשרת
-            loading.classList.add('hidden');
-            form.classList.remove('hidden');
+            // ה-IP אינו מורשה - נעדכן את הטקסט בתוך החלונית ונפתח את השדה להזנה
+            authMessage.innerText = data.message || 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
             
-            if (data.message) {
-                authMessage.innerText = data.message;
-            } else {
-                authMessage.innerText = 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
-            }
-            
-            document.getElementById('apiKeyInput').focus();
+            apiKeyInput.disabled = false;
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
+            apiKeyInput.focus();
         }
     } catch (e) {
-        loading.classList.add('hidden');
-        form.classList.remove('hidden');
         authMessage.innerText = 'שגיאת תקשורת בבדיקת הרשאות מול השרת.';
-        document.getElementById('apiKeyInput').focus();
+        apiKeyInput.disabled = false;
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
+        apiKeyInput.focus();
     }
 }
 
