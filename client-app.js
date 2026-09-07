@@ -129,24 +129,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loginBtn').addEventListener('click', performLogin);
     document.getElementById('logoutBtn').addEventListener('click', performLogout);
     
-    // אם ה-IP כבר סומן במחשב (בזכרון קשיח LocalStorage), נריץ רק בדיקה סמויה
+    // הפעלת לחיצת Enter בשדה הסיסמה
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    apiKeyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            performLogin();
+        }
+    });
+    
+    // אם ה-IP כבר סומן במחשב נטען ישירות, אחרת מפעילים מיקוד (Focus) על שדה הסיסמה
     if (localStorage.getItem('peer_ip_allowed') === 'true') {
-        document.getElementById('auth-overlay').classList.add('hidden');
-        await initApp(); // טוען את האתר מיד
+        await initApp();
     } else {
-        await checkAuthAndInit(); // מציג אנימציית טעינה ובודק
+        setTimeout(() => {
+            apiKeyInput.focus();
+        }, 150);
     }
 });
 
-async function checkAuthAndInit() {
-    const overlay = document.getElementById('auth-overlay');
-    const loading = document.getElementById('auth-loading');
-    const form = document.getElementById('auth-form');
+async function performLogin() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (!key) return;
     
-    overlay.classList.remove('hidden');
-    loading.classList.remove('hidden');
-    form.classList.add('hidden');
-
+    const btn = document.getElementById('loginBtn');
+    const errDiv = document.getElementById('loginError');
+    const errText = document.getElementById('loginErrorText');
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>מאמת נתונים...</span>';
+    btn.disabled = true;
+    
+    // הסתרת שגיאה קודמת והסרת כיתת רעידה אם קיימת
+    errDiv.classList.add('hidden');
+    errDiv.style.animation = 'none';
+    
+    localStorage.setItem('peer_api_key', key);
+    
     try {
         const response = await fetch(`${API_BASE}/auth-check`);
         const data = await response.json();
@@ -155,43 +172,38 @@ async function checkAuthAndInit() {
             if (data.is_ip_allowed) {
                 localStorage.setItem('peer_ip_allowed', 'true');
             }
-            overlay.classList.add('hidden');
+            
+            // כניסה חלקה - הסרת הטשטוש והסתרת המודל
+            document.getElementById('auth-overlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('auth-overlay').style.display = 'none';
+            }, 300);
+            
+            document.getElementById('mainContainer').classList.remove('blurred-bg');
             await initApp();
         } else {
-            loading.classList.add('hidden');
-            form.classList.remove('hidden');
-            if (data.message) {
-                const errDiv = document.getElementById('loginError');
-                errDiv.innerText = data.message;
-                errDiv.style.display = 'block';
-            }
+            // טיפול בסיסמה שגויה
+            errText.innerText = data.message || 'סיסמה שגויה, נסה שוב.';
+            errDiv.classList.remove('hidden');
+            // הפעלת אנימציית רעידה
+            setTimeout(() => { errDiv.style.animation = ''; }, 10);
+            
+            localStorage.removeItem('peer_api_key');
+            document.getElementById('apiKeyInput').value = '';
+            document.getElementById('apiKeyInput').focus();
         }
     } catch (e) {
-        loading.classList.add('hidden');
-        form.classList.remove('hidden');
-        document.getElementById('loginError').innerText = 'שגיאת תקשורת בבדיקת הרשאות.';
-        document.getElementById('loginError').style.display = 'block';
+        errText.innerText = 'שגיאת תקשורת עם השרת.';
+        errDiv.classList.remove('hidden');
+    } finally {
+        btn.innerHTML = '<span>היכנס למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
+        btn.disabled = false;
     }
-}
-
-async function performLogin() {
-    const key = document.getElementById('apiKeyInput').value.trim();
-    if (!key) return;
-    
-    const btn = document.getElementById('loginBtn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מאמת...';
-    btn.disabled = true;
-    
-    localStorage.setItem('peer_api_key', key);
-    await checkAuthAndInit();
-    
-    btn.innerHTML = 'כניסה למערכת';
-    btn.disabled = false;
 }
 
 function performLogout() {
     localStorage.removeItem('peer_api_key');
-    localStorage.removeItem('peer_ip_allowed'); // מוחק גם את הרשאת ה-IP
+    localStorage.removeItem('peer_ip_allowed'); 
     location.reload();
 }
 
