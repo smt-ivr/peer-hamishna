@@ -12,31 +12,38 @@
     <!-- מסך התחברות ובדיקת הרשאות (מעל האתר) -->
     <div id="auth-overlay" class="modal" style="display: flex; z-index: 9999; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);">
         <div class="modal-content auth-card">
-            <div class="auth-header">
-                <div class="logo-wrapper auth-logo-wrapper">
+            <!-- מצב טעינה ובדיקת IP ראשונית -->
+            <div id="auth-loading">
+                <i class="fas fa-spinner fa-spin fa-3x" style="color: var(--primary-color); margin-bottom: 15px;"></i>
+                <h3 style="color: var(--text-main);">בודק הרשאות גישה ו-IP...</h3>
+            </div>
+            
+            <!-- מצב טופס הזנת סיסמה (מוסתר עד שהשרת מעדכן שה-IP לא מאושר) -->
+            <div id="auth-form" class="hidden">
+                <div class="auth-logo-wrapper">
                     <img src="https://smt-tel-manager.netlify.app/smt.png" class="smt-logo" draggable="false">
                 </div>
-                <h2>כניסה למערכת</h2>
-                <p class="text-muted" style="margin-bottom: 25px; font-size: 0.95rem;">המערכת מוגנת. אנא הזן סיסמת גישה כדי להמשיך.</p>
-            </div>
-            
-            <div class="auth-input-group">
-                <i class="fas fa-lock"></i>
-                <input type="password" id="apiKeyInput" placeholder="סיסמת גישה..." class="auth-input" autocomplete="off">
-            </div>
-            
-            <button id="loginBtn" class="btn btn-primary auth-btn">
-                <span>היכנס למערכת</span>
-                <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
-            </button>
-            
-            <div id="loginError" class="auth-error hidden">
-                <i class="fas fa-exclamation-circle"></i> <span id="loginErrorText">סיסמה שגויה</span>
+                <h2>אבטחת מערכת</h2>
+                <p id="authMessage" class="text-muted" style="margin-bottom: 25px; font-size: 0.95rem;">כתובת ה-IP אינה מורשית, נדרשת סיסמה</p>
+                
+                <div class="auth-input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="apiKeyInput" placeholder="סיסמת גישה..." class="auth-input" autocomplete="off">
+                </div>
+                
+                <button id="loginBtn" class="btn btn-primary auth-btn">
+                    <span>כניסה למערכת</span>
+                    <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
+                </button>
+                
+                <div id="loginError" class="auth-error hidden">
+                    <i class="fas fa-exclamation-circle"></i> <span id="loginErrorText">סיסמה שגויה</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- עוטף האתר (מקבל את אפקט הטשטוש) -->
+    <!-- עוטף האתר (מוצג בטשטוש כל עוד אין אישור) -->
     <div class="app-container blurred-bg" id="mainContainer">
         
         <aside class="sidebar no-print">
@@ -126,14 +133,6 @@
             <div class="modal-body" id="modalHistoryBody"></div>
         </div>
     </div>
-    
-    <!-- מנגנון למניעת הבהוב החלונית (FOUC) - מופעל ישירות לפני טעינת שאר האתר -->
-    <script>
-        if (localStorage.getItem('peer_ip_allowed') === 'true') {
-            document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('mainContainer').classList.remove('blurred-bg');
-        }
-    </script>
     
     <script type="module" src="/peer/client-app.js"></script>
 </body>
