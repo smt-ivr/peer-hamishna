@@ -136,24 +136,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    // בדיקת הרשאות מול הזיכרון והשרת בטעינה הראשונית
-    if (localStorage.getItem('peer_ip_allowed') === 'true') {
-        hideAuthOverlay();
-        await initApp();
-    } else if (localStorage.getItem('peer_api_key')) {
-        // אם יש מפתח שמור בזיכרון, נבדוק אותו מול השרת בשקט
-        await checkAuthAndInit();
-    } else {
-        setTimeout(() => {
-            apiKeyInput.focus();
-        }, 150);
-    }
+    // בטעינה הראשונה נבדוק אוטומטית את הרשאות ה-IP או המפתח מול השרת
+    await checkAuthAndInit();
 });
 
 async function checkAuthAndInit() {
-    const errDiv = document.getElementById('loginError');
-    const errText = document.getElementById('loginErrorText');
+    const overlay = document.getElementById('auth-overlay');
+    const loading = document.getElementById('auth-loading');
+    const form = document.getElementById('auth-form');
+    const authMessage = document.getElementById('authMessage');
     
+    overlay.style.display = 'flex';
+    loading.classList.remove('hidden');
+    form.classList.add('hidden');
+    document.getElementById('mainContainer').classList.add('blurred-bg');
+
     try {
         const response = await fetch(`${API_BASE}/auth-check`);
         const data = await response.json();
@@ -165,19 +162,22 @@ async function checkAuthAndInit() {
             hideAuthOverlay();
             await initApp();
         } else {
-            // אם המפתח השמור שגוי, ננקה אותו וניתן להתמקד בשדה
-            localStorage.removeItem('peer_api_key');
-            document.getElementById('auth-overlay').style.display = 'flex';
-            document.getElementById('mainContainer').classList.add('blurred-bg');
-            document.getElementById('apiKeyInput').focus();
+            // ה-IP אינו מורשית או אין הרשאה - מציגים את טופס הסיסמה ואת הודעת השרת
+            loading.classList.add('hidden');
+            form.classList.remove('hidden');
+            
             if (data.message) {
-                errText.innerText = data.message;
-                errDiv.classList.remove('hidden');
+                authMessage.innerText = data.message;
+            } else {
+                authMessage.innerText = 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
             }
+            
+            document.getElementById('apiKeyInput').focus();
         }
     } catch (e) {
-        document.getElementById('auth-overlay').style.display = 'flex';
-        document.getElementById('mainContainer').classList.add('blurred-bg');
+        loading.classList.add('hidden');
+        form.classList.remove('hidden');
+        authMessage.innerText = 'שגיאת תקשורת בבדיקת הרשאות מול השרת.';
         document.getElementById('apiKeyInput').focus();
     }
 }
@@ -187,6 +187,7 @@ function hideAuthOverlay() {
     overlay.style.opacity = '0';
     setTimeout(() => {
         overlay.style.display = 'none';
+        overlay.style.opacity = '1';
     }, 300);
     document.getElementById('mainContainer').classList.remove('blurred-bg');
 }
@@ -231,7 +232,7 @@ async function performLogin() {
         errText.innerText = 'שגיאת תקשורת עם השרת.';
         errDiv.classList.remove('hidden');
     } finally {
-        btn.innerHTML = '<span>היכנס למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
+        btn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
         btn.disabled = false;
     }
 }
