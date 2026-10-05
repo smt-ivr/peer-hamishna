@@ -3,21 +3,36 @@ export class ReportManager {
         this.container = container;
         this.apiBase = apiBase;
         this.allStudents = [];
+        this.allExams = [];
         this.classes = new Set();
         this.injectModal();
+        this.logoUrl = 'https://smti.uk/img/peer.jpg';
     }
 
     setStudents(students) {
         this.allStudents = students;
         this.classes = new Set(this.allStudents.map(s => s.class_grade).filter(Boolean).sort());
-        this.renderView();
+        this.fetchExams(); // חשוב: צריך למשוך את כל המבחנים
+    }
+
+    async fetchExams() {
+        try {
+            const response = await fetch(`${this.apiBase}/exams`);
+            if (response.ok) {
+                this.allExams = await response.json();
+                this.renderView(); // מרנדר את המסך רק אחרי שיש לנו את המבחנים
+            }
+        } catch (error) {
+            console.error('שגיאה במשיכת מבחנים לדוחות', error);
+            this.renderView(); // נרנדר בכל זאת, למקרה שנרצה להציג שגיאה אח"כ
+        }
     }
 
     injectModal() {
         if (!document.getElementById('printReportModal')) {
             const modalHtml = `
             <div id="printReportModal" class="modal hidden no-print" style="z-index: 9999;">
-                <div class="modal-content" style="max-width: 850px; height: 90vh; background: #e2e8f0;">
+                <div class="modal-content" style="max-width: 900px; height: 95vh; background: #e2e8f0;">
                     <div class="modal-header no-print" style="background: white;">
                         <h3><i class="fas fa-print"></i> תצוגה מקדימה להדפסה / ייצוא</h3>
                         <div style="display:flex; gap:10px; align-items:center;">
@@ -28,19 +43,16 @@ export class ReportManager {
                         </div>
                     </div>
                     <div class="modal-body" id="printReportBodyWrapper" style="padding: 20px; overflow-y: auto; background: #e2e8f0;">
-                        <!-- עוטף מיוחד ל-PDF -->
                         <div id="printReportBody"></div>
                     </div>
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // ייצוא לאקסל
             document.getElementById('exportReportCsvBtn').addEventListener('click', () => {
                 if(this.lastRenderedStudents) this.exportToExcel(this.lastRenderedStudents);
             });
 
-            // הורדת PDF ישירה (מבלי להדפיס)
             document.getElementById('directDownloadPdfBtn').addEventListener('click', async () => {
                 await this.downloadDirectPdf();
             });
@@ -59,37 +71,28 @@ export class ReportManager {
 
     renderView() {
         const html = `
-            <div class="card error-card no-print" style="margin-bottom: 15px; background-color: #fffbeb; border-color: #fde68a; color: #b45309;">
-                <i class="fas fa-tools"></i> <strong>הודעת מערכת:</strong> מודול הפקת הדוחות נמצא בפיתוח ראשוני, ועדיין יש בעיות בעיצוב.
-            </div>
-
             <div class="card compact-card no-print" style="margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
-                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות תלמידים רשמיים</h3>
+                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות תלמידים (תואם טופס מקורי)</h3>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                    <!-- הגדרות דוח -->
                     <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
                         <h4 style="margin-bottom: 10px; font-size: 0.95rem;"><i class="fas fa-cog"></i> הגדרות תצוגת דוח</h4>
                         <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfCode" checked> הצג קוד תלמיד בדוח
-                            </label>
-                            <label style="font-size: 0.85rem; cursor: pointer;">
-                                <input type="checkbox" id="repConfExamCode" checked> הצג עמודת קוד מבחן בטבלה
-                            </label>
-                            <label style="font-size: 0.85rem; cursor: pointer;">
+                             <label style="font-size: 0.85rem; cursor: pointer;">
                                 גודל דף: 
                                 <select id="repConfSize" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
-                                    <option value="A5">A5 (מומלץ וקומפקטי)</option>
-                                    <option value="A4">A4 (גדול)</option>
+                                    <option value="A4">A4 (גדול ומרווח - מומלץ לטופס מלא)</option>
+                                    <option value="A5">A5 (קומפקטי)</option>
                                 </select>
                             </label>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">
+                                <i class="fas fa-info-circle"></i> הדוח מציג את כל המבחנים הרלוונטיים לכיתת התלמיד.
+                            </p>
                         </div>
                     </div>
 
-                    <!-- הפקה -->
                     <div style="display: flex; flex-direction: column; gap: 15px;">
                         <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
                             <h4 style="margin-bottom: 10px; font-size: 0.95rem;">דוח לתלמיד בודד</h4>
@@ -175,10 +178,11 @@ export class ReportManager {
     async generateAndShowReport(studentCodesArray) {
         const btn = document.getElementById('generateClassReportBtn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מושך נתונים...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין דוחות...';
         btn.disabled = true;
 
         try {
+            // נוודא שיש לנו את המידע הכי עדכני מהשרת
             const response = await fetch(`${this.apiBase}/students?full_details=true`);
             if (response.ok) {
                 const freshStudents = await response.json();
@@ -198,97 +202,124 @@ export class ReportManager {
         }
     }
 
-    buildReportHtml(students) {
-        const confStudentCode = document.getElementById('repConfCode').checked;
-        const confExamCode = document.getElementById('repConfExamCode').checked;
-        const confSize = document.getElementById('repConfSize').value; 
+    // פונקציית עזר לעיצוב שם המבחן (מסכת + פרק / דפים)
+    formatExamNameForTable(exam) {
+        if (!exam || !exam.details) return exam.exam_code;
         
-        const hebrewDate = this.getHebrewDate();
+        if (exam.exam_type === 'mishnayot') {
+            // החזרת מסכת ופרק בלבד ללא "פרק" או מספר משניות (כדי לחסוך מקום)
+             return `${exam.details.masechet || ''} - ${exam.details.chapter_name || ''}`;
+        } else if (exam.exam_type === 'gemara') {
+             return `${exam.details.masechet || ''} ${exam.details.from_page || ''}-${exam.details.to_page || ''}`;
+        }
+        return exam.exam_code;
+    }
 
+    buildReportHtml(students) {
+        const confSize = document.getElementById('repConfSize').value; 
         let completeHtml = '';
 
         students.forEach((student, index) => {
-            let exams = student.exams_details || [];
-            const totalReward = student.total_reward || 0;
-            const passed = exams.filter(e => e.passed).length;
             const pageBreakClass = index < students.length - 1 ? 'page-break' : '';
+            const studentClass = student.class_grade || 'כללי';
+            
+            // סינון מבחנים רלוונטיים לכיתה זו
+            let relevantExams = this.allExams.filter(e => e.target_grade === studentClass || !e.target_grade || e.target_grade === 'כללי');
+            
+            // אם אין מבחנים רלוונטיים, אולי נרצה להציג את כל המבחנים? נציג הכל כגיבוי.
+            if (relevantExams.length === 0) {
+                 relevantExams = this.allExams;
+            }
 
-            let tableHtml = '<div style="text-align:center; color:#555; padding: 20px; font-weight:bold;">לא נרשמו מבחנים לתלמיד זה.</div>';
-            if (exams.length > 0) {
-                tableHtml = `
-                    <table style="width: 100%; text-align: right; border-collapse: collapse; font-size: 0.85rem; margin-top: 15px;">
-                        <thead>
-                            <tr>
-                                ${confExamCode ? '<th style="padding: 8px 4px; font-weight: bold; color: #000; border-bottom: 2px solid #000;">קוד</th>' : ''}
-                                <th style="padding: 8px 4px; font-weight: bold; color: #000; border-bottom: 2px solid #000;">מבחן</th>
-                                <th style="padding: 8px 4px; font-weight: bold; color: #000; border-bottom: 2px solid #000; text-align: center;">הישג</th>
-                                <th style="padding: 8px 4px; font-weight: bold; color: #000; border-bottom: 2px solid #000; text-align: center;">שווי</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${exams.map(ex => {
-                                let desc = ex.details ? Object.values(ex.details).filter(v => v !== null && v !== '').join(' - ') : ex.exam_code;
-                                const statusText = ex.passed ? '<strong>עבר</strong>' : '<span style="color:#555; text-decoration:underline;">לא עבר</span>';
-                                const rewardVal = (ex.reward || 0).toFixed(1);
-                                return `
-                                <tr>
-                                    ${confExamCode ? `<td style="padding: 8px 4px; color: #000; border-bottom: 1px solid #ddd;">${ex.exam_code}</td>` : ''}
-                                    <td style="padding: 8px 4px; color: #000; border-bottom: 1px solid #ddd;">${desc}</td>
-                                    <td style="padding: 8px 4px; color: #000; border-bottom: 1px solid #ddd; text-align: center;">${statusText}</td>
-                                    <td style="padding: 8px 4px; color: #000; border-bottom: 1px solid #ddd; text-align: center;" dir="ltr">₪${rewardVal}</td>
-                                </tr>`;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                `;
+            // יצירת מפה של ביצועי התלמיד
+            const studentPerformance = {};
+            if (student.exams_details) {
+                student.exams_details.forEach(ex => {
+                    studentPerformance[ex.exam_code] = ex;
+                });
+            }
+
+            // חלוקת המבחנים ל-2 טורים
+            const halfLength = Math.ceil(relevantExams.length / 2);
+            const leftColExams = relevantExams.slice(0, halfLength);
+            const rightColExams = relevantExams.slice(halfLength);
+
+            let tableRows = '';
+            for (let i = 0; i < halfLength; i++) {
+                const leftExam = leftColExams[i];
+                const rightExam = rightColExams[i];
+
+                // --- עמודה שמאלית (מבחנים 1 עד אמצע) ---
+                let leftHtml = '<td colspan="4" style="border: 1px solid #000; padding: 4px;"></td>'; // ריק אם אין מבחן
+                if (leftExam) {
+                    const perf = studentPerformance[leftExam.exam_code];
+                    const mark = perf ? (perf.passed ? '✓' : 'X') : '';
+                    const examName = this.formatExamNameForTable(leftExam);
+                    
+                    leftHtml = `
+                        <td style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 1.1rem; width: 10%; padding: 2px;">${mark}</td>
+                        <td style="border: 1px solid #000; text-align: center; width: 15%; padding: 2px;"></td>
+                        <td style="border: 1px solid #000; padding: 2px 5px; width: 65%; font-size: 0.9rem;">${examName}</td>
+                        <td style="border: 1px solid #000; text-align: center; width: 10%; padding: 2px;">${i + 1}</td>
+                    `;
+                }
+
+                // --- עמודה ימנית (מבחנים אמצע עד סוף) ---
+                let rightHtml = '<td colspan="4" style="border: 1px solid #000; padding: 4px;"></td>';
+                if (rightExam) {
+                    const perf = studentPerformance[rightExam.exam_code];
+                    const mark = perf ? (perf.passed ? '✓' : 'X') : '';
+                    const examName = this.formatExamNameForTable(rightExam);
+                    
+                    rightHtml = `
+                        <td style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 1.1rem; width: 10%; padding: 2px;">${mark}</td>
+                        <td style="border: 1px solid #000; text-align: center; width: 15%; padding: 2px;"></td>
+                        <td style="border: 1px solid #000; padding: 2px 5px; width: 65%; font-size: 0.9rem;">${examName}</td>
+                        <td style="border: 1px solid #000; text-align: center; width: 10%; padding: 2px;">${halfLength + i + 1}</td>
+                    `;
+                }
+
+                tableRows += `<tr>${rightHtml}${leftHtml}</tr>`; // ימין קודם ב-RTL (למרות שהטבלה בנויה משמאל לימין בקוד, RTL יהפוך אותה. כדי למנוע בלבול, נגדיר כיוונים ברורים)
             }
 
             const styleSize = confSize === 'A5' ? 'width: 148mm; min-height: 210mm;' : 'width: 210mm; min-height: 297mm;';
 
-            // עיצוב תעודה רשמית ונקייה בשחור לבן
+            // בניית ה-HTML המלא של תעודה בודדת
             completeHtml += `
-                <div class="print-container ${pageBreakClass}" data-size="${confSize}" style="background: white; padding: 15px; margin: 0 auto 20px auto; font-family: Arial, sans-serif; color: #000; box-sizing: border-box; position: relative; ${styleSize}">
-                    <div style="border: 3px double #000; padding: 20px; box-sizing: border-box; height: 100%;">
+                <div class="print-container ${pageBreakClass}" data-size="${confSize}" style="background: white; margin: 0 auto 20px auto; font-family: Arial, sans-serif; color: #000; box-sizing: border-box; position: relative; ${styleSize}">
+                    <div style="padding: 15px; box-sizing: border-box; height: 100%;">
                         
-                        <div style="text-align: center; border-bottom: 1px solid #000; padding-bottom: 15px; margin-bottom: 20px;">
-                            <h1 style="margin: 0 0 10px 0; font-size: 1.8rem; font-weight: 900; letter-spacing: 1px;">דוח סיכום - פאר המשנה</h1>
-                            <h2 style="margin: 0 0 5px 0; font-size: 1.4rem; font-weight: bold;">${student.first_name} ${student.last_name}</h2>
-                            <div style="display: flex; justify-content: center; gap: 15px; font-size: 0.85rem; margin-top: 15px;">
-                                ${confStudentCode ? `<span>קוד: <strong>${student.student_code}</strong></span> | ` : ''}
-                                <span>כיתה: <strong>${student.class_grade || '-'}</strong></span> | 
-                                <span>תאריך הפקה: <strong>${hebrewDate}</strong></span>
-                            </div>
+                        <!-- Header / Logo -->
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <img src="${this.logoUrl}" alt="פאר המשנה" style="max-width: 100%; height: auto; max-height: 250px;">
                         </div>
                         
-                        <div style="display: flex; justify-content: space-around; margin-bottom: 25px; border: 1px solid #000; background-color: #fcfcfc; padding: 15px; border-radius: 2px;">
-                            <div style="text-align: center;">
-                                <span style="font-size: 0.85rem; text-transform: uppercase;">מבחנים רשומים</span><br>
-                                <span style="font-size: 1.4rem; font-weight: bold;">${exams.length}</span>
-                            </div>
-                            <div style="border-right: 1px solid #ccc;"></div>
-                            <div style="text-align: center;">
-                                <span style="font-size: 0.85rem; text-transform: uppercase;">הצלחות</span><br>
-                                <span style="font-size: 1.4rem; font-weight: bold;">${passed}</span>
-                            </div>
-                            <div style="border-right: 1px solid #ccc;"></div>
-                            <div style="text-align: center;">
-                                <span style="font-size: 0.85rem; text-transform: uppercase;">סך הכל מלגה</span><br>
-                                <span style="font-size: 1.4rem; font-weight: bold; direction: ltr; display: inline-block;">₪${totalReward.toFixed(1)}</span>
-                            </div>
+                        <!-- Student Info -->
+                        <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; padding: 0 10px;">
+                            <div>רשימת מבחני משניות וגמרא</div>
+                            <div>נאמען: <span style="border-bottom: 1px solid #000; padding: 0 40px;">${student.first_name} ${student.last_name}</span></div>
+                            <div>כיתה: <span style="border-bottom: 1px solid #000; padding: 0 20px;">${student.class_grade || ''}</span> נ"י</div>
                         </div>
 
-                        <div>${tableHtml}</div>
-                        
-                        <div style="margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 10px;">
-                            <div style="text-align: right; width: 180px;">
-                                <div style="border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
-                                <div style="font-size: 0.85rem; text-align: center;">חתימת המנהל</div>
-                            </div>
-                            <div style="text-align: left; font-size: 0.75rem; color: #555;">
-                                הופק באמצעות מערכת ניהול - פאר המשנה
-                            </div>
-                        </div>
-
+                        <!-- Table -->
+                        <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.9rem;" dir="rtl">
+                            <thead>
+                                <tr style="background-color: #f0f0f0;">
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון</th>
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון ב'</th>
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מסכת / פרק</th>
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מס'</th>
+                                    
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון</th>
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון ב'</th>
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מסכת / פרק</th>
+                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מס'</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             `;
@@ -332,7 +363,6 @@ export class ReportManager {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין קובץ...';
         btn.disabled = true;
 
-        // ייבוא דינמי של ספריית PDF במידה ולא קיימת
         if (typeof window.html2pdf === 'undefined') {
             try {
                 await new Promise((resolve, reject) => {
