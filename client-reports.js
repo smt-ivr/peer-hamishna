@@ -12,7 +12,7 @@ export class ReportManager {
     setStudents(students) {
         this.allStudents = students;
         this.classes = new Set(this.allStudents.map(s => s.class_grade).filter(Boolean).sort());
-        this.fetchExams(); // חשוב: צריך למשוך את כל המבחנים
+        this.fetchExams();
     }
 
     async fetchExams() {
@@ -20,11 +20,11 @@ export class ReportManager {
             const response = await fetch(`${this.apiBase}/exams`);
             if (response.ok) {
                 this.allExams = await response.json();
-                this.renderView(); // מרנדר את המסך רק אחרי שיש לנו את המבחנים
+                this.renderView();
             }
         } catch (error) {
             console.error('שגיאה במשיכת מבחנים לדוחות', error);
-            this.renderView(); // נרנדר בכל זאת, למקרה שנרצה להציג שגיאה אח"כ
+            this.renderView();
         }
     }
 
@@ -73,7 +73,7 @@ export class ReportManager {
         const html = `
             <div class="card compact-card no-print" style="margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
-                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות תלמידים (תואם טופס מקורי)</h3>
+                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות תלמידים מקצועיים</h3>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
@@ -82,13 +82,13 @@ export class ReportManager {
                         <div style="display: flex; flex-direction: column; gap: 10px;">
                              <label style="font-size: 0.85rem; cursor: pointer;">
                                 גודל דף: 
-                                <select id="repConfSize" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
-                                    <option value="A4">A4 (גדול ומרווח - מומלץ לטופס מלא)</option>
+                                <select id="repConfSize" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; background: white;">
+                                    <option value="A4">A4 (מומלץ למסמך רשמי)</option>
                                     <option value="A5">A5 (קומפקטי)</option>
                                 </select>
                             </label>
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">
-                                <i class="fas fa-info-circle"></i> הדוח מציג את כל המבחנים הרלוונטיים לכיתת התלמיד.
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; line-height: 1.4;">
+                                <i class="fas fa-info-circle"></i> העיצוב יופק אוטומטית בהתאמה אישית, תוך הצגת נתוני התלמיד, סינון מבחנים לפי כיתה והצגת הישגים עדכניים.
                             </p>
                         </div>
                     </div>
@@ -182,7 +182,6 @@ export class ReportManager {
         btn.disabled = true;
 
         try {
-            // נוודא שיש לנו את המידע הכי עדכני מהשרת
             const response = await fetch(`${this.apiBase}/students?full_details=true`);
             if (response.ok) {
                 const freshStudents = await response.json();
@@ -202,124 +201,148 @@ export class ReportManager {
         }
     }
 
-    // פונקציית עזר לעיצוב שם המבחן (מסכת + פרק / דפים)
-    formatExamNameForTable(exam) {
-        if (!exam || !exam.details) return exam.exam_code;
-        
-        if (exam.exam_type === 'mishnayot') {
-            // החזרת מסכת ופרק בלבד ללא "פרק" או מספר משניות (כדי לחסוך מקום)
-             return `${exam.details.masechet || ''} - ${exam.details.chapter_name || ''}`;
-        } else if (exam.exam_type === 'gemara') {
-             return `${exam.details.masechet || ''} ${exam.details.from_page || ''}-${exam.details.to_page || ''}`;
+    createTableRowHtml(exam, index, studentPerformance) {
+        if (!exam) {
+            return `
+                <tr>
+                    <td style="padding: 6px; border: 1px solid #cbd5e1; height: 28px;"></td>
+                    <td style="padding: 6px; border: 1px solid #cbd5e1; height: 28px;"></td>
+                    <td style="padding: 6px; border: 1px solid #cbd5e1; height: 28px;"></td>
+                    <td style="padding: 6px; border: 1px solid #cbd5e1; height: 28px;"></td>
+                </tr>
+            `;
         }
-        return exam.exam_code;
+
+        let masechet = exam.exam_code;
+        let perek = '';
+        
+        if (exam.details) {
+            if (exam.exam_type === 'mishnayot') {
+                masechet = exam.details.masechet || '';
+                perek = exam.details.chapter_name || '';
+            } else if (exam.exam_type === 'gemara') {
+                masechet = exam.details.masechet || '';
+                perek = `${exam.details.from_page || ''}-${exam.details.to_page || ''}`;
+            } else {
+                const vals = Object.values(exam.details);
+                if (vals.length > 0) masechet = vals[0];
+                if (vals.length > 1) perek = vals[1];
+            }
+        }
+
+        const perf = studentPerformance[exam.exam_code];
+        let markHtml = '';
+        if (perf) {
+            markHtml = perf.passed 
+                ? '<span style="color:#059669; font-weight:900; font-size:1.1rem;">✓</span>' 
+                : '<span style="color:#dc2626; font-weight:900; font-size:1.1rem;">✗</span>';
+        }
+
+        const bg = (index % 2 === 0) ? 'background-color: #f8fafc;' : 'background-color: #ffffff;';
+
+        return `
+            <tr style="${bg}">
+                <td style="padding: 6px 4px; border: 1px solid #cbd5e1; font-size: 0.8rem; color: #64748b; text-align: center; width: 10%;">${index + 1}</td>
+                <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 0.85rem; font-weight: 600; color: #1e293b; width: 40%;">${masechet}</td>
+                <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 0.85rem; color: #334155; width: 35%;">${perek}</td>
+                <td style="padding: 6px 4px; border: 1px solid #cbd5e1; text-align: center; width: 15%;">${markHtml}</td>
+            </tr>
+        `;
     }
 
     buildReportHtml(students) {
         const confSize = document.getElementById('repConfSize').value; 
+        const styleSize = confSize === 'A5' ? 'width: 148mm; min-height: 210mm;' : 'width: 210mm; min-height: 297mm;';
         let completeHtml = '';
 
-        students.forEach((student, index) => {
-            const pageBreakClass = index < students.length - 1 ? 'page-break' : '';
+        students.forEach((student, studentIndex) => {
+            const pageBreakClass = studentIndex < students.length - 1 ? 'page-break' : '';
             const studentClass = student.class_grade || 'כללי';
             
-            // סינון מבחנים רלוונטיים לכיתה זו
             let relevantExams = this.allExams.filter(e => e.target_grade === studentClass || !e.target_grade || e.target_grade === 'כללי');
-            
-            // אם אין מבחנים רלוונטיים, אולי נרצה להציג את כל המבחנים? נציג הכל כגיבוי.
-            if (relevantExams.length === 0) {
-                 relevantExams = this.allExams;
-            }
+            if (relevantExams.length === 0) relevantExams = this.allExams;
 
-            // יצירת מפה של ביצועי התלמיד
             const studentPerformance = {};
+            let passedCount = 0;
             if (student.exams_details) {
                 student.exams_details.forEach(ex => {
                     studentPerformance[ex.exam_code] = ex;
+                    if (ex.passed) passedCount++;
                 });
             }
 
-            // חלוקת המבחנים ל-2 טורים
             const halfLength = Math.ceil(relevantExams.length / 2);
-            const leftColExams = relevantExams.slice(0, halfLength);
-            const rightColExams = relevantExams.slice(halfLength);
+            let rightColumnRows = '';
+            let leftColumnRows = '';
 
-            let tableRows = '';
             for (let i = 0; i < halfLength; i++) {
-                const leftExam = leftColExams[i];
-                const rightExam = rightColExams[i];
-
-                // --- עמודה שמאלית (מבחנים 1 עד אמצע) ---
-                let leftHtml = '<td colspan="4" style="border: 1px solid #000; padding: 4px;"></td>'; // ריק אם אין מבחן
-                if (leftExam) {
-                    const perf = studentPerformance[leftExam.exam_code];
-                    const mark = perf ? (perf.passed ? '✓' : 'X') : '';
-                    const examName = this.formatExamNameForTable(leftExam);
-                    
-                    leftHtml = `
-                        <td style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 1.1rem; width: 10%; padding: 2px;">${mark}</td>
-                        <td style="border: 1px solid #000; text-align: center; width: 15%; padding: 2px;"></td>
-                        <td style="border: 1px solid #000; padding: 2px 5px; width: 65%; font-size: 0.9rem;">${examName}</td>
-                        <td style="border: 1px solid #000; text-align: center; width: 10%; padding: 2px;">${i + 1}</td>
-                    `;
-                }
-
-                // --- עמודה ימנית (מבחנים אמצע עד סוף) ---
-                let rightHtml = '<td colspan="4" style="border: 1px solid #000; padding: 4px;"></td>';
-                if (rightExam) {
-                    const perf = studentPerformance[rightExam.exam_code];
-                    const mark = perf ? (perf.passed ? '✓' : 'X') : '';
-                    const examName = this.formatExamNameForTable(rightExam);
-                    
-                    rightHtml = `
-                        <td style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 1.1rem; width: 10%; padding: 2px;">${mark}</td>
-                        <td style="border: 1px solid #000; text-align: center; width: 15%; padding: 2px;"></td>
-                        <td style="border: 1px solid #000; padding: 2px 5px; width: 65%; font-size: 0.9rem;">${examName}</td>
-                        <td style="border: 1px solid #000; text-align: center; width: 10%; padding: 2px;">${halfLength + i + 1}</td>
-                    `;
-                }
-
-                tableRows += `<tr>${rightHtml}${leftHtml}</tr>`; // ימין קודם ב-RTL (למרות שהטבלה בנויה משמאל לימין בקוד, RTL יהפוך אותה. כדי למנוע בלבול, נגדיר כיוונים ברורים)
+                rightColumnRows += this.createTableRowHtml(relevantExams[i], i, studentPerformance);
+                leftColumnRows += this.createTableRowHtml(relevantExams[halfLength + i], halfLength + i, studentPerformance);
             }
 
-            const styleSize = confSize === 'A5' ? 'width: 148mm; min-height: 210mm;' : 'width: 210mm; min-height: 297mm;';
+            const tableHeaderHtml = `
+                <thead>
+                    <tr style="background-color: #f1f5f9; color: #0f172a;">
+                        <th style="padding: 8px 4px; border: 1px solid #cbd5e1; font-size: 0.85rem;">מס'</th>
+                        <th style="padding: 8px 4px; border: 1px solid #cbd5e1; font-size: 0.85rem; text-align: right;">מסכת / נושא</th>
+                        <th style="padding: 8px 4px; border: 1px solid #cbd5e1; font-size: 0.85rem; text-align: right;">פרק / דפים</th>
+                        <th style="padding: 8px 4px; border: 1px solid #cbd5e1; font-size: 0.85rem; text-align: center;">הישג</th>
+                    </tr>
+                </thead>
+            `;
 
-            // בניית ה-HTML המלא של תעודה בודדת
             completeHtml += `
-                <div class="print-container ${pageBreakClass}" data-size="${confSize}" style="background: white; margin: 0 auto 20px auto; font-family: Arial, sans-serif; color: #000; box-sizing: border-box; position: relative; ${styleSize}">
-                    <div style="padding: 15px; box-sizing: border-box; height: 100%;">
+                <div class="print-container ${pageBreakClass}" data-size="${confSize}" style="background: white; margin: 0 auto 20px auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; box-sizing: border-box; position: relative; ${styleSize}">
+                    <div style="padding: 30px; box-sizing: border-box; height: 100%; display: flex; flex-direction: column;">
                         
                         <!-- Header / Logo -->
-                        <div style="text-align: center; margin-bottom: 15px;">
-                            <img src="${this.logoUrl}" alt="פאר המשנה" style="max-width: 100%; height: auto; max-height: 250px;">
+                        <div style="text-align: center; margin-bottom: 25px;">
+                            <img src="${this.logoUrl}" alt="פאר המשנה" style="max-height: 160px; width: auto; object-fit: contain;">
                         </div>
                         
-                        <!-- Student Info -->
-                        <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; padding: 0 10px;">
-                            <div>רשימת מבחני משניות וגמרא</div>
-                            <div>נאמען: <span style="border-bottom: 1px solid #000; padding: 0 40px;">${student.first_name} ${student.last_name}</span></div>
-                            <div>כיתה: <span style="border-bottom: 1px solid #000; padding: 0 20px;">${student.class_grade || ''}</span> נ"י</div>
+                        <!-- Professional Student Banner -->
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 25px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" dir="rtl">
+                            <div style="font-size: 1.2rem; color: #1e293b;">
+                                שם התלמיד: <strong style="color: #0f172a; font-size: 1.3rem;">${student.first_name} ${student.last_name}</strong>
+                            </div>
+                            <div style="font-size: 1.1rem; color: #1e293b; border-right: 2px solid #cbd5e1; padding-right: 25px;">
+                                כיתה: <strong style="color: #0f172a;">${studentClass}</strong>
+                            </div>
+                            <div style="font-size: 1rem; color: #475569; border-right: 2px solid #cbd5e1; padding-right: 25px;">
+                                סך הצלחות: <strong style="color: #059669;">${passedCount}</strong> מתוך ${relevantExams.length}
+                            </div>
                         </div>
 
-                        <!-- Table -->
-                        <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.9rem;" dir="rtl">
-                            <thead>
-                                <tr style="background-color: #f0f0f0;">
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון</th>
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון ב'</th>
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מסכת / פרק</th>
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מס'</th>
-                                    
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון</th>
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">ציון ב'</th>
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מסכת / פרק</th>
-                                    <th style="border: 1px solid #000; padding: 4px; text-align: center;">מס'</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${tableRows}
-                            </tbody>
-                        </table>
+                        <!-- Split Tables Container -->
+                        <div style="display: flex; gap: 25px; flex: 1; align-items: flex-start;" dir="rtl">
+                            
+                            <!-- Right Table (Items 1 to Half) -->
+                            <div style="flex: 1;">
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; background: white;">
+                                    ${tableHeaderHtml}
+                                    <tbody>
+                                        ${rightColumnRows}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Left Table (Items Half to End) -->
+                            <div style="flex: 1;">
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; background: white;">
+                                    ${tableHeaderHtml}
+                                    <tbody>
+                                        ${leftColumnRows}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                        </div>
+                        
+                        <!-- Footer -->
+                        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 0.8rem; color: #94a3b8;">
+                            הופק אוטומטית ממערכת פאר המשנה בתאריך ${this.getHebrewDate()}
+                        </div>
+
                     </div>
                 </div>
             `;
@@ -381,10 +404,10 @@ export class ReportManager {
         }
 
         const element = document.getElementById('printReportBody');
-        const confSize = document.getElementById('repConfSize').value.toLowerCase(); // a4 או a5
+        const confSize = document.getElementById('repConfSize').value.toLowerCase();
 
         const opt = {
-            margin:       5,
+            margin:       0,
             filename:     `דוחות_תלמידים_${new Date().toISOString().slice(0,10)}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true, logging: false },
