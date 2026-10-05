@@ -2,30 +2,33 @@ export class ReportManager {
     constructor(container, apiBase) {
         this.container = container;
         this.apiBase = apiBase;
-        this.allStudents = [];
-        this.allExams = [];
+        this.allStudentsData = [];
         this.classes = new Set();
         this.injectModal();
         this.logoUrl = 'https://smti.uk/img/peer.jpg';
     }
 
-    setStudents(students) {
-        this.allStudents = students;
-        this.classes = new Set(this.allStudents.map(s => s.class_grade).filter(Boolean).sort());
-        this.fetchExams();
-    }
-
-    async fetchExams() {
+    // קורא ל-API החדש שמושך את התלמידים עם סיכום המבחנים המלא
+    async fetchStudentSummaries() {
         try {
-            const response = await fetch(`${this.apiBase}/exams`);
+            const response = await fetch(`${this.apiBase}/student-summary`);
             if (response.ok) {
-                this.allExams = await response.json();
+                this.allStudentsData = await response.json();
+                this.classes = new Set(this.allStudentsData.map(s => s.class_grade).filter(Boolean).sort());
+                this.renderView();
+            } else {
+                console.error('שגיאה בטעינת נתוני דוחות');
                 this.renderView();
             }
         } catch (error) {
-            console.error('שגיאה במשיכת מבחנים לדוחות', error);
+            console.error('שגיאת רשת בטעינת דוחות', error);
             this.renderView();
         }
+    }
+
+    setStudents(students) {
+        // מתעלם מהרשימה הבסיסית שנשלחת מה-App, ומושך את המידע המלא דרך ה-API הייעודי לדוחות
+        this.fetchStudentSummaries();
     }
 
     injectModal() {
@@ -87,7 +90,7 @@ export class ReportManager {
                                 </select>
                             </label>
                             <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; line-height: 1.4;">
-                                <i class="fas fa-info-circle"></i> הדוח עוצב מחדש באופן מכווץ כדי להכניס עשרות שורות מבחנים באותו הדף.
+                                <i class="fas fa-info-circle"></i> הדוח מציג את כל המבחנים הרלוונטיים מתוך ה-API החדש, כולל נתוני הסטטיסטיקה של כל תלמיד.
                             </p>
                         </div>
                     </div>
@@ -132,7 +135,7 @@ export class ReportManager {
                 return;
             }
 
-            const filtered = this.allStudents.filter(s => 
+            const filtered = this.allStudentsData.filter(s => 
                 s.student_code.toLowerCase().includes(term) || 
                 s.first_name.toLowerCase().includes(term) || 
                 s.last_name.toLowerCase().includes(term) ||
@@ -151,7 +154,7 @@ export class ReportManager {
                     item.addEventListener('click', () => {
                         searchInput.value = '';
                         resultsDropdown.classList.add('hidden');
-                        this.generateAndShowReport([student.student_code]);
+                        this.generateAndShowReport(`?student_code=${student.student_code}`);
                     });
                     resultsDropdown.appendChild(item);
                 });
@@ -168,27 +171,26 @@ export class ReportManager {
         document.getElementById('generateClassReportBtn').addEventListener('click', async () => {
             const cls = document.getElementById('reportClassSelect').value;
             if (!cls) return await window.customAlert('נא לבחור כיתה', true);
-            const studentCodes = this.allStudents.filter(s => s.class_grade === cls).map(s => s.student_code);
-            if (studentCodes.length === 0) return await window.customAlert('לא נמצאו תלמידים בכיתה זו', true);
-            this.generateAndShowReport(studentCodes);
+            this.generateAndShowReport(`?class_grade=${encodeURIComponent(cls)}`);
         });
     }
 
-    async generateAndShowReport(studentCodesArray) {
+    async generateAndShowReport(queryParams) {
         const btn = document.getElementById('generateClassReportBtn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין דוחות...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מושך דוחות מהשרת...';
         btn.disabled = true;
 
         try {
-            const response = await fetch(`${this.apiBase}/students?full_details=true`);
+            const response = await fetch(`${this.apiBase}/student-summary${queryParams}`);
             if (response.ok) {
-                const freshStudents = await response.json();
-                this.allStudents = freshStudents; 
-                
-                const selectedStudents = freshStudents.filter(s => studentCodesArray.includes(s.student_code));
-                this.lastRenderedStudents = selectedStudents; 
-                this.buildReportHtml(selectedStudents);
+                const studentsToRender = await response.json();
+                if (studentsToRender.length === 0) {
+                    await window.customAlert('לא נמצאו נתונים לחיפוש זה.', true);
+                } else {
+                    this.lastRenderedStudents = studentsToRender; 
+                    this.buildReportHtml(studentsToRender);
+                }
             } else {
                 await window.customAlert('שגיאה במשיכת נתונים מהשרת.', true);
             }
@@ -200,7 +202,7 @@ export class ReportManager {
         }
     }
 
-    createTableRowHtml(exam, index, studentPerformance) {
+    createTableRowHtml(exam, index) {
         if (!exam) {
             return `
                 <tr>
@@ -224,15 +226,16 @@ export class ReportManager {
             }
         }
 
-        const perf = studentPerformance[exam.exam_code];
         let markHtml = '';
-        let rewardText = '';
+        let rewardText = '-';
 
-        if (perf) {
-            markHtml = perf.passed 
-                ? '<span style="color:#059669; font-weight:bold;">V</span>' 
-                : '<span style="color:#dc2626; font-weight:bold;">X</span>';
-            rewardText = (perf.reward || 0) > 0 ? `₪${perf.reward.toFixed(1)}` : '-';
+        // בדיקה לפי ה-API החדש
+        if (exam.passed === true) {
+            markHtml = '<span style="color:#059669; font-weight:bold;">V</span>';
+            rewardText = (exam.reward_earned || 0) > 0 ? `₪${exam.reward_earned.toFixed(1)}` : '-';
+        } else if (exam.passed === false) {
+            markHtml = '<span style="color:#dc2626; font-weight:bold;">X</span>';
+            rewardText = '-';
         }
 
         const bg = (index % 2 === 0) ? 'background-color: #f8fafc;' : 'background-color: #ffffff;';
@@ -250,34 +253,23 @@ export class ReportManager {
 
     buildReportHtml(students) {
         const confSize = document.getElementById('repConfSize').value; 
-        const styleSize = confSize === 'A5' ? 'width: 148mm; min-height: 210mm;' : 'width: 210mm; min-height: 297mm;';
+        const styleSize = 'width: 210mm; min-height: 297mm;'; // מקובע ל-A4
         let completeHtml = '';
 
         students.forEach((student, studentIndex) => {
             const pageBreakClass = studentIndex < students.length - 1 ? 'page-break' : '';
             const studentClass = student.class_grade || 'כללי';
             
-            let relevantExams = this.allExams.filter(e => e.target_grade === studentClass || !e.target_grade || e.target_grade === 'כללי');
-            if (relevantExams.length === 0) relevantExams = this.allExams;
+            const examsList = student.exams || [];
+            const stats = student.stats || { total_passed: 0, total_available_exams: examsList.length, total_reward: 0 };
 
-            const studentPerformance = {};
-            let passedCount = 0;
-            let totalReward = student.total_reward || 0;
-            
-            if (student.exams_details) {
-                student.exams_details.forEach(ex => {
-                    studentPerformance[ex.exam_code] = ex;
-                    if (ex.passed) passedCount++;
-                });
-            }
-
-            const halfLength = Math.ceil(relevantExams.length / 2);
+            const halfLength = Math.ceil(examsList.length / 2);
             let rightColumnRows = '';
             let leftColumnRows = '';
 
             for (let i = 0; i < halfLength; i++) {
-                rightColumnRows += this.createTableRowHtml(relevantExams[i], i, studentPerformance);
-                leftColumnRows += this.createTableRowHtml(relevantExams[halfLength + i], halfLength + i, studentPerformance);
+                rightColumnRows += this.createTableRowHtml(examsList[i], i);
+                leftColumnRows += this.createTableRowHtml(examsList[halfLength + i], halfLength + i);
             }
 
             const tableHeaderHtml = `
@@ -307,8 +299,8 @@ export class ReportManager {
                             
                             <div style="flex: 1; text-align: left; font-size: 12px; line-height: 1.5;">
                                 <div>שם התלמיד: <strong style="font-size: 14px; color: #000;">${student.first_name} ${student.last_name}</strong></div>
-                                <div>כיתה: <strong>${studentClass}</strong> | הצלחות: <strong>${passedCount}/${relevantExams.length}</strong></div>
-                                <div>סך הכל מלגה: <strong style="color: #059669; font-size: 14px;">₪${totalReward.toFixed(1)}</strong></div>
+                                <div>כיתה: <strong>${studentClass}</strong> | הצלחות: <strong>${stats.total_passed}/${stats.total_available_exams}</strong></div>
+                                <div>סך הכל מלגה: <strong style="color: #059669; font-size: 14px;">₪${(stats.total_reward || 0).toFixed(1)}</strong></div>
                             </div>
                         </div>
 
@@ -351,14 +343,14 @@ export class ReportManager {
         csvContent += 'קוד תלמיד,שם פרטי,שם משפחה,כיתה,קוד מבחן,פירוט,סטטוס,שווי\n';
 
         students.forEach(student => {
-            const exams = student.exams_details || [];
+            const exams = student.exams || [];
             if (exams.length === 0) {
                 csvContent += `"${student.student_code}","${student.first_name}","${student.last_name}","${student.class_grade || ''}","ללא מבחנים","","",""\n`;
             } else {
                 exams.forEach(ex => {
                     let desc = ex.details ? Object.values(ex.details).filter(v => v !== null && v !== '').join(' - ') : ex.exam_code;
-                    let status = ex.passed ? 'עבר' : 'לא עבר';
-                    let reward = ex.reward || 0;
+                    let status = ex.passed === true ? 'עבר' : (ex.passed === false ? 'לא עבר' : 'לא בוצע');
+                    let reward = ex.reward_earned || 0;
                     csvContent += `"${student.student_code}","${student.first_name}","${student.last_name}","${student.class_grade || ''}","${ex.exam_code}","${desc}","${status}","${reward}"\n`;
                 });
             }
