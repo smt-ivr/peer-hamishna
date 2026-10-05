@@ -105,6 +105,11 @@ export class ReportManager {
                                 <input type="checkbox" id="confShowStudentCode" checked style="width: 16px; height: 16px;"> 
                                 הצג קוד תלמיד בפרטי התעודה
                             </label>
+
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                                <input type="checkbox" id="confHideUnattempted" style="width: 16px; height: 16px;"> 
+                                <strong>הסתר מבחנים שלא בוצעו</strong> (מומלץ לדוח תמציתי)
+                            </label>
                             
                             <div style="margin-top: 5px;">
                                 <label style="font-size: 0.9rem; display: block; margin-bottom: 5px; color: #334155;">פריסת עמודות (לדחיסה לדף אחד):</label>
@@ -228,7 +233,7 @@ export class ReportManager {
 
     createTableRowHtml(exam, index, showExamCode, showReward) {
         if (!exam) {
-            return `<tr><td colspan="${2 + (showExamCode ? 1 : 0) + (showReward ? 1 : 0)}" style="border: 1px solid #cbd5e1; height: 18px;"></td></tr>`;
+            return `<tr><td colspan="${1 + (showExamCode ? 1 : 0) + (showReward ? 1 : 0) + 1}" style="border: 1px solid #cbd5e1; height: 18px;"></td></tr>`;
         }
 
         let desc = exam.exam_code;
@@ -243,14 +248,14 @@ export class ReportManager {
         }
 
         let markHtml = '';
-        let rewardText = '-';
+        let rewardText = '';
 
         if (exam.passed === true) {
             markHtml = '<span style="color:#059669; font-weight:900;">V</span>';
-            rewardText = (exam.reward_earned || 0) > 0 ? `₪${exam.reward_earned.toFixed(1)}` : '-';
+            rewardText = (exam.reward_earned || 0) > 0 ? `${exam.reward_earned.toFixed(1)}` : '';
         } else if (exam.passed === false) {
             markHtml = '<span style="color:#dc2626; font-weight:900;">X</span>';
-            rewardText = '-';
+            rewardText = '';
         }
 
         const bg = (index % 2 === 0) ? 'background-color: #f8fafc;' : 'background-color: #ffffff;';
@@ -261,7 +266,7 @@ export class ReportManager {
             rowHtml += `<td style="padding: 2px 4px; border: 1px solid #cbd5e1; font-size: 10px; font-weight: 600; text-align: center; color: #1e293b;">${exam.exam_code}</td>`;
         }
         
-        rowHtml += `<td style="padding: 2px 5px; border: 1px solid #cbd5e1; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; color: #334155;">${desc}</td>`;
+        rowHtml += `<td style="padding: 2px 5px; border: 1px solid #cbd5e1; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; color: #334155;">${desc}</td>`;
         rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center;">${markHtml}</td>`;
         
         if (showReward) {
@@ -273,10 +278,10 @@ export class ReportManager {
     }
 
     buildReportHtml(students) {
-        // קריאת הגדרות המשתמש מהפאנל
         const showReward = document.getElementById('confShowReward').checked;
         const showExamCode = document.getElementById('confShowExamCode').checked;
         const showStudentCode = document.getElementById('confShowStudentCode').checked;
+        const hideUnattempted = document.getElementById('confHideUnattempted').checked;
         const numCols = parseInt(document.getElementById('confColumns').value) || 3;
 
         const styleSize = 'width: 210mm; min-height: 297mm;'; // מקובע ל-A4
@@ -286,10 +291,14 @@ export class ReportManager {
             const pageBreakClass = studentIndex < students.length - 1 ? 'page-break' : '';
             const studentClass = student.class_grade || 'כללי';
             
-            const examsList = student.exams || [];
-            const stats = student.stats || { total_passed: 0, total_attempted: 0, total_available_exams: examsList.length, total_reward: 0 };
+            let examsList = student.exams || [];
+            
+            if (hideUnattempted) {
+                examsList = examsList.filter(ex => ex.passed === true || ex.passed === false);
+            }
 
-            // חישוב חלוקה לעמודות דינמיות
+            const stats = student.stats || { total_passed: 0, total_attempted: 0, total_available_exams: student.exams?.length || 0, total_reward: 0 };
+
             const chunkSize = Math.ceil(examsList.length / numCols);
             let tablesContainerHtml = '';
 
@@ -297,13 +306,11 @@ export class ReportManager {
                 const chunkExams = examsList.slice(c * chunkSize, (c + 1) * chunkSize);
                 let rowsHtml = '';
                 
-                // יצירת השורות לפי כמות הנתונים
                 for (let i = 0; i < chunkSize; i++) {
                     const actualIndex = (c * chunkSize) + i;
                     rowsHtml += this.createTableRowHtml(chunkExams[i], actualIndex, showExamCode, showReward);
                 }
 
-                // בניית העמודה
                 tablesContainerHtml += `
                     <div style="flex: 1; min-width: 0;">
                         <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; background: white; table-layout: fixed;">
@@ -323,9 +330,7 @@ export class ReportManager {
                 `;
             }
 
-            // תצוגת קוד תלמיד (אם הוגדר)
             const codeBadgeHtml = showStudentCode ? `<span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 10px;">קוד: ${student.student_code}</span>` : '';
-            // תצוגת סך מלגה (אם הוגדר)
             const totalRewardHtml = showReward ? `<div style="margin-top: 4px;">סך הכל מלגה: <strong style="color: #059669; font-size: 14px;">₪${(stats.total_reward || 0).toFixed(1)}</strong></div>` : '';
 
             completeHtml += `
