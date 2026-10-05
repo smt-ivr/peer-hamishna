@@ -8,7 +8,6 @@ export class ReportManager {
         this.logoUrl = 'https://smti.uk/img/peer.jpg';
     }
 
-    // קורא ל-API החדש שמושך את התלמידים עם סיכום המבחנים המלא
     async fetchStudentSummaries() {
         try {
             const response = await fetch(`${this.apiBase}/student-summary`);
@@ -27,7 +26,6 @@ export class ReportManager {
     }
 
     setStudents(students) {
-        // מתעלם מהרשימה הבסיסית שנשלחת מה-App, ומושך את המידע המלא דרך ה-API הייעודי לדוחות
         this.fetchStudentSummaries();
     }
 
@@ -35,18 +33,18 @@ export class ReportManager {
         if (!document.getElementById('printReportModal')) {
             const modalHtml = `
             <div id="printReportModal" class="modal hidden no-print" style="z-index: 9999;">
-                <div class="modal-content" style="max-width: 900px; height: 95vh; background: #e2e8f0;">
-                    <div class="modal-header no-print" style="background: white;">
-                        <h3><i class="fas fa-print"></i> תצוגה מקדימה לדוח קומפקטי</h3>
+                <div class="modal-content" style="max-width: 1000px; height: 95vh; background: #e2e8f0; border-radius: 12px; overflow: hidden;">
+                    <div class="modal-header no-print" style="background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                        <h3 style="margin: 0; font-size: 1.2rem; color: #0f172a;"><i class="fas fa-print" style="color: var(--primary-color);"></i> מרכז הפקת דוחות מתקדם</h3>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <button class="btn btn-outline btn-sm" id="exportReportCsvBtn" title="ייצא טבלה לאקסל"><i class="fas fa-file-excel"></i> ייצוא אקסל</button>
-                            <button class="btn btn-secondary btn-sm" id="directDownloadPdfBtn" title="הורד קובץ ישירות"><i class="fas fa-file-pdf"></i> הורד PDF (מומלץ)</button>
-                            <button class="btn btn-primary btn-sm" onclick="window.print()" title="הדפסה במדפסת"><i class="fas fa-print"></i> הדפסה</button>
-                            <button class="close-modal-btn" onclick="document.getElementById('printReportModal').classList.add('hidden')">&times;</button>
+                            <button class="btn btn-secondary btn-sm" id="directDownloadPdfBtn" title="הורד קובץ ישירות"><i class="fas fa-file-pdf"></i> הורד PDF</button>
+                            <button class="btn btn-primary btn-sm" onclick="window.print()" title="הדפסה במדפסת"><i class="fas fa-print"></i> הדפס מסמך</button>
+                            <button class="close-modal-btn" onclick="document.getElementById('printReportModal').classList.add('hidden')" style="margin-right: 15px; font-size: 1.5rem;">&times;</button>
                         </div>
                     </div>
-                    <div class="modal-body" id="printReportBodyWrapper" style="padding: 20px; overflow-y: auto; background: #e2e8f0;">
-                        <div id="printReportBody"></div>
+                    <div class="modal-body" id="printReportBodyWrapper" style="padding: 20px; overflow-y: auto; background: #cbd5e1; display: flex; flex-direction: column; align-items: center;">
+                        <div id="printReportBody" style="width: 100%; max-width: 210mm;"></div>
                     </div>
                 </div>
             </div>`;
@@ -74,47 +72,73 @@ export class ReportManager {
 
     renderView() {
         const html = `
-            <div class="card compact-card no-print" style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
-                    <h3 style="margin: 0;"><i class="fas fa-file-invoice"></i> הפקת דוחות תלמידים מקצועיים (תצוגה קומפקטית)</h3>
+            <div style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-weight: 500;">
+                <i class="fas fa-tools" style="font-size: 1.2rem;"></i>
+                <div>
+                    <strong>הודעת מערכת:</strong> מודול הפקת הדוחות נמצא בבנייה ושדרוג. ניתן להשתמש בהגדרות מטה כדי להתאים אישית את תצוגת המסמך המופק.
+                </div>
+            </div>
+
+            <div class="card compact-card no-print" style="margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
+                    <h3 style="margin: 0; font-size: 1.15rem; color: #1e293b;"><i class="fas fa-sliders-h" style="color: var(--primary-color);"></i> פאנל ניהול והגדרות דוחות</h3>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                    <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
-                        <h4 style="margin-bottom: 10px; font-size: 0.95rem;"><i class="fas fa-cog"></i> הגדרות תצוגת דוח</h4>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                             <label style="font-size: 0.85rem; cursor: pointer;">
-                                גודל דף: 
-                                <select id="repConfSize" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; background: white;">
-                                    <option value="A4">A4 (חובה לדוח קומפקטי בדף אחד)</option>
-                                </select>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px;">
+                    
+                    <!-- Settings Panel -->
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <h4 style="margin-top: 0; margin-bottom: 15px; font-size: 1rem; color: #0f172a;"><i class="fas fa-cog"></i> הגדרות תצוגה במסמך</h4>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                                <input type="checkbox" id="confShowReward" checked style="width: 16px; height: 16px;"> 
+                                הצג עמודת מלגה (פירוט כספי)
                             </label>
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px; line-height: 1.4;">
-                                <i class="fas fa-info-circle"></i> הדוח מציג את כל המבחנים הרלוונטיים מתוך ה-API החדש, כולל נתוני הסטטיסטיקה של כל תלמיד.
-                            </p>
+                            
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                                <input type="checkbox" id="confShowExamCode" checked style="width: 16px; height: 16px;"> 
+                                הצג עמודת קוד מבחן בטבלה
+                            </label>
+
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                                <input type="checkbox" id="confShowStudentCode" checked style="width: 16px; height: 16px;"> 
+                                הצג קוד תלמיד בפרטי התעודה
+                            </label>
+                            
+                            <div style="margin-top: 5px;">
+                                <label style="font-size: 0.9rem; display: block; margin-bottom: 5px; color: #334155;">פריסת עמודות (לדחיסה לדף אחד):</label>
+                                <select id="confColumns" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; outline: none;">
+                                    <option value="2">2 עמודות במקביל</option>
+                                    <option value="3" selected>3 עמודות במקביל (מומלץ לריבוי מבחנים)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
-                        <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
-                            <h4 style="margin-bottom: 10px; font-size: 0.95rem;">דוח לתלמיד בודד</h4>
+                    <!-- Generation Panel -->
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <h4 style="margin-top: 0; margin-bottom: 15px; font-size: 1rem;"><i class="fas fa-user"></i> הפקה לתלמיד בודד</h4>
                             <div class="search-box">
                                 <i class="fas fa-search search-icon"></i>
-                                <input type="text" id="reportStudentSearch" placeholder="חיפוש קוד או שם..." autocomplete="off" style="width: 100%; padding: 6px 30px 6px 10px;">
-                                <div id="reportSearchResults" class="search-results-dropdown hidden"></div>
+                                <input type="text" id="reportStudentSearch" placeholder="הקלד קוד או שם תלמיד..." autocomplete="off" style="width: 100%; padding: 10px 35px 10px 15px; border-radius: 6px;">
+                                <div id="reportSearchResults" class="search-results-dropdown hidden" style="top: 100%; margin-top: 5px;"></div>
                             </div>
                         </div>
 
-                        <div style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
-                            <h4 style="margin-bottom: 10px; font-size: 0.95rem;">דוח מרוכז לכיתה שלמה</h4>
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <h4 style="margin-top: 0; margin-bottom: 15px; font-size: 1rem;"><i class="fas fa-users"></i> הפקה מרוכזת לכיתה</h4>
                             <div style="display: flex; gap: 10px;">
-                                <select id="reportClassSelect" style="flex:1; padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; background: white;">
-                                    <option value="">-- בחר כיתה --</option>
+                                <select id="reportClassSelect" style="flex:1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; outline: none;">
+                                    <option value="">-- בחר כיתה להפקה --</option>
                                     ${Array.from(this.classes).map(c => `<option value="${c}">כיתה ${c}</option>`).join('')}
                                 </select>
-                                <button class="btn btn-primary" id="generateClassReportBtn">הפק לכיתה</button>
+                                <button class="btn btn-primary" id="generateClassReportBtn" style="padding: 0 20px;"><i class="fas fa-magic"></i> הפק דוחות</button>
                             </div>
                         </div>
+                        
                     </div>
                 </div>
             </div>
@@ -178,7 +202,7 @@ export class ReportManager {
     async generateAndShowReport(queryParams) {
         const btn = document.getElementById('generateClassReportBtn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מושך דוחות מהשרת...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעבד נתונים...';
         btn.disabled = true;
 
         try {
@@ -202,17 +226,9 @@ export class ReportManager {
         }
     }
 
-    createTableRowHtml(exam, index) {
+    createTableRowHtml(exam, index, showExamCode, showReward) {
         if (!exam) {
-            return `
-                <tr>
-                    <td style="padding: 2px; border: 1px solid #cbd5e1; height: 20px;"></td>
-                    <td style="padding: 2px; border: 1px solid #cbd5e1; height: 20px;"></td>
-                    <td style="padding: 2px; border: 1px solid #cbd5e1; height: 20px;"></td>
-                    <td style="padding: 2px; border: 1px solid #cbd5e1; height: 20px;"></td>
-                    <td style="padding: 2px; border: 1px solid #cbd5e1; height: 20px;"></td>
-                </tr>
-            `;
+            return `<tr><td colspan="${2 + (showExamCode ? 1 : 0) + (showReward ? 1 : 0)}" style="border: 1px solid #cbd5e1; height: 18px;"></td></tr>`;
         }
 
         let desc = exam.exam_code;
@@ -229,30 +245,40 @@ export class ReportManager {
         let markHtml = '';
         let rewardText = '-';
 
-        // בדיקה לפי ה-API החדש
         if (exam.passed === true) {
-            markHtml = '<span style="color:#059669; font-weight:bold;">V</span>';
+            markHtml = '<span style="color:#059669; font-weight:900;">V</span>';
             rewardText = (exam.reward_earned || 0) > 0 ? `₪${exam.reward_earned.toFixed(1)}` : '-';
         } else if (exam.passed === false) {
-            markHtml = '<span style="color:#dc2626; font-weight:bold;">X</span>';
+            markHtml = '<span style="color:#dc2626; font-weight:900;">X</span>';
             rewardText = '-';
         }
 
         const bg = (index % 2 === 0) ? 'background-color: #f8fafc;' : 'background-color: #ffffff;';
-
-        return `
-            <tr style="${bg}">
-                <td style="padding: 3px; border: 1px solid #cbd5e1; font-size: 10px; color: #64748b; text-align: center;">${index + 1}</td>
-                <td style="padding: 3px; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 600; text-align: center;">${exam.exam_code}</td>
-                <td style="padding: 3px 5px; border: 1px solid #cbd5e1; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${desc}</td>
-                <td style="padding: 3px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center;">${markHtml}</td>
-                <td style="padding: 3px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center; font-weight: 600; color: #334155;">${rewardText}</td>
-            </tr>
-        `;
+        
+        let rowHtml = `<tr style="${bg}">`;
+        
+        if (showExamCode) {
+            rowHtml += `<td style="padding: 2px 4px; border: 1px solid #cbd5e1; font-size: 10px; font-weight: 600; text-align: center; color: #1e293b;">${exam.exam_code}</td>`;
+        }
+        
+        rowHtml += `<td style="padding: 2px 5px; border: 1px solid #cbd5e1; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; color: #334155;">${desc}</td>`;
+        rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center;">${markHtml}</td>`;
+        
+        if (showReward) {
+            rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 10px; text-align: center; font-weight: 600; color: #475569;">${rewardText}</td>`;
+        }
+        
+        rowHtml += `</tr>`;
+        return rowHtml;
     }
 
     buildReportHtml(students) {
-        const confSize = document.getElementById('repConfSize').value; 
+        // קריאת הגדרות המשתמש מהפאנל
+        const showReward = document.getElementById('confShowReward').checked;
+        const showExamCode = document.getElementById('confShowExamCode').checked;
+        const showStudentCode = document.getElementById('confShowStudentCode').checked;
+        const numCols = parseInt(document.getElementById('confColumns').value) || 3;
+
         const styleSize = 'width: 210mm; min-height: 297mm;'; // מקובע ל-A4
         let completeHtml = '';
 
@@ -261,74 +287,77 @@ export class ReportManager {
             const studentClass = student.class_grade || 'כללי';
             
             const examsList = student.exams || [];
-            const stats = student.stats || { total_passed: 0, total_available_exams: examsList.length, total_reward: 0 };
+            const stats = student.stats || { total_passed: 0, total_attempted: 0, total_available_exams: examsList.length, total_reward: 0 };
 
-            const halfLength = Math.ceil(examsList.length / 2);
-            let rightColumnRows = '';
-            let leftColumnRows = '';
+            // חישוב חלוקה לעמודות דינמיות
+            const chunkSize = Math.ceil(examsList.length / numCols);
+            let tablesContainerHtml = '';
 
-            for (let i = 0; i < halfLength; i++) {
-                rightColumnRows += this.createTableRowHtml(examsList[i], i);
-                leftColumnRows += this.createTableRowHtml(examsList[halfLength + i], halfLength + i);
+            for (let c = 0; c < numCols; c++) {
+                const chunkExams = examsList.slice(c * chunkSize, (c + 1) * chunkSize);
+                let rowsHtml = '';
+                
+                // יצירת השורות לפי כמות הנתונים
+                for (let i = 0; i < chunkSize; i++) {
+                    const actualIndex = (c * chunkSize) + i;
+                    rowsHtml += this.createTableRowHtml(chunkExams[i], actualIndex, showExamCode, showReward);
+                }
+
+                // בניית העמודה
+                tablesContainerHtml += `
+                    <div style="flex: 1; min-width: 0;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; background: white; table-layout: fixed;">
+                            <thead>
+                                <tr style="background-color: #e2e8f0; color: #0f172a;">
+                                    ${showExamCode ? `<th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: center; width: ${showReward ? '18%' : '22%'};">קוד</th>` : ''}
+                                    <th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: right; width: ${showExamCode ? (showReward ? '52%' : '63%') : (showReward ? '70%' : '85%')};">פירוט מבחן</th>
+                                    <th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: center; width: 15%;">הישג</th>
+                                    ${showReward ? `<th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: center; width: 15%;">מלגה</th>` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
             }
 
-            const tableHeaderHtml = `
-                <thead>
-                    <tr style="background-color: #f1f5f9; color: #0f172a;">
-                        <th style="padding: 4px; border: 1px solid #cbd5e1; font-size: 11px; width: 6%;">מס'</th>
-                        <th style="padding: 4px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center; width: 14%;">קוד</th>
-                        <th style="padding: 4px; border: 1px solid #cbd5e1; font-size: 11px; text-align: right; width: 50%;">פירוט מבחן</th>
-                        <th style="padding: 4px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center; width: 12%;">הישג</th>
-                        <th style="padding: 4px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center; width: 18%;">מלגה</th>
-                    </tr>
-                </thead>
-            `;
+            // תצוגת קוד תלמיד (אם הוגדר)
+            const codeBadgeHtml = showStudentCode ? `<span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 10px;">קוד: ${student.student_code}</span>` : '';
+            // תצוגת סך מלגה (אם הוגדר)
+            const totalRewardHtml = showReward ? `<div style="margin-top: 4px;">סך הכל מלגה: <strong style="color: #059669; font-size: 14px;">₪${(stats.total_reward || 0).toFixed(1)}</strong></div>` : '';
 
             completeHtml += `
-                <div class="print-container ${pageBreakClass}" data-size="${confSize}" style="background: white; margin: 0 auto 10px auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; box-sizing: border-box; position: relative; ${styleSize}">
-                    <div style="padding: 15px; box-sizing: border-box; height: 100%; display: flex; flex-direction: column;">
+                <div class="print-container ${pageBreakClass}" style="background: white; margin: 0 auto 10px auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; box-sizing: border-box; position: relative; ${styleSize}">
+                    <div style="padding: 15px 20px; box-sizing: border-box; height: 100%; display: flex; flex-direction: column;">
                         
-                        <!-- Compact Header -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 8px; margin-bottom: 12px;" dir="rtl">
+                        <!-- Premium Compact Header -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 15px;" dir="rtl">
                             <div style="flex: 1;">
-                                <h2 style="margin: 0; font-size: 18px; color: #0f172a;">דוח הישגים ומלגות</h2>
-                                <div style="font-size: 11px; color: #475569; margin-top: 2px;">תאריך הפקה: ${this.getHebrewDate()}</div>
+                                <h2 style="margin: 0 0 4px 0; font-size: 18px; color: #0f172a; font-weight: 800;">דוח הישגים ומלגות</h2>
+                                <div style="font-size: 11px; color: #475569;">תאריך הפקה: ${this.getHebrewDate()}</div>
                             </div>
                             
-                            <img src="${this.logoUrl}" style="max-height: 60px; width: auto; object-fit: contain; margin: 0 15px;">
+                            <!-- לוגו מוקטן לחיסכון במקום -->
+                            <img src="${this.logoUrl}" style="max-height: 50px; width: auto; object-fit: contain; margin: 0 15px;">
                             
-                            <div style="flex: 1; text-align: left; font-size: 12px; line-height: 1.5;">
-                                <div>שם התלמיד: <strong style="font-size: 14px; color: #000;">${student.first_name} ${student.last_name}</strong></div>
-                                <div>כיתה: <strong>${studentClass}</strong> | הצלחות: <strong>${stats.total_passed}/${stats.total_available_exams}</strong></div>
-                                <div>סך הכל מלגה: <strong style="color: #059669; font-size: 14px;">₪${(stats.total_reward || 0).toFixed(1)}</strong></div>
+                            <div style="flex: 1; text-align: left; font-size: 12px; line-height: 1.6;">
+                                <div>שם התלמיד: <strong style="font-size: 14px; color: #000;">${student.first_name} ${student.last_name}</strong> ${codeBadgeHtml}</div>
+                                <div>כיתה: <strong>${studentClass}</strong> | עבר <strong style="color: #0284c7;">${stats.total_passed}</strong> מתוך <strong style="color: #0f172a;">${stats.total_attempted}</strong> שביצע</div>
+                                ${totalRewardHtml}
                             </div>
                         </div>
 
-                        <!-- Split Tables Container -->
-                        <div style="display: flex; gap: 15px; flex: 1; align-items: flex-start;" dir="rtl">
-                            
-                            <!-- Right Table -->
-                            <div style="flex: 1; min-width: 0;">
-                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; background: white; table-layout: fixed;">
-                                    ${tableHeaderHtml}
-                                    <tbody>
-                                        ${rightColumnRows}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <!-- Left Table -->
-                            <div style="flex: 1; min-width: 0;">
-                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; background: white; table-layout: fixed;">
-                                    ${tableHeaderHtml}
-                                    <tbody>
-                                        ${leftColumnRows}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
+                        <!-- Dynamic Columns Container -->
+                        <div style="display: flex; gap: 12px; flex: 1; align-items: flex-start;" dir="rtl">
+                            ${tablesContainerHtml}
                         </div>
                         
+                        <!-- Footer -->
+                        <div style="margin-top: auto; padding-top: 10px; text-align: center; font-size: 9px; color: #94a3b8;">
+                            הופק אוטומטית ממערכת הניהול 
+                        </div>
                     </div>
                 </div>
             `;
@@ -390,14 +419,12 @@ export class ReportManager {
         }
 
         const element = document.getElementById('printReportBody');
-        const confSize = document.getElementById('repConfSize').value.toLowerCase();
-
         const opt = {
             margin:       0,
             filename:     `דוחות_תלמידים_${new Date().toISOString().slice(0,10)}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true, logging: false },
-            jsPDF:        { unit: 'mm', format: confSize, orientation: 'portrait' },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak:    { mode: 'css', before: '.page-break' }
         };
 
