@@ -86,7 +86,6 @@ export class ReportManager {
                 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px;">
                     
-                    <!-- Settings Panel -->
                     <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <h4 style="margin-top: 0; margin-bottom: 15px; font-size: 1rem; color: #0f172a;"><i class="fas fa-cog"></i> הגדרות תצוגה במסמך</h4>
                         <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -121,7 +120,6 @@ export class ReportManager {
                         </div>
                     </div>
 
-                    <!-- Generation Panel -->
                     <div style="display: flex; flex-direction: column; gap: 20px;">
                         
                         <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
@@ -233,7 +231,7 @@ export class ReportManager {
 
     createTableRowHtml(exam, index, showExamCode, showReward) {
         if (!exam) {
-            return `<tr><td colspan="${1 + (showExamCode ? 1 : 0) + (showReward ? 1 : 0) + 1}" style="border: 1px solid #cbd5e1; height: 18px;"></td></tr>`;
+            return `<tr><td colspan="${1 + (showExamCode ? 1 : 0) + (showReward ? 1 : 0) + 1}" style="border: 1px solid #cbd5e1; height: 16px;"></td></tr>`;
         }
 
         let desc = exam.exam_code;
@@ -263,14 +261,14 @@ export class ReportManager {
         let rowHtml = `<tr style="${bg}">`;
         
         if (showExamCode) {
-            rowHtml += `<td style="padding: 2px 4px; border: 1px solid #cbd5e1; font-size: 10px; font-weight: 600; text-align: center; color: #1e293b;">${exam.exam_code}</td>`;
+            rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 9px; font-weight: 600; text-align: center; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${exam.exam_code}</td>`;
         }
         
-        rowHtml += `<td style="padding: 2px 5px; border: 1px solid #cbd5e1; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; color: #334155;">${desc}</td>`;
-        rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 11px; text-align: center;">${markHtml}</td>`;
+        rowHtml += `<td style="padding: 2px 4px; border: 1px solid #cbd5e1; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #334155;" title="${desc}">${desc}</td>`;
+        rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 10px; text-align: center;">${markHtml}</td>`;
         
         if (showReward) {
-            rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 10px; text-align: center; font-weight: 600; color: #475569;">${rewardText}</td>`;
+            rowHtml += `<td style="padding: 2px; border: 1px solid #cbd5e1; font-size: 9px; text-align: center; font-weight: 600; color: #475569; white-space: nowrap;">${rewardText}</td>`;
         }
         
         rowHtml += `</tr>`;
@@ -284,7 +282,7 @@ export class ReportManager {
         const hideUnattempted = document.getElementById('confHideUnattempted').checked;
         const numCols = parseInt(document.getElementById('confColumns').value) || 3;
 
-        const styleSize = 'width: 210mm; min-height: 297mm;'; // מקובע ל-A4
+        const styleSize = 'width: 210mm; min-height: 297mm;';
         let completeHtml = '';
 
         students.forEach((student, studentIndex) => {
@@ -316,10 +314,10 @@ export class ReportManager {
                         <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; background: white; table-layout: fixed;">
                             <thead>
                                 <tr style="background-color: #e2e8f0; color: #0f172a;">
-                                    ${showExamCode ? `<th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: center; width: ${showReward ? '18%' : '22%'};">קוד</th>` : ''}
-                                    <th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: right; width: ${showExamCode ? (showReward ? '52%' : '63%') : (showReward ? '70%' : '85%')};">פירוט מבחן</th>
-                                    <th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: center; width: 15%;">הישג</th>
-                                    ${showReward ? `<th style="padding: 4px; border: 1px solid #94a3b8; font-size: 10px; text-align: center; width: 15%;">מלגה</th>` : ''}
+                                    ${showExamCode ? `<th style="padding: 2px; border: 1px solid #94a3b8; font-size: 9px; text-align: center; width: ${showReward ? '18%' : '20%'};">קוד</th>` : ''}
+                                    <th style="padding: 2px; border: 1px solid #94a3b8; font-size: 9px; text-align: right; width: ${showExamCode ? (showReward ? '54%' : '65%') : (showReward ? '72%' : '85%')};">פירוט מבחן</th>
+                                    <th style="padding: 2px; border: 1px solid #94a3b8; font-size: 9px; text-align: center; width: 15%;">הישג</th>
+                                    ${showReward ? `<th style="padding: 2px; border: 1px solid #94a3b8; font-size: 9px; text-align: center; width: 13%;">מלגה</th>` : ''}
                                 </tr>
                             </thead>
                             <tbody>
@@ -330,37 +328,33 @@ export class ReportManager {
                 `;
             }
 
-            const codeBadgeHtml = showStudentCode ? `<span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 10px;">קוד: ${student.student_code}</span>` : '';
-            const totalRewardHtml = showReward ? `<div style="margin-top: 4px;">סך הכל מלגה: <strong style="color: #059669; font-size: 14px;">₪${(stats.total_reward || 0).toFixed(1)}</strong></div>` : '';
+            const codeBadgeHtml = showStudentCode ? `<span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 8px;">קוד: ${student.student_code}</span>` : '';
+            const totalRewardHtml = showReward ? `<div style="margin-top: 4px;">סך הכל מלגה: <strong style="color: #059669; font-size: 13px;">₪${(stats.total_reward || 0).toFixed(1)}</strong></div>` : '';
 
             completeHtml += `
                 <div class="print-container ${pageBreakClass}" style="background: white; margin: 0 auto 10px auto; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; box-sizing: border-box; position: relative; ${styleSize}">
-                    <div style="padding: 15px 20px; box-sizing: border-box; height: 100%; display: flex; flex-direction: column;">
+                    <div style="padding: 10px; box-sizing: border-box; height: 100%; display: flex; flex-direction: column;">
                         
-                        <!-- Premium Compact Header -->
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 15px;" dir="rtl">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px;" dir="rtl">
                             <div style="flex: 1;">
-                                <h2 style="margin: 0 0 4px 0; font-size: 18px; color: #0f172a; font-weight: 800;">דוח הישגים ומלגות</h2>
-                                <div style="font-size: 11px; color: #475569;">תאריך הפקה: ${this.getHebrewDate()}</div>
+                                <h2 style="margin: 0 0 2px 0; font-size: 16px; color: #0f172a; font-weight: 800;">דוח הישגים ומלגות</h2>
+                                <div style="font-size: 10px; color: #475569;">תאריך הפקה: ${this.getHebrewDate()}</div>
                             </div>
                             
-                            <!-- לוגו מוקטן לחיסכון במקום -->
-                            <img src="${this.logoUrl}" style="max-height: 50px; width: auto; object-fit: contain; margin: 0 15px;">
+                            <img src="${this.logoUrl}" style="max-height: 40px; width: auto; object-fit: contain; margin: 0 10px;">
                             
-                            <div style="flex: 1; text-align: left; font-size: 12px; line-height: 1.6;">
-                                <div>שם התלמיד: <strong style="font-size: 14px; color: #000;">${student.first_name} ${student.last_name}</strong> ${codeBadgeHtml}</div>
+                            <div style="flex: 1; text-align: left; font-size: 11px; line-height: 1.4;">
+                                <div>שם התלמיד: <strong style="font-size: 12px; color: #000;">${student.first_name} ${student.last_name}</strong> ${codeBadgeHtml}</div>
                                 <div>כיתה: <strong>${studentClass}</strong> | עבר <strong style="color: #0284c7;">${stats.total_passed}</strong> מתוך <strong style="color: #0f172a;">${stats.total_attempted}</strong> שביצע</div>
                                 ${totalRewardHtml}
                             </div>
                         </div>
 
-                        <!-- Dynamic Columns Container -->
-                        <div style="display: flex; gap: 12px; flex: 1; align-items: flex-start;" dir="rtl">
+                        <div style="display: flex; gap: 8px; flex: 1; align-items: flex-start;" dir="rtl">
                             ${tablesContainerHtml}
                         </div>
                         
-                        <!-- Footer -->
-                        <div style="margin-top: auto; padding-top: 10px; text-align: center; font-size: 9px; color: #94a3b8;">
+                        <div style="margin-top: auto; padding-top: 8px; text-align: center; font-size: 8px; color: #94a3b8;">
                             הופק אוטומטית ממערכת הניהול 
                         </div>
                     </div>
