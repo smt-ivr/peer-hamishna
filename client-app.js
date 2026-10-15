@@ -316,7 +316,7 @@ async function initApp() {
 
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
     studentManager = new StudentManager(document.getElementById('view-students'), API_BASE, goToStudentUpdate, refreshAllData);
-    examListManager = new ExamManager(document.getElementById('view-exams'));
+    examListManager = new ExamManager(document.getElementById('view-exams'), API_BASE, refreshAllData);
     historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE);
     reportManager = new ReportManager(document.getElementById('view-reports'), API_BASE);
     
