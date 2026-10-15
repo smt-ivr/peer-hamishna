@@ -518,7 +518,12 @@ export class ExamManager {
         });
     }
 
-    toast(msg, actionLabel, onAction) {
+    toast(msg, actionLabel, onAction, type = 'success') {
+        // מערכת ההודעות הגלובלית (client-app.js). אם אינה קיימת — נופלים לטוסט המקומי.
+        if (typeof window.notify === 'function') {
+            window.notify(msg, type, { duration: actionLabel ? 9000 : 3500, actionLabel, onAction });
+            return;
+        }
         document.querySelectorAll('.ex-toast').forEach(x => x.remove());
         const el = document.createElement('div');
         el.className = 'ex-toast';
@@ -551,7 +556,7 @@ export class ExamManager {
         this.sel.delete(code);
         this.renderBody();
         this.scheduleSync();
-        this.toast(`מבחן ${code} נמחק`, 'בטל', () => this.restoreOne(code, true));
+        this.toast(`מבחן ${code} נמחק`, 'בטל', () => this.restoreOne(code, true), 'info');
     }
 
     async restoreOne(code, quiet = false) {
@@ -592,7 +597,7 @@ export class ExamManager {
         this.toast(`${done.length} מבחנים נמחקו${failures ? `, ${failures} נכשלו` : ''}`, 'בטל', async () => {
             await this.pool(done, async (c) => { const r = await this.api('POST', `/exams/${encodeURIComponent(c)}/restore`); if (r.ok) this.upsert(r.data); return r.ok; });
             this.renderBody(); this.scheduleSync();
-        });
+        }, failures ? 'warning' : 'info');
     }
 
     async bulkRestore() {
@@ -619,7 +624,7 @@ export class ExamManager {
         this.sel.clear();
         this.renderBody();
         this.scheduleSync();
-        this.toast(failures ? `עודכנו ${codes.length - failures}, נכשלו ${failures}` : `כיתת היעד עודכנה ב-${codes.length} מבחנים`);
+        this.toast(failures ? `עודכנו ${codes.length - failures}, נכשלו ${failures}` : `כיתת היעד עודכנה ב-${codes.length} מבחנים`, null, null, failures ? 'warning' : 'success');
     }
 
     exportCsv() {
