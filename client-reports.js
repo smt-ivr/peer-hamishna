@@ -59,6 +59,14 @@ export const DEFAULT_DESIGN = {
     // פריסה
     cols: 'auto',          // auto | 2 | 3 | 4 | 5
     fontScale: '1',        // 0.9 | 1 | 1.1
+    // טקסטים קבועים בדוח (ריק = ברירת מחדל)
+    texts: {
+        colCode: 'קוד', colMark: 'הישג', colReward: 'מלגה',
+        statAttempted: 'נבחן ב-', statOf: 'מתוך', statPassed: 'עברו', statFailed: 'לא עברו', statMoney: 'סך מלגה',
+        grade: 'כיתה', code: 'קוד', typeM: 'משניות', typeG: 'גמרא',
+        legPass: 'עבר', legFail: 'לא עבר', legNone: 'שורה ללא סימון – טרם נבחן',
+        page: 'עמוד', pageOf: 'מתוך', bsd: 'בס״ד', empty: 'לא נמצאו מבחנים להצגה'
+    },
     // צבעים
     colors: {
         line: '#0f172a',
@@ -71,6 +79,15 @@ export const DEFAULT_DESIGN = {
         failMark: '#dc2626'
     }
 };
+
+export const TEXT_LABELS = [
+    ['colCode', 'כותרת עמודה: קוד'], ['colMark', 'כותרת עמודה: הישג'], ['colReward', 'כותרת עמודה: מלגה'],
+    ['statAttempted', 'כרטיס סיכום: נבחן ב-'], ['statOf', 'כרטיס סיכום: מתוך'], ['statPassed', 'כרטיס סיכום: עברו'],
+    ['statFailed', 'כרטיס סיכום: לא עברו'], ['statMoney', 'כרטיס סיכום: סך מלגה'],
+    ['grade', 'המילה "כיתה"'], ['code', 'המילה "קוד" (ליד התלמיד)'], ['typeM', 'תווית משניות'], ['typeG', 'תווית גמרא'],
+    ['legPass', 'מקרא: עבר'], ['legFail', 'מקרא: לא עבר'], ['legNone', 'מקרא: טרם נבחן'],
+    ['page', 'המילה "עמוד"'], ['pageOf', 'המילה "מתוך" (עמודים)'], ['bsd', 'בס״ד'], ['empty', 'הודעה כשאין מבחנים']
+];
 
 export const COLOR_LABELS = [
     ['line', 'קו וכותרת עליונה'],
@@ -119,6 +136,11 @@ export function sanitizeDesign(raw) {
     });
     if (['auto', '2', '3', '4', '5'].includes(String(raw.cols))) d.cols = String(raw.cols);
     if (['0.9', '1', '1.1'].includes(String(raw.fontScale))) d.fontScale = String(raw.fontScale);
+    if (raw.texts && typeof raw.texts === 'object') {
+        Object.keys(DEFAULT_DESIGN.texts).forEach(k => {
+            if (typeof raw.texts[k] === 'string') d.texts[k] = raw.texts[k].trim().slice(0, 40) || DEFAULT_DESIGN.texts[k];
+        });
+    }
     if (raw.colors && typeof raw.colors === 'object') {
         Object.keys(DEFAULT_DESIGN.colors).forEach(k => {
             if (HEX.test(raw.colors[k] || '')) d.colors[k] = raw.colors[k].toLowerCase();
@@ -517,17 +539,17 @@ export class ReportManager {
         .rp-col { flex: 1; min-width: 0; border-top: .25mm solid #94a3b8; border-left: .25mm solid #cbd5e1; border-right: .25mm solid #cbd5e1; }
         .rp-colhead, .rp-row { height: var(--rh); font-size: var(--fs); display: grid; grid-template-columns: 1fr 8mm 11mm; align-items: stretch; }
         .rp-colhead.no-rw, .rp-row.no-rw { grid-template-columns: 1fr 8mm; }
-        .rp-colhead > span, .rp-row > span { display: flex; align-items: center; min-width: 0; }
+        .rp-colhead > span, .rp-row > span { display: flex; align-items: center; justify-content: center; text-align: center; min-width: 0; }
         .rp-colhead > span:first-child, .rp-row > span:first-child { padding: 0 2mm; }
-        .rp-colhead > span:not(:first-child), .rp-row > span:not(:first-child) { justify-content: center; border-right: .2mm solid #cbd5e1; }
+        .rp-colhead > span:not(:first-child), .rp-row > span:not(:first-child) { border-right: .2mm solid #cbd5e1; }
         .rp-colhead { background: #e2e8f0; color: #0f172a; font-weight: 700; border-bottom: .25mm solid #94a3b8; }
 
         /* כותרת מסכת — אותו צבע לשניהם; ההבדל בין משניות לגמרא בתווית */
-        .rp-mh { height: var(--rh); font-size: var(--fs); display: flex; align-items: center; gap: 1.8mm; padding: 0 2mm; background: var(--mb); color: var(--mt); font-weight: 800; white-space: nowrap; overflow: hidden; }
+        .rp-mh { height: var(--rh); font-size: var(--fs); display: flex; align-items: center; justify-content: center; gap: 1.8mm; padding: 0 2mm; background: var(--mb); color: var(--mt); font-weight: 800; white-space: nowrap; overflow: hidden; }
         .rp-pill { flex: none; font-size: .78em; font-weight: 800; padding: .1mm 1.9mm; border-radius: 10mm; border: .25mm solid var(--mt); }
         .rp-mh.t-m .rp-pill { background: transparent; color: var(--mt); }
         .rp-mh.t-g .rp-pill { background: var(--mt); color: var(--mb); }
-        .rp-mh-stat { margin-right: auto; font-weight: 600; font-size: .9em; opacity: .95; }
+        .rp-mh-stat { margin-right: 0; font-weight: 600; font-size: .9em; opacity: .95; }
 
         .rp-row { background: #fff; border-bottom: .25mm solid #cbd5e1; }
         .rp-row.s1 { background: var(--sb); }
@@ -563,6 +585,7 @@ export class ReportManager {
         .rd-pane > * { flex: none; }
         .rd-group { border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
         .rd-group h4 { font-size: .88rem; color: #0f172a; display: flex; justify-content: space-between; align-items: center; margin: 0; }
+        .rd-tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
         .rd-hint { font-size: .74rem; color: var(--text-muted); line-height: 1.4; }
         .rd-field label.rd-lbl { display: block; font-size: .78rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
         .rd-field input[type=text], .rd-field select { width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: .88rem; outline: none; background: #f8fafc; font-family: inherit; }
@@ -936,6 +959,8 @@ export class ReportManager {
             const ok = await window.customConfirm('לאפס את כל ההתאמות לברירת המחדל?');
             if (!ok) return;
             this.draft = clone(DEFAULT_DESIGN);
+        } else if (what === 'texts') {
+            this.draft.texts = clone(DEFAULT_DESIGN.texts);
         } else if (what === 'colors') {
             this.draft.colors = clone(DEFAULT_DESIGN.colors);
         } else if (what === 'order') {
@@ -981,6 +1006,11 @@ export class ReportManager {
                 <h4>הודעות</h4>
                 ${text('note', 'הודעה לתלמיד (פס מתחת לסיכום, לא חובה)', 'לדוגמה: יישר כוחך! המשך כך', 90)}
                 ${text('footerText', 'טקסט בתחתית העמוד', DEFAULT_DESIGN.footerText, 60)}
+            </div>
+            <div class="rd-group">
+                <h4>טקסטים קבועים בדוח <button class="rd-link" data-reset="texts">איפוס טקסטים</button></h4>
+                <div class="rd-hint">אפשר לשנות כל מילה שמופיעה בדוח. שדה ריק חוזר לברירת המחדל.</div>
+                <div class="rd-tgrid">${TEXT_LABELS.map(([k, label]) => `<div class="rd-field"><label class="rd-lbl">${label}</label><input type="text" data-d="texts.${k}" value="${esc(d.texts[k])}" placeholder="${esc(DEFAULT_DESIGN.texts[k])}" maxlength="40" autocomplete="off"></div>`).join('')}</div>
             </div>`;
         } else if (this.rdTab === 'layout') {
             html = `
@@ -1121,16 +1151,17 @@ export class ReportManager {
         const failed = Math.max(0, attempted - passed);
         const reward = Number(st.total_reward ?? rewardCalc) || 0;
 
+        const T = { ...DEFAULT_DESIGN.texts, ...(o.texts || {}) };
         const title = (o.title || '').trim() || DEFAULT_DESIGN.title;
         const subtitle = (o.subtitle || '').trim();
         const note = (o.note || '').trim();
 
         // כרטיסי סיכום לפי הסדר וההצגה שנבחרו
         const cards = {
-            attempted: `<div class="rp-stat">נבחן ב-<b>${attempted}</b> מתוך ${total}</div>`,
-            passed: `<div class="rp-stat ok">עברו <b>${passed}</b></div>`,
-            failed: `<div class="rp-stat bad">לא עברו <b>${failed}</b></div>`,
-            money: o.showReward ? `<div class="rp-stat money">סך מלגה <b>₪${reward.toFixed(1)}</b></div>` : ''
+            attempted: `<div class="rp-stat">${esc(T.statAttempted)}<b>${attempted}</b> ${esc(T.statOf)} ${total}</div>`,
+            passed: `<div class="rp-stat ok">${esc(T.statPassed)} <b>${passed}</b></div>`,
+            failed: `<div class="rp-stat bad">${esc(T.statFailed)} <b>${failed}</b></div>`,
+            money: o.showReward ? `<div class="rp-stat money">${esc(T.statMoney)} <b>₪${reward.toFixed(1)}</b></div>` : ''
         };
         const visibleStats = o.showStats ? o.statsOrder.filter(id => o.statsVisible[id] && cards[id]) : [];
         const bodyH = computeBodyH(visibleStats.length > 0, !!note);
@@ -1144,7 +1175,7 @@ export class ReportManager {
 
         // כותרת עליונה לפי הסדר שנבחר
         const titleSize = title.length > 34 ? 4.4 : (title.length > 22 ? 5.4 : 6.4);
-        const codeChip = o.showStudentCode ? `<span class="rp-chip">קוד ${esc(student.student_code)}</span>` : '';
+        const codeChip = o.showStudentCode ? `<span class="rp-chip">${esc(T.code)} ${esc(student.student_code)}</span>` : '';
         const present = o.headerOrder.filter(id => id !== 'logo' || (logo && o.showLogo));
         const last = present.length - 1;
         const headParts = {
@@ -1156,24 +1187,24 @@ export class ReportManager {
                 </div>`,
             student: (i) => `<div class="rp-student" style="text-align:${i === 0 ? 'right' : (i === last ? 'left' : 'center')}">
                     <div class="rp-name">${esc(student.first_name)} ${esc(student.last_name)}</div>
-                    <div class="rp-meta">כיתה ${esc(student.class_grade || 'כללי')}${codeChip}</div>
+                    <div class="rp-meta">${esc(T.grade)} ${esc(student.class_grade || 'כללי')}${codeChip}</div>
                 </div>`
         };
         const headHtml = present.map((id, i) => headParts[id](i)).join('');
 
         const legend = o.showLegend
-            ? '<span><b class="ok">✓</b> עבר</span><span><b class="no">✕</b> לא עבר</span><span>שורה ללא סימון – טרם נבחן</span>'
+            ? `<span><b class="ok">✓</b> ${esc(T.legPass)}</span><span><b class="no">✕</b> ${esc(T.legFail)}</span><span>${esc(T.legNone)}</span>`
             : '';
 
         return plan.pages.map((cols, pageIdx) => {
             const colsHtml = [];
             for (let i = 0; i < plan.N; i++) colsHtml.push(this.renderColumn(cols[i] || [], o, plan.N));
-            const body = exams.length === 0 ? '<div class="rp-empty">לא נמצאו מבחנים להצגה</div>' : colsHtml.join('');
-            const footText = [o.footerText, totalPages > 1 ? `עמוד ${pageIdx + 1} מתוך ${totalPages}` : ''].filter(Boolean).map(esc).join(' &nbsp;·&nbsp; ');
+            const body = exams.length === 0 ? `<div class="rp-empty">${esc(T.empty)}</div>` : colsHtml.join('');
+            const footText = [o.footerText, totalPages > 1 ? `${T.page} ${pageIdx + 1} ${T.pageOf} ${totalPages}` : ''].filter(Boolean).map(esc).join(' &nbsp;·&nbsp; ');
 
             return `
             <div class="rp-page" style="${vars}">
-                ${o.bsd ? '<div class="rp-bsd">בס״ד</div>' : ''}
+                ${o.bsd ? `<div class="rp-bsd">${esc(T.bsd)}</div>` : ''}
                 <div class="rp-head">${headHtml}</div>
                 ${visibleStats.length ? `<div class="rp-stats">${visibleStats.map(id => cards[id]).join('')}</div>` : '<div class="rp-gap"></div>'}
                 ${note ? `<div class="rp-note">${esc(note)}</div>` : ''}
@@ -1188,13 +1219,15 @@ export class ReportManager {
 
     renderColumn(col, o, N) {
         const rw = o.showReward;
-        const head = `<div class="rp-colhead ${rw ? '' : 'no-rw'}"><span>קוד</span><span>הישג</span>${rw ? '<span>מלגה</span>' : ''}</div>`;
+        const T = { ...DEFAULT_DESIGN.texts, ...(o.texts || {}) };
+        const head = `<div class="rp-colhead ${rw ? '' : 'no-rw'}"><span>${esc(T.colCode)}</span><span>${esc(T.colMark)}</span>${rw ? `<span>${esc(T.colReward)}</span>` : ''}</div>`;
 
         const rows = col.map(it => {
             const g = it.g;
             const ti = g.typeInfo;
             if (it.t === 'h') {
-                const pill = ti.label && o.showTypeLabels ? `<span class="rp-pill">${ti.label}</span>` : '';
+                const pillText = ti.cls === 't-m' ? T.typeM : (ti.cls === 't-g' ? T.typeG : '');
+                const pill = pillText && o.showTypeLabels ? `<span class="rp-pill">${esc(pillText)}</span>` : '';
                 let stat = '';
                 if (!it.cont && o.showSummary && (N <= 4 || g.name.length <= 6)) {   // ב-5 עמודות אין מקום לסיכום ליד שם ארוך
                     const p = g.exams.filter(e => e.passed === true).length;
