@@ -6,102 +6,273 @@ import { ReportManager } from './client-reports.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 
-// --- מודולים מעוצבים המחליפים את ה-Alert, Confirm, Prompt של הדפדפן ---
-window.customAlert = function(message, isError = false) {
-    return new Promise((resolve) => {
-        const overlay = document.getElementById('customModalOverlay');
-        document.getElementById('customModalIcon').innerHTML = isError ? '<i class="fas fa-times-circle" style="color:var(--danger);"></i>' : '<i class="fas fa-check-circle" style="color:var(--success);"></i>';
-        document.getElementById('customModalTitle').innerText = isError ? 'שגיאה' : 'הודעת מערכת';
-        document.getElementById('customModalMessage').innerText = message;
-        document.getElementById('customModalInputContainer').classList.add('hidden');
-        
-        const btnContainer = document.getElementById('customModalButtons');
-        btnContainer.innerHTML = '<button class="btn btn-primary" id="customModalOkBtn" style="min-width: 100px;">אישור</button>';
-        
-        overlay.classList.remove('hidden');
-        
-        document.getElementById('customModalOkBtn').onclick = () => {
-            overlay.classList.add('hidden');
-            resolve(true);
-        };
-    });
-};
-
-// פונקציה להצגת חלונית הודעה עם כפתור "קראתי"
-window.showReadMessageModal = function(messageText) {
-    const overlay = document.getElementById('customModalOverlay');
-    document.getElementById('customModalIcon').innerHTML = '<i class="fas fa-info-circle" style="color:var(--primary-color);"></i>';
-    document.getElementById('customModalTitle').innerText = 'הודעת מערכת';
-    document.getElementById('customModalMessage').innerText = messageText;
-    document.getElementById('customModalInputContainer').classList.add('hidden');
-    
-    const btnContainer = document.getElementById('customModalButtons');
-    btnContainer.innerHTML = '<button class="btn btn-primary" id="msgReadBtn" style="min-width: 120px; justify-content: center;">קראתי</button>';
-    
-    overlay.classList.remove('hidden');
-    
-    document.getElementById('msgReadBtn').onclick = () => {
-        overlay.classList.add('hidden');
+// --- מערכת הודעות: טוסטים (הצלחה / שגיאה / אזהרה / מידע) + חלונות אישור ---
+// ה-API נשאר זהה: customAlert(msg, isError) · customConfirm(msg) · customPrompt(msg, default) · showReadMessageModal(msg)
+// חדש: window.notify(msg, type, { title, duration, actionLabel, onAction })
+(function setupNotifications() {
+    const svg = (inner) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+    const ICONS = {
+        success: svg('<path d="M5 12.5l4.2 4.2L19 7"/>'),
+        error: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+        warning: svg('<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5"/><path d="M12 17.4v.01"/>'),
+        info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6v.01"/>'),
+        question: svg('<circle cx="12" cy="12" r="9"/><path d="M9.4 9.6a2.6 2.6 0 1 1 3.7 2.3c-.8.4-1.1.9-1.1 1.8"/><path d="M12 17.2v.01"/>'),
+        edit: svg('<path d="M4 20h4l10.5-10.5-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>')
     };
-};
+    const TITLES = { success: 'בוצע בהצלחה', error: 'שגיאה', warning: 'שימו לב', info: 'הודעה' };
+    const BASE_MS = { success: 4000, info: 5000, warning: 7000, error: 9000 };
+    const MAX_VISIBLE = 4;
 
-window.customConfirm = function(message) {
-    return new Promise((resolve) => {
-        const overlay = document.getElementById('customModalOverlay');
-        document.getElementById('customModalIcon').innerHTML = '<i class="fas fa-question-circle" style="color:var(--warning);"></i>';
-        document.getElementById('customModalTitle').innerText = 'אישור פעולה';
-        document.getElementById('customModalMessage').innerText = message;
-        document.getElementById('customModalInputContainer').classList.add('hidden');
-        
-        const btnContainer = document.getElementById('customModalButtons');
-        btnContainer.innerHTML = `
-            <button class="btn btn-outline" id="customModalCancelBtn" style="min-width: 80px;">ביטול</button>
-            <button class="btn btn-primary" id="customModalConfirmBtn" style="min-width: 80px;">אישור</button>
-        `;
-        
-        overlay.classList.remove('hidden');
-        
-        document.getElementById('customModalCancelBtn').onclick = () => {
-            overlay.classList.add('hidden');
-            resolve(false);
-        };
-        document.getElementById('customModalConfirmBtn').onclick = () => {
-            overlay.classList.add('hidden');
-            resolve(true);
-        };
-    });
-};
+    const css = `
+    #ntfStack { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); width: min(440px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 10px; z-index: 10050; pointer-events: none; direction: rtl; }
+    .ntf, .ntf-dicon { --c: #2563eb; --bg: #dbeafe; }
+    .ntf.success, .ntf-dicon.success { --c: #059669; --bg: #d1fae5; }
+    .ntf.error, .ntf-dicon.error { --c: #dc2626; --bg: #fee2e2; }
+    .ntf.warning, .ntf-dicon.warning { --c: #d97706; --bg: #fef3c7; }
+    .ntf { pointer-events: auto; position: relative; display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 13px 16px 16px 12px; box-shadow: 0 12px 32px rgba(15,23,42,.18), 0 2px 6px rgba(15,23,42,.08); overflow: hidden; animation: ntfIn .3s cubic-bezier(.2,.9,.3,1.2); }
+    .ntf::before { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 5px; background: var(--c); }
+    .ntf.out { animation: ntfOut .2s ease-in forwards; }
+    .ntf-ico { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--bg); color: var(--c); display: flex; align-items: center; justify-content: center; margin-right: 4px; }
+    .ntf-ico svg { width: 18px; height: 18px; }
+    .ntf-body { flex: 1; min-width: 0; }
+    .ntf-title { font-weight: 800; font-size: .92rem; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+    .ntf-count { background: var(--c); color: #fff; border-radius: 99px; font-size: .7rem; padding: 0 7px; line-height: 18px; font-weight: 700; }
+    .ntf-msg { margin-top: 2px; font-size: .86rem; color: #475569; line-height: 1.5; white-space: pre-line; word-break: break-word; }
+    .ntf-actions { margin-top: 9px; display: flex; gap: 8px; }
+    .ntf-action { border: none; background: var(--bg); color: var(--c); font-weight: 800; font-size: .82rem; padding: 5px 14px; border-radius: 8px; cursor: pointer; }
+    .ntf-action:hover { filter: brightness(.95); }
+    .ntf-x { flex: none; border: none; background: none; color: #94a3b8; font-size: 1.25rem; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+    .ntf-x:hover { background: #f1f5f9; color: #475569; }
+    .ntf-bar { position: absolute; bottom: 0; right: 0; left: 0; height: 3px; background: rgba(15,23,42,.05); }
+    .ntf-bar i { display: block; height: 100%; background: var(--c); transform-origin: right; animation: ntfBar linear forwards; }
+    .ntf.paused .ntf-bar i { animation-play-state: paused; }
+    @keyframes ntfIn { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: none; } }
+    @keyframes ntfOut { to { opacity: 0; transform: translateY(-10px) scale(.96); } }
+    @keyframes ntfBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+    @keyframes ntfPop { from { opacity: 0; transform: scale(.92) translateY(8px); } to { opacity: 1; transform: none; } }
 
-window.customPrompt = function(message, defaultValue = '') {
-    return new Promise((resolve) => {
-        const overlay = document.getElementById('customModalOverlay');
-        document.getElementById('customModalIcon').innerHTML = '<i class="fas fa-edit" style="color:var(--primary-color);"></i>';
-        document.getElementById('customModalTitle').innerText = 'הזנת נתונים';
-        document.getElementById('customModalMessage').innerText = message;
-        document.getElementById('customModalInputContainer').classList.remove('hidden');
-        const input = document.getElementById('customModalInput');
-        input.value = defaultValue;
-        
-        const btnContainer = document.getElementById('customModalButtons');
-        btnContainer.innerHTML = `
-            <button class="btn btn-outline" id="customModalCancelBtn" style="flex:1;">ביטול</button>
-            <button class="btn btn-primary" id="customModalConfirmBtn" style="flex:1;">שמור</button>
-        `;
-        
-        overlay.classList.remove('hidden');
-        setTimeout(() => input.focus(), 50);
-        
-        document.getElementById('customModalCancelBtn').onclick = () => {
-            overlay.classList.add('hidden');
-            resolve(null);
-        };
-        document.getElementById('customModalConfirmBtn').onclick = () => {
-            const val = input.value;
-            overlay.classList.add('hidden');
-            resolve(val);
-        };
-    });
-};
+    /* חלונות אישור / הזנה (אותו overlay שקיים ב-index.html) */
+    #customModalOverlay { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    #customModalOverlay .modal-content { max-width: 420px !important; border-radius: 18px !important; padding: 28px 26px 22px !important; box-shadow: 0 24px 60px rgba(15,23,42,.3) !important; }
+    #customModalOverlay:not(.hidden) .modal-content { animation: ntfPop .2s cubic-bezier(.2,.9,.3,1.2); }
+    .ntf-dicon { width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--c); }
+    .ntf-dicon svg { width: 30px; height: 30px; }
+    #customModalTitle { font-size: 1.15rem !important; font-weight: 800; color: #0f172a; }
+    #customModalMessage { white-space: pre-line; line-height: 1.55; }
+    #customModalButtons .btn { height: 38px; border-radius: 10px; font-weight: 700; min-width: 96px; justify-content: center; }
+    #customModalButtons .ntf-danger { background: #dc2626; color: #fff; }
+    #customModalButtons .ntf-danger:hover { background: #b91c1c; }
+    @media (prefers-reduced-motion: reduce) { .ntf, .ntf.out, #customModalOverlay:not(.hidden) .modal-content, .ntf-bar i { animation: none; } }`;
+    const style = document.createElement('style');
+    style.id = 'ntfStyles';
+    style.textContent = css;
+    document.head.appendChild(style);
+
+    // ---------- טוסטים ----------
+    const live = new Map();   // key -> toast state
+
+    function getStack() {
+        let st = document.getElementById('ntfStack');
+        if (!st) {
+            st = document.createElement('div');
+            st.id = 'ntfStack';
+            st.setAttribute('aria-live', 'polite');
+            document.body.appendChild(st);
+        }
+        return st;
+    }
+
+    function closeToast(t) {
+        if (t.closed) return;
+        t.closed = true;
+        clearTimeout(t.timer);
+        live.delete(t.key);
+        t.el.classList.add('out');
+        setTimeout(() => t.el.remove(), 200);
+    }
+
+    function armTimer(t) {
+        if (!t.duration) return;
+        clearTimeout(t.timer);
+        t.startedAt = Date.now();
+        t.timer = setTimeout(() => closeToast(t), t.remaining);
+        const bar = t.el.querySelector('.ntf-bar i');
+        bar.style.animation = 'none';
+        void bar.offsetWidth;                       // מאתחל את האנימציה
+        bar.style.animation = '';
+        bar.style.animationDuration = t.remaining + 'ms';
+        t.el.classList.remove('paused');
+    }
+
+    window.notify = function (message, type = 'info', opts = {}) {
+        if (!ICONS[type] || type === 'question' || type === 'edit') type = 'info';
+        message = String(message ?? '');
+        const key = `${type}|${message}`;
+        const existing = live.get(key);
+
+        // אותה הודעה שוב ושוב → מונה במקום ערימה
+        if (existing && !opts.actionLabel) {
+            existing.count++;
+            let badge = existing.el.querySelector('.ntf-count');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'ntf-count';
+                existing.el.querySelector('.ntf-title').appendChild(badge);
+            }
+            badge.textContent = '×' + existing.count;
+            existing.remaining = existing.duration;
+            armTimer(existing);
+            return { close: () => closeToast(existing) };
+        }
+
+        const duration = opts.duration !== undefined ? opts.duration : Math.min(14000, BASE_MS[type] + message.length * 35);
+        const el = document.createElement('div');
+        el.className = `ntf ${type}`;
+        el.setAttribute('role', type === 'error' || type === 'warning' ? 'alert' : 'status');
+
+        const ico = document.createElement('div'); ico.className = 'ntf-ico'; ico.innerHTML = ICONS[type];
+        const body = document.createElement('div'); body.className = 'ntf-body';
+        const title = document.createElement('div'); title.className = 'ntf-title'; title.textContent = opts.title || TITLES[type];
+        const msg = document.createElement('div'); msg.className = 'ntf-msg'; msg.textContent = message;
+        body.append(title, msg);
+
+        const t = { key, el, count: 1, duration, remaining: duration, closed: false };
+
+        if (opts.actionLabel) {
+            const actions = document.createElement('div'); actions.className = 'ntf-actions';
+            const a = document.createElement('button'); a.type = 'button'; a.className = 'ntf-action'; a.textContent = opts.actionLabel;
+            a.onclick = () => { closeToast(t); if (opts.onAction) opts.onAction(); };
+            actions.appendChild(a);
+            body.appendChild(actions);
+        }
+
+        const x = document.createElement('button'); x.type = 'button'; x.className = 'ntf-x'; x.setAttribute('aria-label', 'סגור'); x.textContent = '×';
+        x.onclick = () => closeToast(t);
+        el.append(ico, body, x);
+
+        if (duration) {
+            const bar = document.createElement('div'); bar.className = 'ntf-bar'; bar.innerHTML = '<i></i>';
+            el.appendChild(bar);
+            el.addEventListener('mouseenter', () => {
+                if (t.closed) return;
+                clearTimeout(t.timer);
+                t.remaining = Math.max(600, t.remaining - (Date.now() - t.startedAt));
+                el.classList.add('paused');
+            });
+            el.addEventListener('mouseleave', () => {
+                if (t.closed) return;
+                t.startedAt = Date.now();
+                clearTimeout(t.timer);
+                t.timer = setTimeout(() => closeToast(t), t.remaining);
+                el.classList.remove('paused');
+            });
+        }
+
+        const stack = getStack();
+        stack.appendChild(el);
+        live.set(key, t);
+        while (stack.children.length > MAX_VISIBLE) {          // לא מציפים את המסך
+            const oldest = [...live.values()].find(x2 => x2.el === stack.firstElementChild);
+            if (oldest) closeToast(oldest); else stack.firstElementChild.remove();
+        }
+        if (duration) armTimer(t);
+        return { close: () => closeToast(t) };
+    };
+
+    // ---------- חלונות אישור / הזנה (תור — חלון אחד בכל רגע) ----------
+    let chain = Promise.resolve();
+
+    function openDialog({ type, icon, title, message, input, buttons, focusCancel }) {
+        const run = () => new Promise((resolve) => {
+            const $ = (id) => document.getElementById(id);
+            const overlay = $('customModalOverlay');
+            const inputWrap = $('customModalInputContainer'), inputEl = $('customModalInput'), btnWrap = $('customModalButtons');
+
+            $('customModalIcon').innerHTML = `<div class="ntf-dicon ${type}">${ICONS[icon || type]}</div>`;
+            $('customModalTitle').textContent = title;
+            $('customModalMessage').textContent = message;
+            if (input) { inputWrap.classList.remove('hidden'); inputEl.value = input.value || ''; } else inputWrap.classList.add('hidden');
+
+            btnWrap.textContent = '';
+            let done = false;
+            const finish = (val) => {
+                if (done) return;
+                done = true;
+                document.removeEventListener('keydown', onKey, true);
+                overlay.classList.add('hidden');
+                resolve(val);
+            };
+            buttons.forEach((b) => {
+                const el = document.createElement('button');
+                el.type = 'button';
+                el.className = 'btn ' + (b.danger ? 'ntf-danger' : (b.primary ? 'btn-primary' : 'btn-outline'));
+                el.textContent = b.label;
+                if (b.id) el.id = b.id;
+                el.onclick = () => finish(b.fromInput ? inputEl.value : b.value);
+                b.el = el;
+                btnWrap.appendChild(el);
+            });
+            const cancelBtn = buttons.find((b) => b.cancel);
+            const mainBtn = buttons.find((b) => b.primary || b.danger);
+
+            function onKey(e) {
+                if (e.key === 'Escape' && cancelBtn) { e.preventDefault(); e.stopPropagation(); finish(cancelBtn.fromInput ? null : cancelBtn.value); }
+                else if (e.key === 'Enter') {
+                    const ae = document.activeElement;
+                    if (ae && ae.tagName === 'BUTTON') return;      // הכפתור הממוקד יטפל
+                    e.preventDefault(); e.stopPropagation(); mainBtn.el.click();
+                }
+            }
+            document.addEventListener('keydown', onKey, true);
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                const target = input ? inputEl : ((focusCancel && cancelBtn) ? cancelBtn.el : mainBtn.el);
+                target.focus();
+                if (input) inputEl.select();
+            }, 30);
+        });
+        const p = chain.then(run);
+        chain = p.catch(() => {});
+        return p;
+    }
+
+    // ---------- ה-API הקיים ----------
+    // isError: true → שגיאה · false/ריק → הצלחה · או מחרוזת: 'success' | 'error' | 'warning' | 'info'
+    window.customAlert = function (message, isError = false) {
+        const type = isError === true ? 'error' : (typeof isError === 'string' && TITLES[isError] ? isError : 'success');
+        window.notify(message, type);
+        return Promise.resolve(true);
+    };
+
+    window.showReadMessageModal = function (messageText) {
+        return openDialog({
+            type: 'info', title: 'הודעת מערכת', message: messageText,
+            buttons: [{ label: 'קראתי', primary: true, cancel: true, value: true, id: 'msgReadBtn' }]
+        });
+    };
+
+    window.customConfirm = function (message) {
+        const danger = /מחק|למחוק|הסר|לאפס|איפוס|נקה/.test(String(message));
+        return openDialog({
+            type: danger ? 'error' : 'warning', icon: danger ? 'warning' : 'question',
+            title: 'אישור פעולה', message, focusCancel: danger,
+            buttons: [
+                { label: 'ביטול', cancel: true, value: false, id: 'customModalCancelBtn' },
+                { label: danger ? 'כן, המשך' : 'אישור', primary: !danger, danger, value: true, id: 'customModalConfirmBtn' }
+            ]
+        });
+    };
+
+    window.customPrompt = function (message, defaultValue = '') {
+        return openDialog({
+            type: 'info', icon: 'edit', title: 'הזנת נתונים', message, input: { value: defaultValue },
+            buttons: [
+                { label: 'ביטול', cancel: true, fromInput: true, value: null, id: 'customModalCancelBtn' },
+                { label: 'שמור', primary: true, fromInput: true, id: 'customModalConfirmBtn' }
+            ]
+        });
+    };
+})();
 
 // --- מעטפת Fetch גלובלית ---
 const originalFetch = window.fetch;
