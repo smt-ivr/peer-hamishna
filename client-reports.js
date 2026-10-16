@@ -55,6 +55,8 @@ export const DEFAULT_DESIGN = {
     showTypeLabels: true,
     showLegend: true,
     showHebrewDate: true,
+    showChapterLetter: true,   // אות הפרק ליד קוד המבחן (במשניות)
+    gemaraByChapter: true,     // בגמרא: כותרת לפי שם הפרק במקום שם המסכת
     rowStripes: true,
     // פריסה
     cols: 'auto',          // auto | 2 | 3 | 4 | 5
@@ -65,7 +67,8 @@ export const DEFAULT_DESIGN = {
         statAttempted: 'נבחן ב-', statOf: 'מתוך', statPassed: 'עברו', statFailed: 'לא עברו', statMoney: 'סך מלגה',
         grade: 'כיתה', code: 'קוד', typeM: 'משניות', typeG: 'גמרא',
         legPass: 'עבר', legFail: 'לא עבר', legNone: 'שורה ללא סימון – טרם נבחן',
-        page: 'עמוד', pageOf: 'מתוך', bsd: 'בס״ד', empty: 'לא נמצאו מבחנים להצגה'
+        page: 'עמוד', pageOf: 'מתוך', bsd: 'בס״ד', empty: 'לא נמצאו מבחנים להצגה',
+        legChapter: 'האות ליד הקוד = מספר הפרק'
     },
     // צבעים
     colors: {
@@ -86,7 +89,8 @@ export const TEXT_LABELS = [
     ['statFailed', 'כרטיס סיכום: לא עברו'], ['statMoney', 'כרטיס סיכום: סך מלגה'],
     ['grade', 'המילה "כיתה"'], ['code', 'המילה "קוד" (ליד התלמיד)'], ['typeM', 'תווית משניות'], ['typeG', 'תווית גמרא'],
     ['legPass', 'מקרא: עבר'], ['legFail', 'מקרא: לא עבר'], ['legNone', 'מקרא: טרם נבחן'],
-    ['page', 'המילה "עמוד"'], ['pageOf', 'המילה "מתוך" (עמודים)'], ['bsd', 'בס״ד'], ['empty', 'הודעה כשאין מבחנים']
+    ['page', 'המילה "עמוד"'], ['pageOf', 'המילה "מתוך" (עמודים)'], ['bsd', 'בס״ד'], ['empty', 'הודעה כשאין מבחנים'],
+    ['legChapter', 'מקרא: האות ליד הקוד']
 ];
 
 export const COLOR_LABELS = [
@@ -221,13 +225,17 @@ function designVars(d) {
 // ============================================================
 
 // קיבוץ מבחנים לפי מסכת + סוג. משניות קודם, אחר כך גמרא.
-export function groupExams(exams) {
+export function groupExams(exams, opts = {}) {
+    const byChapter = opts.gemaraByChapter !== false;
     const map = new Map();
     exams.forEach(ex => {
-        const name = String((ex.details && ex.details.masechet) || '').trim() || 'כללי';
+        const d = ex.details || {};
+        const name = String(d.masechet || '').trim() || 'כללי';
         const type = ex.exam_type || '';
-        const key = `${name}|${type}`;
-        if (!map.has(key)) map.set(key, { name, type, typeInfo: typeOf(type), exams: [] });
+        const chapter = type === 'gemara' && byChapter ? String(d.chapter_title || '').trim() : '';
+        const key = `${name}|${type}|${chapter}`;
+        // label = מה שמוצג בכותרת: בגמרא שם הפרק (אם יש), אחרת שם המסכת
+        if (!map.has(key)) map.set(key, { name, label: chapter || name, type, typeInfo: typeOf(type), exams: [] });
         map.get(key).exams.push(ex);
     });
     return [...map.values()]
@@ -324,17 +332,23 @@ export function computeBodyH(hasStats, hasNote) {
 
 // ---------- נתוני דוגמה לתצוגה החיה ----------
 function buildSample(kind) {
-    const mk = (masechet, type, n, pre, rw) => Array.from({ length: n }, (_, i) => {
+    const mk = (masechet, type, n, pre, rw, chapters) => Array.from({ length: n }, (_, i) => {
         const passed = i % 3 === 0 ? true : (i % 7 === 0 ? false : null);
-        return { exam_code: `${pre + 1 + Math.floor(i / 2)}${i % 2 ? 'ב' : 'א'}`, exam_type: type, details: { masechet }, passed, reward_earned: passed === true ? rw : 0 };
+        const details = { masechet };
+        if (type === 'mishnayot') details.chapter_num = i + 1;
+        else if (chapters) details.chapter_title = chapters[Math.min(chapters.length - 1, Math.floor(i / Math.ceil(n / chapters.length)))];
+        return { exam_code: `${pre + 1 + Math.floor(i / 2)}${i % 2 ? 'ב' : 'א'}`, exam_type: type, details, passed, reward_earned: passed === true ? rw : 0 };
     });
+    const BK = ['ארבעה אבות', 'כיצד הרגל', 'הכונס', 'שור שנגח'];
+    const BM = ['אלו מציאות', 'המפקיד', 'הזהב', 'איזהו נשך', 'השוכר את הפועלים', 'השואל'];
+    const KD = ['האשה נקנית', 'האומר', 'מי שאחז'];
     let exams = [];
     if (kind === 'small') {
-        exams = [...mk('ברכות', 'mishnayot', 8, 0, 1.4), ...mk('שבת', 'mishnayot', 10, 0, 1.6), ...mk('בבא קמא', 'gemara', 12, 53, 3.0)];
+        exams = [...mk('ברכות', 'mishnayot', 8, 0, 1.4), ...mk('שבת', 'mishnayot', 10, 0, 1.6), ...mk('בבא קמא', 'gemara', 12, 53, 3.0, BK)];
     } else {
         [['ברכות', 9], ['שבת', 24], ['ערובין', 10], ['פסחים', 10], ['שקלים', 8], ['יומא', 7], ['סוכה', 5], ['מגילה', 4], ['ראש השנה', 4], ['ביצה', 5], ['תענית', 4], ['חגיגה', 3]]
             .forEach(([m, n]) => exams.push(...mk(m, 'mishnayot', n, 0, 1.4)));
-        exams.push(...mk('בבא מציעא', 'gemara', 60, 49, 3.0), ...mk('בבא קמא', 'gemara', 60, 53, 3.0), ...mk('קדושין', 'gemara', 18, 120, 3.0));
+        exams.push(...mk('בבא מציעא', 'gemara', 60, 49, 3.0, BM), ...mk('בבא קמא', 'gemara', 60, 53, 3.0, BK), ...mk('קדושין', 'gemara', 18, 120, 3.0, KD));
     }
     const passed = exams.filter(e => e.passed === true).length;
     const attempted = exams.filter(e => e.passed !== null).length;
@@ -448,8 +462,29 @@ export class ReportManager {
                 });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                if (!data.message) await window.customAlert('השמירה בשרת נכשלה. העיצוב נשמר רק במחשב הזה.', true);
+                if (!data.message) {
+                    const why = String(data.error || '');
+                    const hint = /no such table/i.test(why)
+                        ? 'הטבלה report_settings לא קיימת ב-D1 — יש להריץ את פקודת יצירת הטבלה.'
+                        : (why ? `(${res.status}: ${why})` : `(קוד ${res.status})`);
+                    await window.customAlert(`השמירה בשרת נכשלה. ${hint}\nהעיצוב נשמר רק במחשב הזה.`, true);
+                }
                 this.designSource = isDefaultDesign(this.design) ? 'default' : 'local';
+                this.updateDesignBadge();
+                return false;
+            }
+            // אימות: קוראים חזרה מהשרת ובודקים שמה שנשמר זהה למה ששלחנו
+            let verified = true;
+            try {
+                const chk = await fetch(`${this.apiBase}/report-settings`);
+                if (chk.ok) {
+                    const v = await chk.json();
+                    verified = JSON.stringify(sanitizeDesign(v.settings)) === JSON.stringify(this.design);
+                }
+            } catch (e) { /* אם הקריאה החוזרת נכשלה — לא מכריזים על כשלון */ }
+            if (!verified) {
+                await window.customAlert('השרת אישר את השמירה, אבל הקריאה החוזרת לא החזירה את אותם נתונים. כדאי לנסות שוב.', 'warning');
+                this.designSource = 'local';
                 this.updateDesignBadge();
                 return false;
             }
@@ -554,6 +589,8 @@ export class ReportManager {
         .rp-row { background: #fff; border-bottom: .25mm solid #cbd5e1; }
         .rp-row.s1 { background: var(--sb); }
         .rp-row .c-code { font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; }
+        .rp-row .c-ch, .rp-legend .c-ch { font-family: 'Frank Ruehl CLM', 'David CLM', 'David Libre', David, 'Times New Roman', serif; font-weight: 700; font-size: 1.12em; line-height: 1; color: #334155; }
+        .rp-row .c-ch { margin-right: 1.2mm; padding-right: 1.2mm; border-right: .2mm solid #94a3b8; }
         .rp-row .c-mark { font-weight: 900; font-size: 1.1em; }
         .rp-row .c-rw { font-weight: 600; color: #475569; white-space: nowrap; }
         .rp-row.pass { background: var(--pb); } .rp-row.pass.s1 { background: var(--pb2); } .rp-row.pass .c-mark { color: var(--pm); }
@@ -585,6 +622,7 @@ export class ReportManager {
         .rd-pane > * { flex: none; }
         .rd-group { border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
         .rd-group h4 { font-size: .88rem; color: #0f172a; display: flex; justify-content: space-between; align-items: center; margin: 0; }
+        .rd-savebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: -16px; background: #fff; padding: 8px 0; z-index: 2; }
         .rd-tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
         .rd-hint { font-size: .74rem; color: var(--text-muted); line-height: 1.4; }
         .rd-field label.rd-lbl { display: block; font-size: .78rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
@@ -942,16 +980,21 @@ export class ReportManager {
         document.getElementById('reportDesignModal').classList.add('hidden');
     }
 
+    // כפתור "שמור בשרת" היחיד: שומר את כל העיצוב כולל כל הטקסטים הקבועים, ובודק מול השרת שנשמר
     async saveDraft() {
         const btn = document.getElementById('rdSaveBtn');
         const status = document.getElementById('rdStatus');
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר...';
+        status.textContent = '';
         const ok = await this.persistDesign(this.draft);
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> שמור בשרת';
-        status.textContent = ok ? 'נשמר בהצלחה ✓' : 'נשמר רק במחשב זה';
-        if (ok) setTimeout(() => this.closeDesignModal(true), 600);
+        status.textContent = ok ? 'נשמר בשרת ✓ (העיצוב והטקסטים נבדקו מול השרת)' : 'לא נשמר בשרת — נשמר רק במחשב זה';
+        if (ok) {
+            window.customAlert('העיצוב וכל הטקסטים נשמרו בשרת ✓');
+            setTimeout(() => this.closeDesignModal(true), 700);
+        }
     }
 
     async resetDraft(what) {
@@ -1050,6 +1093,8 @@ export class ReportManager {
                 ${sw('showSummary', 'סיכום בכותרת כל מסכת (עברו / סה"כ)')}
                 ${sw('showTypeLabels', 'תווית "משניות" / "גמרא" בכותרת מסכת')}
                 ${sw('showStudentCode', 'קוד תלמיד בפרטי התעודה')}
+                ${sw('showChapterLetter', 'אות הפרק ליד קוד המבחן (במשניות)')}
+                ${sw('gemaraByChapter', 'בגמרא: כותרת לפי שם הפרק במקום שם המסכת')}
                 ${sw('showHebrewDate', 'תאריך עברי בכותרת')}
                 ${sw('showLegend', 'מקרא בתחתית העמוד')}
             </div>`;
@@ -1166,7 +1211,7 @@ export class ReportManager {
         const visibleStats = o.showStats ? o.statsOrder.filter(id => o.statsVisible[id] && cards[id]) : [];
         const bodyH = computeBodyH(visibleStats.length > 0, !!note);
 
-        const groups = groupExams(exams);
+        const groups = groupExams(exams, { gemaraByChapter: o.gemaraByChapter });
         const plan = planLayout(groups, { pagesMode: o.pagesMode, cols: o.cols, bodyH });
         const scale = parseFloat(o.fontScale) || 1;
         const fs = Math.min(plan.rowH * 0.6 * scale, 3.5 * scale, plan.rowH * 0.85).toFixed(2);
@@ -1193,7 +1238,7 @@ export class ReportManager {
         const headHtml = present.map((id, i) => headParts[id](i)).join('');
 
         const legend = o.showLegend
-            ? `<span><b class="ok">✓</b> ${esc(T.legPass)}</span><span><b class="no">✕</b> ${esc(T.legFail)}</span><span>${esc(T.legNone)}</span>`
+            ? `<span><b class="ok">✓</b> ${esc(T.legPass)}</span><span><b class="no">✕</b> ${esc(T.legFail)}</span><span>${esc(T.legNone)}</span>${o.showChapterLetter && exams.some(e => parseInt((e.details || {}).chapter_num, 10) > 0) ? `<span><b class="c-ch" style="border:0;margin:0;padding:0">ג׳</b> ${esc(T.legChapter)}</span>` : ''}`
             : '';
 
         return plan.pages.map((cols, pageIdx) => {
@@ -1229,12 +1274,12 @@ export class ReportManager {
                 const pillText = ti.cls === 't-m' ? T.typeM : (ti.cls === 't-g' ? T.typeG : '');
                 const pill = pillText && o.showTypeLabels ? `<span class="rp-pill">${esc(pillText)}</span>` : '';
                 let stat = '';
-                if (!it.cont && o.showSummary && (N <= 4 || g.name.length <= 6)) {   // ב-5 עמודות אין מקום לסיכום ליד שם ארוך
+                if (!it.cont && o.showSummary && (N <= 4 || g.label.length <= 6)) {   // ב-5 עמודות אין מקום לסיכום ליד שם ארוך
                     const p = g.exams.filter(e => e.passed === true).length;
                     const sum = g.exams.reduce((s, e) => s + (e.passed === true ? (Number(e.reward_earned) || 0) : 0), 0);
                     stat = `<span class="rp-mh-stat">${p}/${g.exams.length}${rw && sum > 0 && N <= 3 ? ` · ₪${sum.toFixed(1)}` : ''}</span>`;
                 }
-                return `<div class="rp-mh ${ti.cls}"><span>${esc(g.name)}</span>${pill}${stat}</div>`;
+                return `<div class="rp-mh ${ti.cls}"><span>${esc(g.label)}</span>${pill}${stat}</div>`;
             }
             const ex = it.ex;
             let cls = 'none', mark = '', rewardText = '';
@@ -1245,7 +1290,9 @@ export class ReportManager {
             } else if (ex.passed === false) {
                 cls = 'fail'; mark = '✕';
             }
-            return `<div class="rp-row ${cls} s${it.idx % 2} ${rw ? '' : 'no-rw'}"><span class="c-code">${esc(ex.exam_code)}</span><span class="c-mark">${mark}</span>${rw ? `<span class="c-rw">${rewardText}</span>` : ''}</div>`;
+            const chNum = parseInt((ex.details || {}).chapter_num, 10);
+            const letter = o.showChapterLetter && chNum > 0 ? `<span class="c-ch">${esc(toHebrewNumeral(chNum))}</span>` : '';
+            return `<div class="rp-row ${cls} s${it.idx % 2} ${rw ? '' : 'no-rw'}"><span class="c-code">${esc(ex.exam_code)}${letter}</span><span class="c-mark">${mark}</span>${rw ? `<span class="c-rw">${rewardText}</span>` : ''}</div>`;
         }).join('');
 
         return `<div class="rp-col">${head}${rows}</div>`;
