@@ -61,7 +61,6 @@ export const DEFAULT_DESIGN = {
     // פריסה
     cols: 'auto',          // auto | 2 | 3 | 4 | 5
     fontScale: '1',        // 0.9 | 1 | 1.1
-    passOf: 'attempted',   // בכרטיס "עברו": המספר אחרי "מתוך" — attempted | total | none
     // טקסטים קבועים בדוח (ריק = ברירת מחדל)
     texts: {
         colCode: 'קוד', colMark: 'הישג', colReward: 'מלגה',
@@ -144,7 +143,6 @@ export function sanitizeDesign(raw) {
     });
     if (['auto', '2', '3', '4', '5'].includes(String(raw.cols))) d.cols = String(raw.cols);
     if (['0.9', '1', '1.1'].includes(String(raw.fontScale))) d.fontScale = String(raw.fontScale);
-    if (['attempted', 'total', 'none'].includes(raw.passOf)) d.passOf = raw.passOf;
     if (raw.texts && typeof raw.texts === 'object') {
         Object.keys(DEFAULT_DESIGN.texts).forEach(k => {
             if (typeof raw.texts[k] === 'string') {
@@ -1131,8 +1129,6 @@ export class ReportManager {
                 ${sw('gemaraByChapter', 'בגמרא: כותרת לפי שם הפרק במקום שם המסכת')}
                 ${sw('showHebrewDate', 'תאריך עברי בכותרת')}
                 ${sw('showLegend', 'מקרא בתחתית העמוד')}
-                <div class="rd-field"><label class="rd-lbl">בכרטיס "עברו": המספר אחרי "מתוך"</label>
-                    <select data-d="passOf">${[['attempted', 'הבחינות שהתלמיד נבחן בהן (עברו 45 מתוך 55)'], ['total', 'כל הבחינות הרלוונטיות לכיתה (עברו 45 מתוך 198)'], ['none', 'בלי "מתוך"']].map(([v, t]) => `<option value="${v}" ${d.passOf === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
             </div>`;
         }
         pane.innerHTML = html;
@@ -1240,7 +1236,7 @@ export class ReportManager {
         // כרטיסי סיכום לפי הסדר וההצגה שנבחרו
         const cards = {
             attempted: `<div class="rp-stat">${fillTpl(T.statAttempted, attempted)} ${esc(T.statOf)} ${total}</div>`,
-            passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}${o.passOf === 'none' ? '' : ` ${esc(T.statOf)} ${o.passOf === 'total' ? total : attempted}`}</div>`,
+            passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}</div>`,
             failed: `<div class="rp-stat bad">${fillTpl(T.statFailed, failed)}</div>`,
             money: o.showReward ? `<div class="rp-stat money">${fillTpl(T.statMoney, '₪' + reward.toFixed(1))}</div>` : ''
         };
