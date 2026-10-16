@@ -490,7 +490,7 @@ async function initApp() {
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent, refreshAllData);
     studentManager = new StudentManager(document.getElementById('view-students'), API_BASE, goToStudentUpdate, refreshAllData);
     examListManager = new ExamManager(document.getElementById('view-exams'), API_BASE, refreshAllData);
-    historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE);
+    historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE, openStudentCard, refreshAllData);
     reportManager = new ReportManager(document.getElementById('view-reports'), API_BASE);
     
     setupTabs();
@@ -522,6 +522,12 @@ function setupTabs() {
             });
         });
     });
+}
+
+// מההיסטוריה: מעבר לניהול תלמידים ופתיחת כרטיס התלמיד
+function openStudentCard(studentCode) {
+    document.querySelector('[data-target="view-students"]').click();
+    if (studentManager) studentManager.openCard(studentCode);
 }
 
 function goToStudentUpdate(studentCode) {
