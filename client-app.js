@@ -279,7 +279,9 @@ const originalFetch = window.fetch;
 window.fetch = async function(...args) {
     let [resource, config] = args;
     if (typeof resource === 'string' && resource.startsWith(API_BASE)) {
-        config = config || {};
+        config = { ...(config || {}) };
+        const silent = config.silent === true;      // { silent: true } = הקורא מציג שגיאות בעצמה, בלי טוסט גלובלי
+        delete config.silent;
         config.headers = config.headers || {};
         const key = localStorage.getItem('peer_api_key');
         if (key) {
@@ -288,7 +290,7 @@ window.fetch = async function(...args) {
 
         try {
             const response = await originalFetch(resource, config);
-            if (!response.ok && resource.indexOf('/auth-check') === -1) { 
+            if (!response.ok && !silent && resource.indexOf('/auth-check') === -1) { 
                 response.clone().json().then(data => {
                     if (data && data.message) {
                         window.customAlert(data.message, true);
@@ -485,7 +487,7 @@ async function initApp() {
         if(historyManager) historyManager.loadAndRender(allStudents, allExams);
     };
 
-    examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent);
+    examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent, refreshAllData);
     studentManager = new StudentManager(document.getElementById('view-students'), API_BASE, goToStudentUpdate, refreshAllData);
     examListManager = new ExamManager(document.getElementById('view-exams'), API_BASE, refreshAllData);
     historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE);
