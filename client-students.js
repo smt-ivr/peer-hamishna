@@ -203,15 +203,16 @@ export class StudentManager {
             const head = `<div class="stu-gh"><b>${esc(g.d.masechet || 'כללי')}</b><span>${TYPE[g.t] || ''}</span>
                 ${editable ? `<button type="button" class="stu-gb" data-gset="${i}" title="סמן את כל הבחינות במסכת כעבר">הכל עבר</button>` : ''}<em>${g.rows.filter(e => e.passed).length}/${g.rows.length}</em></div>`;
             return head + g.rows.map(e => {
-                const d = e.details || {}, [txt, cls] = STATUS[e.passed];
+                const d = e.details || {}, pend = editable && this.ed && this.ed.pending.has(e.exam_code), eff = pend ? this.ed.pending.get(e.exam_code) : e.passed, [txt, cls] = STATUS[eff];
                 const what = e.exam_type === 'gemara' ? `${d.from_page || ''} – ${d.to_page || ''}` : `פרק ${d.chapter_name || d.chapter_num || ''}`;
                 const label = `<span class="w">${esc(what)}${d.chapter_title ? ` <i>${esc(d.chapter_title)}</i>` : ''}</span>`;
                 if (!editable) return `<div class="stu-r"><b>${esc(e.exam_code)}</b>${label}<span class="stu-pill ${cls}">${txt}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}</span></div>`;
-                const on = v => e.passed === v ? ` on ${v ? 'ok' : 'bad'}` : '';
-                return `<div class="stu-r stu-xr ${e.busy ? 'busy' : ''} ${cls}" data-code="${esc(e.exam_code)}"><b>${esc(e.exam_code)}</b>${label}
+                const on = v => eff === v ? ` on ${v ? 'ok' : 'bad'}` : '';
+                const lab = v => (v === true ? 'עבר' : v === false ? 'לא עבר' : 'טרם נבחן');
+                return `<div class="stu-r stu-xr ${e.busy ? 'busy' : ''} ${pend ? 'pend' : ''} ${cls}" data-code="${esc(e.exam_code)}"><b>${esc(e.exam_code)}</b>${label}
                     <div class="stu-set"><button type="button" data-set="true" class="${on(true)}" title="עבר">✓</button><button type="button" data-set="false" class="${on(false)}" title="לא עבר">✕</button>
-                    <button type="button" data-set="none" title="הסר את התוצאה (טרם נבחן)" ${e.passed === null ? 'disabled' : ''}>⌫</button></div>
-                    <span class="fb ${e.err ? 'bad' : ''}">${e.err ? esc(e.err) : (e.saved ? 'נשמר ✓' : (e.passed !== null ? heb(e.updated_at) : ''))}</span></div>`;
+                    <button type="button" data-set="none" title="הסר את התוצאה (טרם נבחן)" ${eff === null ? 'disabled' : ''}>⌫</button></div>
+                    <span class="fb ${e.err ? 'bad' : ''}">${pend ? `${e.err ? `<b class="stu-er">${esc(e.err)}</b><br>` : ''}<b class="stu-pt">ממתין: ${lab(e.passed)} ← ${lab(eff)}</b> <button type="button" class="stu-un" data-undo>בטל</button>` : e.err ? esc(e.err) : (e.saved ? 'נשמר ✓' : (e.passed !== null ? heb(e.updated_at) : ''))}</span></div>`;
             }).join('');
         }).join('');
     }
@@ -233,7 +234,7 @@ export class StudentManager {
 
     openForm(code = null, tab = 'details') {
         const s = code ? this.find(code) : null;
-        this.ed = { code: s ? s.student_code : null, q: '', seg: 'taken' };
+        this.ed = { code: s ? s.student_code : null, q: '', seg: 'taken', pending: new Map(), review: false, items: [] };   // pending: שינויים שסומנו ועדיין לא נשמרו
         $('stuForm').reset();
         ['fFirst', 'fLast', 'fClass', 'fCode'].forEach(id => this.fieldErr(id, ''));
         this.say(null);
@@ -256,7 +257,11 @@ export class StudentManager {
         if (!s || tab !== 'exams') setTimeout(() => $('fFirst').focus(), 50);
     }
 
-    closeForm() {
+    async closeForm(force = false) {
+        if (!force && this.ed && this.ed.pending.size) {
+            const ok = await window.customConfirm(`יש ${this.ed.pending.size} שינויים בבחינות שעדיין לא נשמרו.\nלסגור ולבטל אותם?`);
+            if (!ok) return;
+        }
         $('stuFormModal').classList.add('hidden');
         this.ed = null;
         this.flushSync();
@@ -269,6 +274,7 @@ export class StudentManager {
         $('stuExamsPane').classList.toggle('hidden', name !== 'exams');
         $('stuFootDetails').classList.toggle('hidden', name !== 'details');
         $('stuFootExams').classList.toggle('hidden', name !== 'exams');
+        $('stuReview').classList.add('hidden'); $('stuFootReview').classList.add('hidden'); this.ed.review = false;
         this.say(null);
         if (name === 'exams') this.openExams();
     }
@@ -311,10 +317,13 @@ export class StudentManager {
         const r = orig ? await this.call('PUT', `/students/${encodeURIComponent(orig)}`, body) : await this.call('POST', '/students', body);
         btn.disabled = false; btn.innerHTML = label;
         if (!r.ok) return this.serverError(r, 'השמירה נכשלה. נסה שוב.');
-        this.cards.clear(); this.sum.delete(orig);
-        this.closeForm();
+        const keep = orig && this.ed.pending.size;          // יש שינויים בבחינות שממתינים לאישור — המודל נשאר פתוח
+        if (!keep) { this.cards.clear(); this.sum.delete(orig); }
+        this._pending = true;
+        if (keep) { this.say('success', 'פרטי התלמיד נשמרו. שים לב: יש שינויים בבחינות שעדיין ממתינים לאישור (לשונית "בחינות").'); return this.flushSync(); }
+        await this.closeForm(true);
         window.customAlert(orig ? 'פרטי התלמיד עודכנו.' : `התלמיד נוסף. קוד התלמיד: ${r.data.student_code}`);   // טוסט: המודל נסגר
-        this._pending = true; this.flushSync();
+        this.flushSync();
     }
 
     async changeCode() {
@@ -322,9 +331,10 @@ export class StudentManager {
         const next = await window.customPrompt(`הזן את הקוד החדש שיחליף את ${old}:`);
         if (next === null || !next.trim()) return;
         if (next.trim() === old) return this.say('warning', 'הקוד החדש זהה לקוד הקיים. לא בוצע שינוי.');
+        if (this.ed.pending.size) return this.say('warning', 'יש שינויים בבחינות שעדיין לא נשמרו. אשר או בטל אותם לפני החלפת הקוד.');
         const r = await this.call('PUT', `/students/${encodeURIComponent(old)}/change-code`, { new_student_code: next.trim() });
         if (!r.ok) return this.serverError(r, 'שינוי הקוד נכשל. נסה שוב.');
-        this.cards.clear(); this.closeCard(); this.closeForm();
+        this.cards.clear(); this.closeCard(); await this.closeForm(true);
         window.customAlert(`הקוד שונה ל-${next.trim()} בכל רישומי המערכת.`);
         this._pending = true; this.flushSync();
     }
@@ -347,7 +357,11 @@ export class StudentManager {
         const taken = rows.filter(e => e.passed !== null).length;
         const shown = rows.filter(e => (this.ed.seg === 'all' || (this.ed.seg === 'taken') === (e.passed !== null))
             && (!term || `${e.exam_code} ${Object.values(e.details || {}).join(' ')}`.toLowerCase().includes(term)));
-        $('stuTabCount').textContent = `(${taken})`;
+        const n = this.ed.pending.size;
+        $('stuTabCount').textContent = `(${taken})${n ? ' •' : ''}`;
+        $('stuPendInfo').className = n ? 'stu-pi warn' : 'stu-pi';
+        $('stuPendInfo').innerHTML = n ? `<b>${n}</b> שינויים ממתינים לאישור. עדיין לא נשמר כלום.` : 'סימון ✓ ✕ ⌫ רק מכין שינוי. שום דבר לא נשמר לפני שתאשר בסקירה.';
+        $('fReview').disabled = !n; $('fReview').innerHTML = n ? `סקירה ואישור (${n})` : 'סקירה ואישור'; $('fUndoAll').disabled = !n;
         $('stuExSeg').innerHTML = [['taken', 'נבחן', taken], ['pending', 'טרם נבחן', rows.length - taken], ['all', 'הכל', rows.length]]
             .map(([v, t, n]) => `<button type="button" data-seg="${v}" class="${this.ed.seg === v ? 'on' : ''}">${t} (${n})</button>`).join('');
         $('stuExSum').innerHTML = `נבחן <b>${st.attempted}</b> מתוך ${st.available ?? rows.length} · עברו <b class="stu-ok">${st.passed}</b> · <b class="stu-money">${money(st.reward)}</b>`;
@@ -356,40 +370,84 @@ export class StudentManager {
         box.scrollTop = top;
     }
 
-    // קובע תוצאה (true / false) או מסיר אותה (null) — נשמר מיד, והמשוב מופיע על השורה עצמה
-    async setResult(code, val) {
-        const sc = this.ed.code, rows = this.cards.get(sc) || [], row = rows.find(e => e.exam_code === code);
-        if (!row || row.passed === val || row.busy) return;
-        row.busy = true; row.err = ''; this.paintExams();
-        const r = val === null
-            ? await this.call('DELETE', `/student-exams/${encodeURIComponent(sc)}/${encodeURIComponent(code)}`)
-            : await this.call('POST', '/student-exams', { student_code: sc, exams: [{ exam_code: code, passed: val, force_update: true }] });
-        row.busy = false;
-        const problem = !r.ok ? this.errText(r, 'השמירה נכשלה') : ((r.data && r.data.errors && r.data.errors[0]) ? r.data.errors[0].reason : '');
-        if (problem) { row.err = problem; return this.paintExams(); }
-        this.applyResult(sc, row, val);
+    // סימון בלבד — לא נשמר כלום עד שמאשרים בסקירה
+    stage(code, val) {
+        const row = (this.cards.get(this.ed.code) || []).find(e => e.exam_code === code);
+        if (!row || row.busy) return;
+        row.err = '';
+        if (val === row.passed) this.ed.pending.delete(code); else this.ed.pending.set(code, val);
+        this.paintExams();
+    }
+
+    // "הכל עבר" למסכת — גם זה רק מסמן
+    stageGroupPassed(i) {
+        const rows = (this.cards.get(this.ed.code) || []).filter(e => (this.groupCodes[i] || []).includes(e.exam_code) && e.passed !== true);
+        if (!rows.length) return this.say('info', 'כל הבחינות במסכת כבר מסומנות כעבר.');
+        rows.forEach(e => { e.err = ''; this.ed.pending.set(e.exam_code, true); });
+        this.paintExams();
+    }
+
+    lab(v) { return v === true ? 'עבר' : v === false ? 'לא עבר' : 'טרם נבחן'; }
+    what(r) { const d = r.details || {}; return `${r.exam_code} · ${r.exam_type === 'gemara' ? `${d.masechet || ''} ${d.from_page || ''} – ${d.to_page || ''}` : `${d.masechet || ''} פרק ${d.chapter_name || d.chapter_num || ''}`}`; }
+
+    // מסך אישור: מציג בדיוק מה הולך להתעדכן, ורק "אשר ועדכן" שומר
+    openReview() {
+        const code = this.ed.code, s = this.find(code), rows = this.cards.get(code) || [];
+        const items = [...this.ed.pending].map(([c, to]) => { const r = rows.find(e => e.exam_code === c); return r && { r, from: r.passed, to }; }).filter(Boolean);
+        if (!items.length) return;
+        this.ed.items = items; this.ed.review = true;
+        const add = items.filter(i => i.from === null && i.to !== null), upd = items.filter(i => i.from !== null && i.to !== null), del = items.filter(i => i.to === null);
+        const reward = v => (v.to === true ? (v.r.potential_reward || 0) : 0) - (v.from === true ? (v.r.reward_earned || 0) : 0);
+        const delta = items.reduce((a, v) => a + reward(v), 0);
+        const grp = (cls, icon, title, list, line) => list.length ? `<div class="stu-rg ${cls}"><b>${icon} ${title} (${list.length})</b><ul>${list.map(line).join('')}</ul></div>` : '';
+        $('stuReview').innerHTML = `
+            <div class="stu-rvh"><div class="ic">${ICONS.warning}</div><div><b>אישור עדכון בחינות</b><p>הפעולה תעדכן את הרשומות של <b>${esc(this.fullName(s))}</b> בשרת. עבור על הרשימה ואשר רק אם הכול נכון.</p></div></div>
+            ${grp('add', '＋', 'יתווספו', add, i => `<li>${esc(this.what(i.r))} ← <b>${this.lab(i.to)}</b></li>`)}
+            ${grp('upd', '✎', 'יעודכנו', upd, i => `<li>${esc(this.what(i.r))}: ${this.lab(i.from)} ← <b>${this.lab(i.to)}</b></li>`)}
+            ${grp('del', '✕', 'יימחקו (יחזרו להיות "טרם נבחן")', del, i => `<li>${esc(this.what(i.r))} (היה: ${this.lab(i.from)})</li>`)}
+            <div class="stu-rd ${delta < 0 ? 'neg' : ''}">שינוי במלגה של התלמיד: <b>${delta >= 0 ? '+' : '−'}${money(Math.abs(delta))}</b></div>`;
+        $('fConfirm').innerHTML = `<i class="fas fa-check"></i> אשר ועדכן ${items.length} ${items.length === 1 ? 'בחינה' : 'בחינות'}`;
+        $('stuExamsPane').classList.add('hidden'); $('stuFootExams').classList.add('hidden');
+        $('stuReview').classList.remove('hidden'); $('stuFootReview').classList.remove('hidden');
+        this.say(null);
+    }
+
+    backFromReview() {
+        this.ed.review = false;
+        $('stuReview').classList.add('hidden'); $('stuFootReview').classList.add('hidden');
+        $('stuExamsPane').classList.remove('hidden'); $('stuFootExams').classList.remove('hidden');
+        this.paintExams();
+    }
+
+    async confirmReview() {
+        const sc = this.ed.code, items = this.ed.items, btn = $('fConfirm'), label = btn.innerHTML;
+        btn.disabled = true; $('fBack').disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
+        const sets = items.filter(i => i.to !== null), dels = items.filter(i => i.to === null), results = [];
+        if (sets.length) {
+            const r = await this.call('POST', '/student-exams', { student_code: sc, exams: sets.map(i => ({ exam_code: i.r.exam_code, passed: i.to, force_update: true })) });
+            const bad = new Map(r.ok ? ((r.data && r.data.errors) || []).map(x => [x.exam_code, x.reason]) : []);
+            sets.forEach(i => results.push({ i, ok: r.ok && !bad.has(i.r.exam_code), reason: r.ok ? bad.get(i.r.exam_code) : this.errText(r, 'השמירה נכשלה') }));
+        }
+        for (const i of dels) {
+            const r = await this.call('DELETE', `/student-exams/${encodeURIComponent(sc)}/${encodeURIComponent(i.r.exam_code)}`);
+            results.push({ i, ok: r.ok, reason: r.ok ? '' : this.errText(r, 'המחיקה נכשלה') });
+        }
+        btn.disabled = false; $('fBack').disabled = false; btn.innerHTML = label;
+        let okN = 0, badN = 0;
+        results.forEach(({ i, ok, reason }) => {
+            if (ok) { okN++; this.ed.pending.delete(i.r.exam_code); this.applyResult(sc, i.r, i.to); } else { badN++; i.r.err = reason || 'לא עודכן'; }
+        });
+        if (badN) this.ed.seg = 'all';       // שורה שנדחתה חייבת להיות גלויה (גם אם היא לא בסינון הנוכחי)
+        this.backFromReview();
+        this.say(badN ? 'warning' : 'success', badN ? `${okN} בחינות עודכנו, ${badN} לא עודכנו. הסיבה מופיעה בשורה, והשינוי נשאר ממתין.` : `עודכנו ${okN} ${okN === 1 ? 'בחינה' : 'בחינות'} בהצלחה.`);
     }
 
     applyResult(sc, row, val) {
         row.passed = val; row.reward_earned = val ? (row.potential_reward || 0) : 0; row.updated_at = val === null ? null : nowStr(); row.err = ''; row.saved = true;
         this.recalc(sc); this.markDirty();
-        this.paintExams(); this.paint(); if (this.cardCode === sc) this.paintCard();
-        setTimeout(() => { row.saved = false; if (this.ed && this.ed.code === sc && this.ed.tab === 'exams') this.paintExams(); }, 2200);
-    }
-
-    // "הכל עבר" לכל המסכת — בקשה אחת
-    async setGroupPassed(i) {
-        const sc = this.ed.code, rows = this.cards.get(sc) || [];
-        const list = rows.filter(e => (this.groupCodes[i] || []).includes(e.exam_code) && e.passed !== true);
-        if (!list.length) return this.say('info', 'כל הבחינות במסכת כבר מסומנות כעבר.');
-        list.forEach(e => { e.busy = true; e.err = ''; }); this.paintExams();
-        const r = await this.call('POST', '/student-exams', { student_code: sc, exams: list.map(e => ({ exam_code: e.exam_code, passed: true, force_update: true })) });
-        list.forEach(e => { e.busy = false; });
-        if (!r.ok) { list.forEach(e => { e.err = this.errText(r, 'השמירה נכשלה'); }); return this.paintExams(); }
-        const bad = new Map(((r.data && r.data.errors) || []).map(x => [x.exam_code, x.reason]));
-        list.forEach(e => { bad.has(e.exam_code) ? (e.err = bad.get(e.exam_code)) : this.applyResult(sc, e, true); });
-        this.paintExams();
-        if (bad.size) this.say('warning', `${list.length - bad.size} בחינות עודכנו, ${bad.size} לא עודכנו (הסיבה מופיעה בשורה).`);
+        if (this.ed && this.ed.code === sc && this.ed.tab === 'exams') this.paintExams();
+        this.paint(); if (this.cardCode === sc) this.paintCard();
+        setTimeout(() => { row.saved = false; if (this.ed && this.ed.code === sc && this.ed.tab === 'exams' && !this.ed.review) this.paintExams(); }, 2200);
     }
 
     exportCsv() {
@@ -452,13 +510,18 @@ export class StudentManager {
         $('stuExSeg').addEventListener('click', e => { const b = e.target.closest('[data-seg]'); if (b) { this.ed.seg = b.dataset.seg; this.paintExams(); } });
         $('stuExList').addEventListener('click', e => {
             const g = e.target.closest('[data-gset]');
-            if (g) return this.setGroupPassed(+g.dataset.gset);
+            if (g) return this.stageGroupPassed(+g.dataset.gset);
             const b = e.target.closest('[data-set]'), row = e.target.closest('.stu-xr');
-            if (b && row) this.setResult(row.dataset.code, b.dataset.set === 'none' ? null : b.dataset.set === 'true');
+            if (b && row) return this.stage(row.dataset.code, b.dataset.set === 'none' ? null : b.dataset.set === 'true');
+            if (e.target.closest('[data-undo]') && row) { this.ed.pending.delete(row.dataset.code); this.paintExams(); }
         });
+        $('fReview').addEventListener('click', () => this.openReview());
+        $('fUndoAll').addEventListener('click', () => { this.ed.pending.clear(); this.paintExams(); });
+        $('fBack').addEventListener('click', () => this.backFromReview());
+        $('fConfirm').addEventListener('click', () => this.confirmReview());
         document.addEventListener('keydown', e => {
             if (e.key !== 'Escape') return;
-            if (!M.classList.contains('hidden')) this.closeForm();
+            if (!M.classList.contains('hidden')) { if (this.ed && this.ed.review) this.backFromReview(); else this.closeForm(); }
             else if (this.cardCode) this.closeCard();
         });
     }
@@ -492,7 +555,13 @@ export class StudentManager {
             </div>
             <div class="stu-mfoot" id="stuFootDetails"><button type="button" class="btn btn-outline" id="fCancel">ביטול</button>
                 <button type="submit" form="stuForm" class="btn btn-primary" id="fSave"><i class="fas fa-save"></i> שמור</button></div>
-            <div class="stu-mfoot hidden" id="stuFootExams"><span class="stu-mut" style="margin-left:auto">כל שינוי נשמר מיד</span><button type="button" class="btn btn-primary" id="fDone">סיום</button></div>
+            <div id="stuReview" class="stu-pane hidden"></div>
+            <div class="stu-mfoot hidden" id="stuFootExams"><span class="stu-pi" id="stuPendInfo"></span>
+                <button type="button" class="btn btn-outline" id="fUndoAll" disabled>בטל שינויים</button>
+                <button type="button" class="btn btn-primary" id="fReview" disabled>סקירה ואישור</button>
+                <button type="button" class="btn btn-outline" id="fDone">סגירה</button></div>
+            <div class="stu-mfoot hidden" id="stuFootReview"><button type="button" class="btn btn-outline" id="fBack">חזרה לעריכה</button>
+                <button type="button" class="btn btn-primary" id="fConfirm"><i class="fas fa-check"></i> אשר ועדכן</button></div>
         </div></div>`);
     }
 
@@ -575,6 +644,12 @@ export class StudentManager {
         .stu-set button.on.ok{background:#059669;border-color:#059669;color:#fff}.stu-set button.on.bad{background:#dc2626;border-color:#dc2626;color:#fff}
         .stu-xr .fb{font-size:.74rem;color:#64748b;text-align:left}.stu-xr .fb.bad{color:#b91c1c;font-weight:600;white-space:normal}
         .stu-gb{margin-right:auto;margin-left:10px;border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;border-radius:99px;padding:0 10px;font-size:.72rem;cursor:pointer}.stu-gb:hover{background:rgba(255,255,255,.18)}
+        .stu-xr.pend{background:#fffbeb;box-shadow:inset 3px 0 0 #f59e0b}.stu-pt{color:#b45309;font-size:.72rem}.stu-er{color:#b91c1c;font-size:.74rem}.stu-un{border:none;background:none;color:var(--primary-color);cursor:pointer;font-size:.72rem;font-weight:700;text-decoration:underline}
+        .stu-xr .fb{white-space:normal}.stu-pi{flex:1;font-size:.8rem;color:#64748b;text-align:right}.stu-pi.warn{color:#b45309;font-weight:600}
+        .stu-rvh{display:flex;gap:12px;align-items:flex-start;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;color:#92400e}.stu-rvh .ic{flex:none;width:26px;height:26px}.stu-rvh .ic svg{width:26px;height:26px}.stu-rvh p{margin:4px 0 0;font-size:.86rem}
+        .stu-rg{border:1px solid var(--border-color);border-radius:10px;padding:10px 14px}.stu-rg b{font-size:.9rem}.stu-rg ul{margin:6px 18px 0;padding:0;font-size:.85rem;line-height:1.7}
+        .stu-rg.add{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.stu-rg.upd{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a}.stu-rg.del{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+        .stu-rd{font-size:.88rem;color:#047857;background:#f8fafc;border:1px solid var(--border-color);border-radius:10px;padding:8px 14px}.stu-rd.neg{color:#b91c1c}
         @media(max-width:700px){.stu-2{grid-template-columns:1fr}.stu-tiles{grid-template-columns:1fr 1fr}.stu-r{grid-template-columns:44px 1fr auto}.stu-r .m,.stu-r .dt{display:none}}`;
         document.head.appendChild(st);
     }
