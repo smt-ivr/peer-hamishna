@@ -1,9 +1,9 @@
 // ============================================================
-//  client-exam-update.js — הזנת ציונים לתלמיד (מהירה, מבוססת מקלדת)
+//  client-exam-update.js — הזנת ציונים לתלמיד
 //  new ExamUpdateManager(apiBase, container, onSwitchStudent, onChanged)
 //
-//  זרימה: מקלידים קוד ← Enter ← 1 (עבר) / 2 (לא עבר).   אפשר גם: "12א 1" · "12*2" · "5א-9ב" · הדבקת רשימה.
-//  שמירה: לחצן "שמור" או Ctrl+Enter. הודעות מוצגות בתוך המסך (בלי טוסטים).
+//  הלוגיקה כמו תמיד: שורות של [חיפוש קוד בחינה + עבר / לא עבר]. אפשר להוסיף שורה בלי לסמן סטטוס,
+//  ולשמור רק כשכל שורה שהתחילו למלא שלמה. בחינה שכבר רשומה מסומנת באזהרה, ודורסים אותה רק בכפתור "דרוס".
 // ============================================================
 import { formatHebrewDate } from './client-reports.js';
 
@@ -13,39 +13,11 @@ const heb = ts => { const d = new Date(String(ts || '').replace(' ', 'T')); retu
 const $ = id => document.getElementById(id);
 const TYPE = { mishnayot: 'משניות', gemara: 'גמרא' };
 
-// ---------- פירוק קלט (מיוצא לבדיקות) ----------
-// 12*1 = 12א · 12*2 = 12ב  (כמו בטלפון)
-export function normCode(t) {
-    t = String(t).trim().replace(/["'׳״]/g, '');
-    const m = t.match(/^(\d+)\*([12])$/);
-    return m ? m[1] + (m[2] === '1' ? 'א' : 'ב') : t;
-}
-
-// מחזיר { items: [{code, status}], unknown: [טקסט שלא זוהה] }.  status: true / false / null (עוד לא נבחר)
-export function parseEntry(text, list) {
-    const idx = new Map(list.map((e, i) => [e.exam_code, i]));
-    const items = [], unknown = [];
-    for (const raw of String(text).split(/[\s,;]+/).filter(Boolean)) {
-        const last = items[items.length - 1];
-        if (/^[12+-]$/.test(raw) && last && last.status === null) { last.status = raw === '1' || raw === '+'; continue; }
-        const rng = raw.match(/^(.+?)[-–](.+)$/);                       // טווח: 5א-9ב
-        if (rng && idx.has(normCode(rng[1])) && idx.has(normCode(rng[2]))) {
-            let a = idx.get(normCode(rng[1])), b = idx.get(normCode(rng[2]));
-            if (a > b) [a, b] = [b, a];
-            for (let i = a; i <= b; i++) items.push({ code: list[i].exam_code, status: null });
-            continue;
-        }
-        const c = normCode(raw);
-        idx.has(c) ? items.push({ code: c, status: null }) : unknown.push(raw);
-    }
-    return { items, unknown };
-}
-
 export class ExamUpdateManager {
     constructor(apiBase, container, onSwitch, onChanged) {
         Object.assign(this, { apiBase, container, onSwitch, onChanged });
         this.allExams = []; this.exMap = new Map();
-        this.student = null; this.rows = []; this.pending = null; this.sugIdx = -1; this.hSeg = 'all'; this.hQ = '';
+        this.student = null; this.rows = []; this.nextId = 1; this.report = null; this.hSeg = 'all'; this.hQ = '';
         this.css();
         this.bind();
     }
@@ -69,18 +41,20 @@ export class ExamUpdateManager {
         if (!silent) {
             this.container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> טוען נתוני תלמיד...</div>';
             this.container.classList.remove('hidden');
-            this.rows = []; this.report = null; this.pending = null;
         }
         const r = await this.call('GET', `/student-summary?student_code=${encodeURIComponent(code)}`);
         const me = r.ok && Array.isArray(r.data) ? r.data[0] : null;
         if (!me) {
-            if (!silent) this.container.innerHTML = `<div class="ge-fail">${esc(r.ok ? 'לא נמצא תלמיד עם הקוד הזה.' : this.errText(r, 'שגיאה בטעינת התלמיד.'))}<br><button class="btn btn-outline btn-sm" id="geBack">חזרה לחיפוש</button></div>`;
+            if (!silent) this.container.innerHTML = `<div class="ge-fail">${esc(r.ok ? 'לא נמצא תלמיד עם הקוד הזה.' : this.errText(r, 'שגיאה בטעינת נתוני התלמיד.'))}<br><button class="btn btn-outline btn-sm" id="geBack">חזרה לחיפוש</button></div>`;
             return;
         }
         this.student = me;
-        if (silent) { this.paintTop(); this.paintHist(); this.paintStage(); } else { this.render(); }
+        if (silent) { this.paintTop(); this.paintHist(); this.refreshRows(); return; }
+        this.rows = [this.newRow()]; this.report = null;
+        this.render();
     }
 
+    newRow() { return { id: this.nextId++, code: '', status: null, force: false, note: '' }; }
     mine(code) { return this.student && this.student.exams.find(e => e.exam_code === code); }
     desc(ex) {
         const d = ex.details || {};
@@ -98,16 +72,18 @@ export class ExamUpdateManager {
             <div class="ge-card ge-top" id="geTop"></div>
             <div class="ge-main">
                 <section class="ge-card ge-entry">
-                    <div class="ge-eh"><h3><i class="fas fa-file-signature"></i> הזנת בחינות</h3>
-                        <span class="ge-hint">הקלד קוד ← Enter ← <kbd>1</kbd> עבר · <kbd>2</kbd> לא עבר &nbsp;|&nbsp; "12א 1" · "12*2" · "5א-9ב" · הדבקת רשימה &nbsp;|&nbsp; <kbd>Ctrl</kbd>+<kbd>Enter</kbd> שמירה</span></div>
-                    <div class="ge-bar">
-                        <div class="ge-codewrap"><input id="geCode" placeholder="קוד בחינה, טווח, או חיפוש לפי מסכת / פרק..." autocomplete="off"><div class="ge-sug hidden" id="geSug"></div></div>
-                        <div class="ge-pend hidden" id="gePend" tabindex="0"></div>
+                    <div class="ge-eh">
+                        <div><h3><i class="fas fa-file-signature"></i> דיווח והזנת בחינות</h3>
+                            <p>בחר קוד וסטטוס (עבר / לא עבר). חובה לבחור את הסטטוס.</p>
+                            <p class="ge-caution"><i class="fas fa-info-circle"></i> שים לב: הנתונים לא נשמרים עד לחיצה על לחצן השמירה.</p></div>
+                        <button type="button" class="btn btn-outline btn-sm ge-add" id="geAddRow"><i class="fas fa-plus"></i> הוסף שורה</button>
                     </div>
-                    <div class="ge-msg hidden" id="geMsg" role="status"></div>
-                    <div class="ge-stage" id="geStage"></div>
-                    <div class="ge-foot" id="geFoot"></div>
-                    <div id="geReport"></div>
+                    <form id="geForm" class="ge-form" autocomplete="off">
+                        <div class="ge-rows" id="geRows"></div>
+                        <div id="geReport"></div>
+                        <div class="ge-foot"><span class="ge-fh" id="geFootHint"></span>
+                            <button type="submit" class="btn btn-primary ge-save" id="geSave" disabled><i class="fas fa-save"></i> שמור עדכונים במערכת</button></div>
+                    </form>
                 </section>
                 <aside class="ge-card ge-hist">
                     <div class="ge-eh"><h3><i class="fas fa-history"></i> מה כבר נבחן <em id="geHCount"></em></h3></div>
@@ -116,8 +92,7 @@ export class ExamUpdateManager {
                 </aside>
             </div>
         </div>`;
-        this.paintTop(); this.paintHist(); this.paintStage(); this.paintPending();
-        setTimeout(() => { const i = $('geCode'); if (i) i.focus(); }, 60);
+        this.paintTop(); this.paintHist(); this.paintRows(); this.paintReport();
     }
 
     paintTop() {
@@ -127,183 +102,125 @@ export class ExamUpdateManager {
             <div class="ge-av">${esc((s.first_name || '?').charAt(0))}</div>
             <div class="ge-id"><h2>${esc(name)}</h2><div class="ge-tags"><span>כיתה ${esc(s.class_grade || '-')}</span><span>קוד ${esc(s.student_code)}</span></div></div>
             <div class="ge-tiles">${tile(`${st.total_attempted ?? 0} מתוך ${st.total_available_exams ?? 0}`, 'נבחן')}${tile(st.total_passed ?? 0, 'עברו', 'ok')}${tile(Math.max(0, (st.total_attempted ?? 0) - (st.total_passed ?? 0)), 'לא עברו', 'bad')}${tile(money(st.total_reward), 'מלגה', 'money')}</div>
-            <button class="btn btn-outline btn-sm" id="geSwitch"><i class="fas fa-exchange-alt"></i> החלף תלמיד</button>`;
+            <button type="button" class="btn btn-outline btn-sm" id="geSwitch"><i class="fas fa-exchange-alt"></i> החלף תלמיד</button>`;
     }
 
     // ============================================================
-    //  רשימת ההזנה
+    //  שורות ההזנה
     // ============================================================
-    // מצב כל שורה: חסימה לפי כיתה / ציון קיים / האם אפשר לשלוח
-    info(row) {
-        const mine = this.mine(row.code), ex = this.exMap.get(row.code);
-        const blocked = !mine && ex ? `הבחינה מיועדת לכיתה ${ex.target_grade} ומעלה` : '';
-        const existing = mine && mine.passed !== null ? mine : null;
-        const same = existing && row.status !== null && existing.passed === row.status;
-        const send = row.status !== null && !blocked && !same && (!existing || row.force);
-        return { ex, mine, blocked, existing, same, send };
-    }
-
-    stage(code, status = null, extra = {}) {
-        let row = this.rows.find(r => r.code === code);
-        if (!row) { row = { code, status: null, force: false }; this.rows.push(row); }
-        if (status !== null) row.status = status;
-        Object.assign(row, extra);
-        row.err = '';
-    }
-
-    paintStage() {
-        if (!$('geStage')) return;
-        const rows = this.rows;
-        $('geStage').innerHTML = rows.length ? rows.map(r => this.rowHtml(r)).join('') :
-            `<div class="ge-empty"><i class="fas fa-keyboard"></i><b>הרשימה ריקה</b><span>הקלד קוד בחינה למעלה. למשל <kbd>12א</kbd>, ואז <kbd>1</kbd> לעבר או <kbd>2</kbd> לא עבר.</span></div>`;
-        const infos = rows.map(r => this.info(r));
-        const send = infos.filter(i => i.send).length, noStatus = rows.filter(r => r.status === null).length;
-        const blocked = infos.filter(i => i.blocked).length, held = infos.filter(i => i.existing && !i.same && !i.send && !i.blocked).length;
-        const bits = [];
-        if (noStatus) bits.push(`<span class="warn">${noStatus} ללא סטטוס</span>`);
-        if (held) bits.push(`<span class="warn">${held} כבר רשומות (סמן "עדכן" כדי לדרוס)</span>`);
-        if (blocked) bits.push(`<span class="bad">${blocked} חסומות לפי כיתה</span>`);
-        $('geFoot').innerHTML = rows.length ? `
-            <div class="ge-bulk"><span>לא מסומנות:</span><button type="button" data-fill="true">עבר</button><button type="button" data-fill="false">לא עבר</button><button type="button" data-clear class="ge-link">נקה הכל</button></div>
-            <div class="ge-st">${bits.join('')}</div>
-            <button class="btn btn-primary" id="geSave" ${send && !noStatus ? '' : 'disabled'}><i class="fas fa-save"></i> שמור ${send || ''} ${send === 1 ? 'עדכון' : 'עדכונים'}</button>` : '';
+    paintRows() {
+        $('geRows').innerHTML = this.rows.map(r => this.rowHtml(r)).join('');
+        this.refreshRows();
     }
 
     rowHtml(r) {
-        const i = this.info(r), cls = i.blocked ? 'blocked' : (r.status === null ? 'nostat' : (r.err ? 'err' : ''));
-        let note = '';
-        if (r.err) note = `<span class="bad">${esc(r.err)}</span>`;
-        else if (i.blocked) note = `<span class="bad">${esc(i.blocked)}</span>`;
-        else if (i.same) note = `<span class="mut">כבר רשום כך — אין שינוי</span>`;
-        else if (i.existing) note = `<span class="warn">כבר רשום: ${i.existing.passed ? 'עבר' : 'לא עבר'}</span><label class="ge-force"><input type="checkbox" data-force ${r.force ? 'checked' : ''}> עדכן</label>`;
-        return `<div class="ge-row ${cls}" data-code="${esc(r.code)}">
-            <b class="c">${esc(r.code)}</b><div class="w">${esc(i.ex ? this.desc(i.ex) : '')}</div>
-            <div class="ge-tog"><button type="button" data-st="true" class="${r.status === true ? 'on ok' : ''}">✓ עבר</button><button type="button" data-st="false" class="${r.status === false ? 'on bad' : ''}">✕ לא עבר</button></div>
-            <div class="n">${note}</div><button type="button" class="ge-x" data-rm title="הסר">&times;</button></div>`;
+        return `<div class="ge-row" data-id="${r.id}">
+            <div class="ge-n"></div>
+            <div class="ge-rb">
+                <div class="ge-det"></div>
+                <div class="ge-codewrap"><input type="text" class="ge-code" value="${esc(r.code)}" placeholder="חיפוש קוד או נושא..." autocomplete="off"><div class="ge-sug hidden"></div></div>
+                <div class="ge-warn"></div>
+            </div>
+            <div class="ge-tog"><button type="button" data-st="true"><i class="fas fa-check"></i> עבר</button><button type="button" data-st="false"><i class="fas fa-times"></i> לא עבר</button></div>
+            <button type="button" class="ge-x" data-rm title="הסר שורה"><i class="fas fa-trash"></i></button></div>`;
     }
 
-    // ---------- הודעה בתוך המסך ----------
-    flash(type, text) {
-        const el = $('geMsg');
-        if (!text) { el.className = 'ge-msg hidden'; return; }
-        el.className = `ge-msg ${type}`;
-        el.innerHTML = `<div>${esc(text)}</div><button type="button" data-mx aria-label="סגור">&times;</button>`;
+    // מצב כל שורה: איזו בחינה, האם כבר רשומה, האם מיועדת לכיתה גבוהה
+    info(r) {
+        const ex = this.exMap.get(r.code), mine = ex ? this.mine(r.code) : null;
+        return { ex, existing: mine && mine.passed !== null ? mine : null, restricted: ex && !mine ? ex.target_grade : '' };
     }
 
-    // ============================================================
-    //  שורת ההקלדה
-    // ============================================================
-    suggestions(term) {
-        const q = term.trim().toLowerCase();
-        if (!q) return [];
-        const score = e => {
-            const code = e.exam_code.toLowerCase(), txt = Object.values(e.details || {}).join(' ').toLowerCase();
-            return code === q ? 0 : code.startsWith(q) ? 1 : code.includes(q) ? 2 : txt.includes(q) ? 3 : 9;
-        };
-        return this.allExams.map(e => [score(e), e]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0]).slice(0, 8).map(x => x[1]);
+    // מעדכן את מה שמוצג בשורה (בלי לבנות אותה מחדש — כדי לא לאבד פוקוס בזמן הקלדה)
+    fillRow(r) {
+        const el = this.container.querySelector(`.ge-row[data-id="${r.id}"]`);
+        if (!el) return;
+        const i = this.info(r);
+        el.querySelector('.ge-det').innerHTML = i.ex
+            ? `<span class="ge-ty ${i.ex.exam_type === 'gemara' ? 'g' : 'm'}">${TYPE[i.ex.exam_type] || ''}</span> ${esc(this.desc(i.ex))}`
+            : '<span class="ge-mut">בחר בחינה מהרשימה</span>';
+        let warn = '';
+        if (i.existing) {
+            warn = `<div class="ge-wl"><span class="ge-ex"><i class="fas fa-exclamation-triangle"></i> כבר עודכן (${i.existing.passed ? 'עבר' : 'לא עבר'})</span>
+                <button type="button" class="ge-ow ${r.force ? 'on' : ''}" data-ow aria-pressed="${r.force}"><i class="fas fa-eraser"></i> ${r.force ? 'יידרס בשמירה' : 'דרוס את הציון הקיים'}</button></div>`;
+        }
+        if (i.restricted) warn += `<div class="ge-wl"><span class="ge-bad"><i class="fas fa-ban"></i> הבחינה מיועדת לכיתה ${esc(i.restricted)} ומעלה</span></div>`;
+        if (r.note) warn += `<div class="ge-wl"><span class="ge-bad"><i class="fas fa-times-circle"></i> ${esc(r.note)}</span></div>`;
+        el.querySelector('.ge-warn').innerHTML = warn;
+        el.classList.toggle('has-warn', !!i.existing || !!i.restricted);
+        el.classList.toggle('has-ow', !!(i.existing && r.force));
+        el.classList.toggle('has-err', !!r.note || !!i.restricted);
+        el.classList.toggle('done', !!(r.code && r.status !== null));
+        el.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', r.status !== null && b.dataset.st === String(r.status)));
     }
 
-    paintSug(list) {
-        const box = $('geSug');
-        this.sugList = list;
-        if (!list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
-        box.innerHTML = list.map((e, i) => {
-            const mine = this.mine(e.exam_code), tag = !mine ? '<i class="bad">חסום לכיתה</i>' : (mine.passed === null ? '' : `<i class="${mine.passed ? 'ok' : 'bad'}">${mine.passed ? '✓ עבר' : '✕ לא עבר'}</i>`);
-            return `<div class="ge-sg ${i === this.sugIdx ? 'on' : ''}" data-code="${esc(e.exam_code)}"><b>${esc(e.exam_code)}</b><span>${esc(this.desc(e))}</span>${tag}</div>`;
-        }).join('');
+    refreshRows() {
+        this.rows.forEach((r, n) => {
+            this.fillRow(r);
+            const el = this.container.querySelector(`.ge-row[data-id="${r.id}"]`);
+            if (el) { el.querySelector('.ge-n').textContent = n + 1; el.querySelector('[data-rm]').disabled = this.rows.length === 1; }
+        });
+        this.updateSave();
+    }
+
+    // כמו תמיד: שומרים רק כשיש לפחות שורה שלמה ואין שורה חלקית
+    updateSave() {
+        const btn = $('geSave');
+        if (!btn) return;
+        const valid = this.rows.filter(r => r.code && r.status !== null).length;
+        const partial = this.rows.some(r => (r.code || r.status !== null) && !(r.code && r.status !== null));
+        const ok = valid > 0 && !partial;
+        btn.disabled = !ok;
+        btn.innerHTML = `<i class="fas fa-save"></i> ${ok ? `שמור ${valid} ${valid === 1 ? 'עדכון' : 'עדכונים'} במערכת` : 'שמור עדכונים במערכת'}`;
+        $('geFootHint').textContent = partial ? 'יש שורה שלא הושלמה: חסר קוד או סטטוס' : (ok ? '' : 'הוסף בחינה כדי לשמור');
+    }
+
+    // ---------- הצעות בזמן הקלדה ----------
+    showSug(r, el) {
+        const box = el.querySelector('.ge-sug'), term = r.code.trim();
+        if (!term) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        const list = this.allExams.filter(ex => ex.exam_code.includes(term) || Object.values(ex.details || {}).some(v => String(v ?? '').includes(term))).slice(0, 10);
+        box.innerHTML = list.length ? list.map(ex => {
+            const mine = this.mine(ex.exam_code), tag = !mine ? '<i class="bad">לכיתה גבוהה</i>' : (mine.passed === null ? '' : `<i class="${mine.passed ? 'ok' : 'bad'}">${mine.passed ? '✓ עבר' : '✕ לא עבר'}</i>`);
+            return `<div class="ge-sg" data-code="${esc(ex.exam_code)}"><b>${esc(ex.exam_code)}</b><span>${esc(this.desc(ex))}</span>${tag}</div>`;
+        }).join('') : '<div class="ge-sg none">לא נמצאו בחינות</div>';
         box.classList.remove('hidden');
     }
 
-    onCodeInput() {
-        const val = $('geCode').value, last = val.split(/[\s,;]+/).pop();
-        this.sugIdx = -1;
-        this.paintSug(/^[12+-]$/.test(last) ? [] : this.suggestions(last));
-    }
-
-    onCodeKey(e) {
-        const n = (this.sugList || []).length;
-        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            if (!n) return;
-            e.preventDefault();
-            this.sugIdx = (this.sugIdx + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
-            return this.paintSug(this.sugList);
-        }
-        if (e.key === 'Escape') { this.paintSug([]); this.pending = null; this.paintPending(); return; }
-        if (e.key !== 'Enter' || e.ctrlKey) return;
-        e.preventDefault();
-        let text = $('geCode').value;
-        if (this.sugIdx >= 0 && this.sugList[this.sugIdx]) {               // בחירה מההצעות
-            const parts = text.split(/([\s,;]+)/); parts[parts.length - 1] = this.sugList[this.sugIdx].exam_code; text = parts.join('');
-        } else if (n === 1 && !parseEntry(text, this.allExams).items.length) {  // הצעה יחידה — בוחרים אותה
-            const parts = text.split(/([\s,;]+)/); parts[parts.length - 1] = this.sugList[0].exam_code; text = parts.join('');
-        }
-        this.commit(text);
-    }
-
-    commit(text) {
-        this.paintSug([]);
-        const { items, unknown } = parseEntry(text, this.allExams);
-        if (!items.length) {
-            if (text.trim()) this.flash('warning', `לא נמצאה בחינה "${unknown[0] || text.trim()}". הקלד קוד מלא (למשל 12א), או בחר מההצעות.`);
-            return;
-        }
-        this.flash(null);
-        $('geCode').value = unknown.join(' ');
-        if (items.length === 1 && items[0].status === null && !unknown.length) {     // קוד בודד — ממתינים ל-1 / 2
-            this.pending = items[0].code; this.paintPending();
-            return $('gePend').focus();
-        }
-        items.forEach(it => this.stage(it.code, it.status));
-        this.paintStage();
-        const open = items.filter(it => it.status === null).length;
-        const extra = [open ? `סמן עבר / לא עבר לכל שורה (או "לא מסומנות").` : '', unknown.length ? `לא זוהו: ${unknown.join(', ')}` : ''].filter(Boolean).join(' ');
-        this.flash(unknown.length ? 'warning' : 'info', `נוספו ${items.length} בחינות לרשימה. ${extra}`.trim());
-    }
-
-    paintPending() {
-        const el = $('gePend');
-        if (!el) return;
-        const ex = this.pending && this.exMap.get(this.pending);
-        if (!ex) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-        const mine = this.mine(ex.exam_code), blocked = !mine;
-        el.classList.remove('hidden');
-        el.innerHTML = `<div class="p-d"><b>${esc(ex.exam_code)}</b> ${esc(this.desc(ex))}${blocked ? ` <i class="bad">מיועדת לכיתה ${esc(ex.target_grade)} ומעלה</i>` : (mine.passed !== null ? ` <i class="warn">כבר רשום: ${mine.passed ? 'עבר' : 'לא עבר'}</i>` : '')}</div>
-            <div class="p-b"><button type="button" data-pend="true" class="ok"><kbd>1</kbd> עבר</button><button type="button" data-pend="false" class="bad"><kbd>2</kbd> לא עבר</button><button type="button" data-pend="x" class="ge-link">ביטול (Esc)</button></div>`;
-    }
-
-    choosePending(status) {
-        const code = this.pending;
-        this.pending = null; this.paintPending();
-        if (status !== null && code) {
-            const mine = this.mine(code);
-            this.stage(code, status, mine && mine.passed !== null && mine.passed !== status ? { force: true } : {});   // תיקון מכוון — כבר מסומן "עדכן"
-            this.paintStage();
-        }
-        $('geCode').value = ''; $('geCode').focus();
+    addRow() {
+        const r = this.newRow();
+        this.rows.push(r);
+        $('geRows').insertAdjacentHTML('beforeend', this.rowHtml(r));
+        this.refreshRows();
+        const inp = this.container.querySelector(`.ge-row[data-id="${r.id}"] .ge-code`);
+        if (inp) { inp.focus(); inp.scrollIntoView({ block: 'nearest' }); }
     }
 
     // ============================================================
     //  שמירה
     // ============================================================
     async save() {
+        const send = this.rows.filter(r => r.code && r.status !== null);
         const btn = $('geSave');
-        const send = this.rows.filter(r => this.info(r).send);
-        if (!send.length || (btn && btn.disabled)) return;
-        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר...';
-        const r = await this.call('POST', '/student-exams', { student_code: this.student.student_code, exams: send.map(x => ({ exam_code: x.code, passed: x.status, force_update: !!x.force })) });
-        if (!r.ok) {
-            this.report = { error: this.errText(r, 'השמירה נכשלה. הנתונים לא נשמרו.') };
-            this.paintReport(); return this.paintStage();
-        }
+        if (!send.length || btn.disabled) return;
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
+        this.report = null; this.paintReport();
+
+        const r = await this.call('POST', '/student-exams', {
+            student_code: this.student.student_code,
+            exams: send.map(x => (x.force ? { exam_code: x.code, passed: x.status, force_update: true } : { exam_code: x.code, passed: x.status }))
+        });
+        if (!r.ok) { this.report = { error: this.errText(r, 'שגיאת מערכת, הנתונים לא נשמרו.') }; this.paintReport(); return this.updateSave(); }
+
         const { updated = [], skipped = [], errors = [] } = r.data || {};
-        const done = new Map(updated.map(u => [u.exam_code, send.find(x => x.code === u.exam_code)]));
-        const bad = new Map([...errors, ...skipped].map(x => [x.exam_code, x.reason]));
-        this.rows = this.rows.filter(row => !done.has(row.code));
-        this.rows.forEach(row => { if (bad.has(row.code)) row.err = bad.get(row.code); });
-        this.report = { done: [...done.values()].map(x => ({ code: x.code, status: x.status })), problems: [...bad].map(([code, reason]) => ({ code, reason })) };
+        this.report = { updated, skipped, errors };
+        // שורות שנקלטו — יורדות. שורות שדולגו / נכשלו נשארות עם הסיבה, כדי שאפשר יהיה לתקן (למשל לסמן "דרוס")
+        const problem = new Map([...skipped, ...errors].map(x => [x.exam_code, x.reason]));
+        const keep = this.rows.filter(row => problem.has(row.code));
+        keep.forEach(row => { row.note = problem.get(row.code); });
+        this.rows = keep.length ? keep : [this.newRow()];
         await this.loadStudentData(this.student.student_code, true);
-        this.paintReport(); this.paintStage();
-        $('geCode') && $('geCode').focus();
+        this.paintRows(); this.paintReport();
         if (this.onChanged) { clearTimeout(this._t); this._t = setTimeout(() => this.onChanged(), 1500); }
     }
 
@@ -311,16 +228,17 @@ export class ExamUpdateManager {
         const el = $('geReport'), r = this.report;
         if (!el) return;
         if (!r) { el.innerHTML = ''; return; }
-        if (r.error) { el.innerHTML = `<div class="ge-rep bad"><b>לא נשמר</b><div>${esc(r.error)}</div><button type="button" data-rx>&times;</button></div>`; return; }
-        const chips = r.done.map(x => `<i class="${x.status ? 'ok' : 'bad'}">${esc(x.code)} ${x.status ? '✓' : '✕'}</i>`).join('');
-        el.innerHTML = `<div class="ge-rep ${r.problems.length ? 'warn' : 'ok'}">
-            ${r.done.length ? `<div><b>נשמרו ${r.done.length} בחינות</b><div class="ge-chips">${chips}</div></div>` : ''}
-            ${r.problems.length ? `<div><b>${r.problems.length} לא נשמרו</b><ul>${r.problems.map(p => `<li>${esc(p.code)}: ${esc(p.reason)}</li>`).join('')}</ul></div>` : ''}
+        if (r.error) { el.innerHTML = `<div class="ge-rep bad"><div><b><i class="fas fa-times-circle"></i> לא נשמר</b><div>${esc(r.error)}</div></div><button type="button" data-rx aria-label="סגור">&times;</button></div>`; return; }
+        const grp = (cls, icon, title, items, line) => items.length ? `<div class="ge-rg ${cls}"><b><i class="fas ${icon}"></i> ${title} (${items.length})</b><ul>${items.map(line).join('')}</ul></div>` : '';
+        el.innerHTML = `<div class="ge-rep"><div class="ge-rgs"><div class="ge-rt">סיכום עדכון</div>
+            ${grp('ok', 'fa-check-circle', 'נקלט בהצלחה', r.updated, i => `<li>בחינה ${esc(i.exam_code)} · ${esc(i.status)}</li>`)}
+            ${grp('warn', 'fa-info-circle', 'דולגו', r.skipped, i => `<li>בחינה ${esc(i.exam_code)}: ${esc(i.reason)}</li>`)}
+            ${grp('bad', 'fa-times-circle', 'שגיאות', r.errors, i => `<li>בחינה ${esc(i.exam_code)}: ${esc(i.reason)}</li>`)}</div>
             <button type="button" data-rx aria-label="סגור">&times;</button></div>`;
     }
 
     // ============================================================
-    //  "מה כבר נבחן" (צד) — עם תיקון בלחיצה
+    //  "מה כבר נבחן" (צד) — צפייה בלבד
     // ============================================================
     paintHist() {
         if (!$('geHList')) return;
@@ -332,64 +250,55 @@ export class ExamUpdateManager {
         rows.forEach(e => { const k = (e.details || {}).masechet || 'כללי'; (groups.get(k) || groups.set(k, []).get(k)).push(e); });
         $('geHList').innerHTML = rows.length ? [...groups].map(([m, list]) => `<div class="ge-gh">${esc(m)}<em>${list.filter(e => e.passed).length}/${list.length}</em></div>` + list.map(e => `
             <div class="ge-hr"><b>${esc(e.exam_code)}</b><span class="w">${esc(this.desc(e).split(' · ').slice(1).join(' · '))}</span>
-                <span class="ge-pill ${e.passed ? 'ok' : 'bad'}">${e.passed ? '✓ עבר' : '✕ לא עבר'}</span><span class="dt">${heb(e.updated_at)}</span>
-                <button type="button" data-fix="${esc(e.exam_code)}" title="תקן: הוסף לרשימה עם הסטטוס ההפוך">✎</button></div>`).join('')).join('')
-            : `<div class="ge-empty small">${all.length ? 'לא נמצאו תוצאות' : 'התלמיד עדיין לא נבחן באף בחינה'}</div>`;
+                <span class="ge-pill ${e.passed ? 'ok' : 'bad'}">${e.passed ? '✓ עבר' : '✕ לא עבר'}</span><span class="dt">${heb(e.updated_at)}</span></div>`).join('')).join('')
+            : `<div class="ge-empty">${all.length ? 'לא נמצאו תוצאות' : 'התלמיד עדיין לא נבחן באף בחינה'}</div>`;
     }
 
     // ============================================================
     //  אירועים (פעם אחת, על המיכל)
     // ============================================================
     bind() {
-        const c = this.container;
+        const c = this.container, rowOf = t => { const el = t.closest('.ge-row'); return el ? { el, r: this.rows.find(x => x.id === +el.dataset.id) } : {}; };
+
         c.addEventListener('input', e => {
-            if (e.target.id === 'geCode') this.onCodeInput();
-            if (e.target.id === 'geHQ') { this.hQ = e.target.value; this.paintHist(); }
+            if (e.target.id === 'geHQ') { this.hQ = e.target.value; return this.paintHist(); }
+            if (!e.target.classList.contains('ge-code')) return;
+            const { el, r } = rowOf(e.target);
+            r.code = e.target.value.trim(); r.note = '';
+            if (!r.code) { r.status = null; r.force = false; }        // כמו תמיד: מחיקת הקוד מאפסת את הסטטוס
+            this.fillRow(r); this.showSug(r, el); this.updateSave();
         });
-        c.addEventListener('paste', e => {                                  // הדבקת רשימה
-            if (e.target.id !== 'geCode') return;
-            const text = (e.clipboardData || window.clipboardData).getData('text');
-            if (!/[\s,;\n]/.test(text.trim())) return;
-            e.preventDefault(); this.commit(text);
-        });
-        c.addEventListener('keydown', e => {
-            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); return this.save(); }     // Ctrl+Enter = שמירה, מכל מקום במסך
-            if (e.target.id === 'geCode') return this.onCodeKey(e);
-            if (e.target.closest && e.target.closest('#gePend')) {
-                if (e.key === '1' || e.key === '+') { e.preventDefault(); this.choosePending(true); }
-                else if (e.key === '2' || e.key === '-') { e.preventDefault(); this.choosePending(false); }
-                else if (e.key === 'Escape') { e.preventDefault(); this.choosePending(null); }
-            }
-        });
-        c.addEventListener('change', e => {
-            if (e.target.matches('[data-force]')) { this.rows.find(r => r.code === e.target.closest('.ge-row').dataset.code).force = e.target.checked; this.paintStage(); }
-        });
+
+        c.addEventListener('submit', e => { if (e.target.id === 'geForm') { e.preventDefault(); this.save(); } });
+
         c.addEventListener('click', e => {
-            const t = e.target, row = t.closest('.ge-row');
+            const t = e.target;
             if (t.closest('#geSwitch') || t.closest('#geBack')) return this.onSwitch && this.onSwitch();
-            const sg = t.closest('.ge-sg');
-            if (sg) { this.commit(sg.dataset.code); return; }
-            const pend = t.closest('[data-pend]');
-            if (pend) return this.choosePending(pend.dataset.pend === 'x' ? null : pend.dataset.pend === 'true');
-            if (t.closest('#geSave')) return this.save();
-            const st = t.closest('[data-st]');
-            if (st && row) { const r = this.rows.find(x => x.code === row.dataset.code); r.status = st.dataset.st === 'true'; r.err = ''; return this.paintStage(); }
-            if (t.closest('[data-rm]') && row) { this.rows = this.rows.filter(r => r.code !== row.dataset.code); return this.paintStage(); }
-            const fill = t.closest('[data-fill]');
-            if (fill) { this.rows.forEach(r => { if (r.status === null) r.status = fill.dataset.fill === 'true'; }); return this.paintStage(); }
-            if (t.closest('[data-clear]')) { this.rows = []; this.flash(null); return this.paintStage(); }
-            if (t.closest('[data-mx]')) return this.flash(null);
+            if (t.closest('#geAddRow')) return this.addRow();
             if (t.closest('[data-rx]')) { this.report = null; return this.paintReport(); }
             const hs = t.closest('[data-hseg]');
             if (hs) { this.hSeg = hs.dataset.hseg; return this.paintHist(); }
-            const fx = t.closest('[data-fix]');
-            if (fx) {
-                const cur = this.mine(fx.dataset.fix);
-                this.stage(fx.dataset.fix, !cur.passed, { force: true });
-                this.paintStage(); this.flash('info', `בחינה ${fx.dataset.fix} נוספה לרשימה כתיקון (${!cur.passed ? 'עבר' : 'לא עבר'}). לחץ "שמור" כדי לעדכן.`);
-                return;
+
+            const sg = t.closest('.ge-sg[data-code]');
+            if (sg) {
+                const { el, r } = rowOf(sg);
+                r.code = sg.dataset.code; r.note = '';
+                el.querySelector('.ge-code').value = r.code;
+                el.querySelector('.ge-sug').classList.add('hidden');
+                return this.refreshRows();
             }
-            if (!t.closest('.ge-codewrap')) this.paintSug([]);
+            const { el, r } = rowOf(t);
+            if (r) {
+                const st = t.closest('[data-st]');
+                if (st) { r.status = st.dataset.st === 'true'; r.note = ''; return this.refreshRows(); }
+                if (t.closest('[data-ow]')) { r.force = !r.force; return this.refreshRows(); }
+                if (t.closest('[data-rm]')) {
+                    this.rows = this.rows.filter(x => x.id !== r.id); el.remove();
+                    if (!this.rows.length) { this.addRow(); return; }
+                    return this.refreshRows();
+                }
+            }
+            if (!t.closest('.ge-codewrap')) c.querySelectorAll('.ge-sug').forEach(b => b.classList.add('hidden'));   // לחיצה מחוץ להצעות סוגרת אותן
         });
     }
 
@@ -406,46 +315,45 @@ export class ExamUpdateManager {
         .ge-tiles{display:flex;gap:8px}.ge-tile{background:#f8fafc;border:1px solid var(--border-color);border-radius:10px;padding:6px 14px;text-align:center;min-width:76px}
         .ge-tile b{display:block;font-size:1rem}.ge-tile span{font-size:.7rem;color:#64748b}.ge-tile.ok{background:#ecfdf5;border-color:#a7f3d0}.ge-tile.ok b{color:#047857}
         .ge-tile.bad{background:#fef2f2;border-color:#fecaca}.ge-tile.bad b{color:#dc2626}.ge-tile.money b{color:#0369a1}
-        .ge-main{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:10px;flex:1;min-height:0}
+        .ge-main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:10px;flex:1;min-height:0}
         .ge-entry,.ge-hist{display:flex;flex-direction:column;min-height:0;overflow:hidden}
-        .ge-eh{padding:12px 16px 4px;display:flex;flex-direction:column;gap:3px}.ge-eh h3{margin:0;font-size:1.02rem;display:flex;gap:8px;align-items:center}.ge-eh h3 i{color:var(--primary-color)}.ge-eh em{font-style:normal;color:#94a3b8;font-weight:600}
-        .ge-hint{font-size:.74rem;color:#64748b}kbd{background:#f1f5f9;border:1px solid #cbd5e1;border-bottom-width:2px;border-radius:5px;padding:0 6px;font-size:.72rem;font-family:inherit;color:#334155}
-        .ge-bar{padding:8px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;flex:none}
-        .ge-codewrap{position:relative;flex:1;min-width:240px}
-        .ge-codewrap input{width:100%;padding:11px 14px;font-size:1.05rem;border:2px solid var(--border-color);border-radius:10px;outline:none;background:#f8fafc}
-        .ge-codewrap input:focus{border-color:var(--primary-color);background:#fff;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
-        .ge-sug{position:absolute;top:calc(100% + 4px);right:0;left:0;background:#fff;border:1px solid var(--border-color);border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);z-index:20;overflow:hidden}
-        .ge-sg{display:flex;gap:10px;align-items:center;padding:7px 12px;cursor:pointer;font-size:.86rem}.ge-sg b{min-width:42px}.ge-sg span{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .ge-sg.on,.ge-sg:hover{background:#eff6ff}.ge-sg i{font-style:normal;font-size:.72rem;font-weight:700}i.ok{color:#047857}i.bad{color:#b91c1c}i.warn{color:#b45309;font-style:normal}
-        .ge-pend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fffbeb;border:2px solid #fcd34d;border-radius:10px;padding:8px 12px;outline:none;flex:1 1 100%}
-        .ge-pend:focus{box-shadow:0 0 0 4px rgba(245,158,11,.2)}.ge-pend .p-d{flex:1;min-width:200px;font-size:.9rem}.ge-pend .p-b{display:flex;gap:8px}
-        .ge-pend button{border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;font-size:.9rem}.ge-pend .ok{background:#059669;color:#fff}.ge-pend .bad{background:#dc2626;color:#fff}
-        .ge-link{background:none!important;border:none;color:var(--primary-color)!important;cursor:pointer;font-size:.8rem;font-weight:600}.ge-link:hover{text-decoration:underline}
-        .ge-msg{margin:0 16px 6px;padding:8px 12px;border-radius:9px;border:1px solid;display:flex;gap:10px;align-items:flex-start;font-size:.84rem;flex:none}.ge-msg div{flex:1}.ge-msg button{border:none;background:none;font-size:1.15rem;cursor:pointer;color:inherit;opacity:.6}
-        .ge-msg.info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}.ge-msg.warning{background:#fffbeb;border-color:#fde68a;color:#92400e}.ge-msg.hidden{display:none}
-        .ge-stage{flex:1;min-height:140px;overflow:auto;padding:0 16px}
-        .ge-row{display:grid;grid-template-columns:50px 1fr auto minmax(120px,190px) 26px;gap:10px;align-items:center;padding:7px 8px;border-bottom:1px solid #eef2f7;font-size:.86rem}
-        .ge-row:nth-child(even){background:#f8fafc}.ge-row .c{font-size:.95rem}.ge-row .w{color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .ge-row.nostat{background:#fffbeb}.ge-row.blocked,.ge-row.err{background:#fef2f2}
-        .ge-tog{display:inline-flex;gap:4px}.ge-tog button{border:1px solid var(--border-color);background:#fff;border-radius:8px;padding:4px 11px;font-weight:700;font-size:.8rem;cursor:pointer;color:#64748b}
-        .ge-tog button.on.ok{background:#059669;border-color:#059669;color:#fff}.ge-tog button.on.bad{background:#dc2626;border-color:#dc2626;color:#fff}
-        .ge-row .n{font-size:.76rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.bad{color:#b91c1c}.warn{color:#b45309}.mut{color:#64748b}
-        .ge-force{display:inline-flex;gap:4px;align-items:center;cursor:pointer;font-weight:700}.ge-x{border:none;background:none;font-size:1.2rem;color:#94a3b8;cursor:pointer}.ge-x:hover{color:#dc2626}
-        .ge-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 10px;color:#64748b;text-align:center}.ge-empty i{font-size:1.8rem;color:#cbd5e1}.ge-empty.small{padding:20px 10px}
-        .ge-foot{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--border-color);background:#f8fafc;flex:none}.ge-foot:empty{display:none}
-        .ge-bulk{display:flex;gap:6px;align-items:center;font-size:.8rem;color:#475569}.ge-bulk button:not(.ge-link){border:1px solid var(--border-color);background:#fff;border-radius:7px;padding:2px 10px;cursor:pointer;font-weight:700}
-        .ge-st{flex:1;display:flex;gap:10px;flex-wrap:wrap;font-size:.78rem;font-weight:600}
-        .ge-rep{margin:0 16px 12px;padding:10px 14px;border-radius:10px;border:1px solid;display:flex;gap:14px;align-items:flex-start;font-size:.85rem;position:relative}.ge-rep>div{flex:1}.ge-rep>button{border:none;background:none;font-size:1.2rem;cursor:pointer;color:inherit;opacity:.6}
-        .ge-rep.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.ge-rep.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}.ge-rep.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
-        .ge-rep ul{margin:4px 18px 0;padding:0}.ge-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}.ge-chips i{font-style:normal;background:#fff;border:1px solid currentColor;border-radius:99px;padding:0 9px;font-size:.76rem;font-weight:700}
+        .ge-eh{padding:14px 18px 6px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.ge-eh h3{margin:0 0 3px;font-size:1.05rem;display:flex;gap:8px;align-items:center}.ge-eh h3 i{color:var(--primary-color)}.ge-eh em{font-style:normal;color:#94a3b8;font-weight:600}
+        .ge-eh p{margin:0;font-size:.8rem;color:#64748b}.ge-eh p.ge-caution{color:#b45309;font-weight:600;margin-top:2px}
+        .ge-add{border-style:dashed;border-color:var(--primary-color);color:var(--primary-color);flex:none}
+        .ge-form{display:flex;flex-direction:column;flex:1;min-height:0}
+        .ge-rows{flex:1;overflow:auto;padding:6px 16px 120px;display:flex;flex-direction:column;gap:10px}
+        .ge-row{display:grid;grid-template-columns:30px 1fr auto 32px;gap:12px;align-items:center;background:#fff;border:1px solid var(--border-color);border-radius:12px;padding:12px 14px;transition:border-color .15s,box-shadow .15s}
+        .ge-row:focus-within{border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+        .ge-row.done{border-right:4px solid #10b981}.ge-row.has-warn{background:#fffbeb;border-color:#fcd34d}.ge-row.has-ow{background:#fef2f2;border-color:#f87171}.ge-row.has-err{border-color:#fca5a5}
+        .ge-n{width:26px;height:26px;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.78rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+        .ge-rb{display:flex;flex-direction:column;gap:6px;min-width:0}
+        .ge-det{min-height:20px;font-size:.88rem;font-weight:600;color:var(--primary-color);display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ge-mut{color:#94a3b8;font-weight:500}
+        .ge-ty{border-radius:99px;padding:0 9px;font-size:.7rem;font-weight:800;border:1px solid}.ge-ty.m{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.ge-ty.g{background:#fffbeb;color:#92400e;border-color:#fde68a}
+        .ge-codewrap{position:relative}.ge-code{width:100%;padding:9px 12px;font-size:.95rem;border:1px solid var(--border-color);border-radius:9px;outline:none;background:#f8fafc}
+        .ge-code:focus{border-color:var(--primary-color);background:#fff}
+        .ge-sug{position:absolute;top:calc(100% + 4px);right:0;left:0;background:#fff;border:1px solid var(--border-color);border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);z-index:20;overflow:hidden;max-height:300px;overflow-y:auto}
+        .ge-sg{display:flex;gap:10px;align-items:center;padding:8px 12px;cursor:pointer;font-size:.86rem}.ge-sg b{min-width:42px}.ge-sg span{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-sg:hover{background:#eff6ff}.ge-sg.none{color:#94a3b8;cursor:default;justify-content:center}.ge-sg.none:hover{background:none}
+        .ge-sg i{font-style:normal;font-size:.72rem;font-weight:700}i.ok{color:#047857}i.bad{color:#b91c1c}
+        .ge-warn{display:flex;flex-direction:column;gap:6px}.ge-warn:empty{display:none}
+        .ge-wl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.82rem}.ge-ex{color:#b45309;font-weight:700}.ge-bad{color:#b91c1c;font-weight:700}
+        .ge-ow{border:2px solid #dc2626;background:#fff;color:#b91c1c;border-radius:9px;padding:3px 12px;font-weight:800;font-size:.8rem;cursor:pointer;display:inline-flex;gap:6px;align-items:center;transition:.15s}
+        .ge-ow:hover{background:#fef2f2}.ge-ow.on{background:#dc2626;color:#fff}
+        .ge-tog{display:inline-flex;gap:6px}.ge-tog button{border:2px solid var(--border-color);background:#fff;border-radius:10px;padding:8px 16px;font-weight:800;font-size:.86rem;cursor:pointer;color:#64748b;display:inline-flex;gap:6px;align-items:center;transition:.15s}
+        .ge-tog button:hover{background:#f8fafc}.ge-tog button.on[data-st=true]{background:#059669;border-color:#059669;color:#fff}.ge-tog button.on[data-st=false]{background:#dc2626;border-color:#dc2626;color:#fff}
+        .ge-x{border:none;background:none;color:#cbd5e1;cursor:pointer;font-size:.95rem}.ge-x:hover:not(:disabled){color:#dc2626}.ge-x:disabled{opacity:.4;cursor:default}
+        .ge-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--border-color);background:#f8fafc;flex:none}
+        .ge-fh{font-size:.8rem;color:#b45309;font-weight:600}.ge-save{padding:9px 22px;font-weight:800}
+        #geReport{flex:none;padding:0 16px 10px}.ge-rep{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border-color);border-radius:12px;padding:10px 14px;background:#fff;font-size:.85rem}
+        .ge-rep.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ge-rep>button{border:none;background:none;font-size:1.3rem;cursor:pointer;color:#94a3b8}.ge-rgs{flex:1;display:flex;flex-direction:column;gap:6px}.ge-rt{font-weight:800}
+        .ge-rg ul{margin:3px 18px 0;padding:0}.ge-rg.ok{color:#047857}.ge-rg.warn{color:#b45309}.ge-rg.bad{color:#b91c1c}
         .ge-htools{padding:6px 14px;display:flex;flex-direction:column;gap:6px}.ge-htools input{padding:6px 10px;border:1px solid var(--border-color);border-radius:8px;outline:none;background:#f8fafc}
         .ge-seg{display:inline-flex;border:1px solid var(--border-color);border-radius:8px;overflow:hidden;align-self:flex-start}.ge-seg button{border:none;background:#fff;padding:3px 12px;font-size:.78rem;font-weight:600;cursor:pointer;color:#475569}.ge-seg button+button{border-right:1px solid var(--border-color)}.ge-seg button.on{background:var(--primary-color);color:#fff}
         .ge-hlist{flex:1;overflow:auto}.ge-gh{background:#1e293b;color:#fff;padding:5px 14px;font-size:.8rem;display:flex;justify-content:space-between;position:sticky;top:0}.ge-gh em{font-style:normal;opacity:.8}
-        .ge-hr{display:grid;grid-template-columns:42px 1fr auto 52px 24px;gap:6px;align-items:center;padding:5px 14px;border-bottom:1px solid #eef2f7;font-size:.8rem}.ge-hr:nth-child(even){background:#f8fafc}
-        .ge-hr .w{color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-hr .dt{color:#94a3b8;font-size:.7rem;text-align:left}.ge-hr button{border:none;background:none;cursor:pointer;color:#94a3b8}.ge-hr button:hover{color:var(--primary-color)}
+        .ge-hr{display:grid;grid-template-columns:42px 1fr auto 52px;gap:6px;align-items:center;padding:5px 14px;border-bottom:1px solid #eef2f7;font-size:.8rem}.ge-hr:nth-child(even){background:#f8fafc}
+        .ge-hr .w{color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-hr .dt{color:#94a3b8;font-size:.7rem;text-align:left}
         .ge-pill{border-radius:99px;padding:0 8px;font-size:.7rem;font-weight:700}.ge-pill.ok{background:#d1fae5;color:#047857}.ge-pill.bad{background:#fee2e2;color:#b91c1c}
-        .ge-fail{padding:30px;text-align:center;color:#991b1b}
-        @media(max-width:1000px){.ge-main{grid-template-columns:1fr}.ge-hist{max-height:320px}.ge-row{grid-template-columns:46px 1fr auto 24px}.ge-row .n{grid-column:1/-1}}`;
+        .ge-empty{padding:26px 10px;text-align:center;color:#94a3b8;font-size:.85rem}.ge-fail{padding:30px;text-align:center;color:#991b1b}
+        @media(max-width:1000px){.ge-main{grid-template-columns:1fr}.ge-hist{max-height:320px}.ge-row{grid-template-columns:28px 1fr 30px}.ge-tog{grid-column:2/3}}`;
         document.head.appendChild(st);
     }
 }
