@@ -19,6 +19,7 @@ export class ExamUpdateManager {
         this.allExams = []; this.exMap = new Map();
         this.student = null; this.rows = []; this.nextId = 1; this.report = null; this.hSeg = 'all'; this.hQ = '';
         this.css();
+        this.mountHist();
         this.bind();
     }
 
@@ -49,8 +50,9 @@ export class ExamUpdateManager {
             return;
         }
         this.student = me;
-        if (silent) { this.paintTop(); this.paintHist(); this.refreshRows(); return; }
+        if (silent) { this.paintTop(); this.refreshRows(); if (!$('geHistModal').classList.contains('hidden')) this.paintHist(); return; }
         this.rows = [this.newRow()]; this.report = null;
+        this.closeHist();
         this.render();
     }
 
@@ -70,29 +72,22 @@ export class ExamUpdateManager {
         this.container.innerHTML = `
         <div class="ge-root">
             <div class="ge-card ge-top" id="geTop"></div>
-            <div class="ge-main">
-                <section class="ge-card ge-entry">
-                    <div class="ge-eh">
-                        <div><h3><i class="fas fa-file-signature"></i> דיווח והזנת בחינות</h3>
-                            <p>בחר קוד וסטטוס (עבר / לא עבר). חובה לבחור את הסטטוס.</p>
-                            <p class="ge-caution"><i class="fas fa-info-circle"></i> שים לב: הנתונים לא נשמרים עד לחיצה על לחצן השמירה.</p></div>
-                        <button type="button" class="btn btn-outline btn-sm ge-add" id="geAddRow"><i class="fas fa-plus"></i> הוסף שורה</button>
-                    </div>
-                    <form id="geForm" class="ge-form" autocomplete="off">
-                        <div class="ge-rows" id="geRows"></div>
-                        <div id="geReport"></div>
-                        <div class="ge-foot"><span class="ge-fh" id="geFootHint"></span>
-                            <button type="submit" class="btn btn-primary ge-save" id="geSave" disabled><i class="fas fa-save"></i> שמור עדכונים במערכת</button></div>
-                    </form>
-                </section>
-                <aside class="ge-card ge-hist">
-                    <div class="ge-eh"><h3><i class="fas fa-history"></i> מה כבר נבחן <em id="geHCount"></em></h3></div>
-                    <div class="ge-htools"><input id="geHQ" placeholder="חיפוש..." autocomplete="off"><div class="ge-seg" id="geHSeg"></div></div>
-                    <div class="ge-hlist" id="geHList"></div>
-                </aside>
-            </div>
+            <section class="ge-card ge-entry">
+                <div class="ge-eh">
+                    <div><h3><i class="fas fa-file-signature"></i> דיווח והזנת בחינות</h3>
+                        <p>בחר קוד וסטטוס (עבר / לא עבר). חובה לבחור את הסטטוס. <b class="ge-caution"><i class="fas fa-info-circle"></i> הנתונים לא נשמרים עד לחיצה על לחצן השמירה.</b></p></div>
+                    <button type="button" class="btn btn-outline btn-sm ge-add" id="geAddRow"><i class="fas fa-plus"></i> הוסף שורה</button>
+                </div>
+                <div class="ge-msg hidden" id="geMsg" role="status"></div>
+                <form id="geForm" class="ge-form" autocomplete="off">
+                    <div class="ge-rows" id="geRows"></div>
+                    <div id="geReport"></div>
+                    <div class="ge-foot"><span class="ge-fh" id="geFootHint"></span>
+                        <button type="submit" class="btn btn-primary ge-save" id="geSave" disabled><i class="fas fa-save"></i> שמור עדכונים במערכת</button></div>
+                </form>
+            </section>
         </div>`;
-        this.paintTop(); this.paintHist(); this.paintRows(); this.paintReport();
+        this.paintTop(); this.paintRows(); this.paintReport();
     }
 
     paintTop() {
@@ -102,7 +97,15 @@ export class ExamUpdateManager {
             <div class="ge-av">${esc((s.first_name || '?').charAt(0))}</div>
             <div class="ge-id"><h2>${esc(name)}</h2><div class="ge-tags"><span>כיתה ${esc(s.class_grade || '-')}</span><span>קוד ${esc(s.student_code)}</span></div></div>
             <div class="ge-tiles">${tile(`${st.total_attempted ?? 0} מתוך ${st.total_available_exams ?? 0}`, 'נבחן')}${tile(st.total_passed ?? 0, 'עברו', 'ok')}${tile(Math.max(0, (st.total_attempted ?? 0) - (st.total_passed ?? 0)), 'לא עברו', 'bad')}${tile(money(st.total_reward), 'מלגה', 'money')}</div>
+            <button type="button" class="btn btn-secondary btn-sm" id="geHistBtn"><i class="fas fa-history"></i> היסטוריה (${st.total_attempted ?? 0})</button>
             <button type="button" class="btn btn-outline btn-sm" id="geSwitch"><i class="fas fa-exchange-alt"></i> החלף תלמיד</button>`;
+    }
+
+    flash(text) {
+        const el = $('geMsg');
+        if (!text) { el.className = 'ge-msg hidden'; return; }
+        el.className = 'ge-msg';
+        el.innerHTML = `<div>${esc(text)}</div><button type="button" data-mx aria-label="סגור">&times;</button>`;
     }
 
     // ============================================================
@@ -116,12 +119,9 @@ export class ExamUpdateManager {
     rowHtml(r) {
         return `<div class="ge-row" data-id="${r.id}">
             <div class="ge-n"></div>
-            <div class="ge-rb">
-                <div class="ge-det"></div>
-                <div class="ge-codewrap"><input type="text" class="ge-code" value="${esc(r.code)}" placeholder="חיפוש קוד או נושא..." autocomplete="off"><div class="ge-sug hidden"></div></div>
-                <div class="ge-warn"></div>
-            </div>
-            <div class="ge-tog"><button type="button" data-st="true"><i class="fas fa-check"></i> עבר</button><button type="button" data-st="false"><i class="fas fa-times"></i> לא עבר</button></div>
+            <div class="ge-codewrap"><input type="text" class="ge-code" value="${esc(r.code)}" placeholder="חיפוש קוד או נושא..." autocomplete="off"><div class="ge-sug hidden"></div></div>
+            <div class="ge-mid"><span class="ge-det"></span><span class="ge-warn"></span></div>
+            <div class="ge-tog"><button type="button" data-st="true">✓ עבר</button><button type="button" data-st="false">✕ לא עבר</button></div>
             <button type="button" class="ge-x" data-rm title="הסר שורה"><i class="fas fa-trash"></i></button></div>`;
     }
 
@@ -137,15 +137,15 @@ export class ExamUpdateManager {
         if (!el) return;
         const i = this.info(r);
         el.querySelector('.ge-det').innerHTML = i.ex
-            ? `<span class="ge-ty ${i.ex.exam_type === 'gemara' ? 'g' : 'm'}">${TYPE[i.ex.exam_type] || ''}</span> ${esc(this.desc(i.ex))}`
+            ? `<span class="ge-ty ${i.ex.exam_type === 'gemara' ? 'g' : 'm'}">${TYPE[i.ex.exam_type] || ''}</span><span class="t">${esc(this.desc(i.ex))}</span>`
             : '<span class="ge-mut">בחר בחינה מהרשימה</span>';
         let warn = '';
         if (i.existing) {
-            warn = `<div class="ge-wl"><span class="ge-ex"><i class="fas fa-exclamation-triangle"></i> כבר עודכן (${i.existing.passed ? 'עבר' : 'לא עבר'})</span>
-                <button type="button" class="ge-ow ${r.force ? 'on' : ''}" data-ow aria-pressed="${r.force}"><i class="fas fa-eraser"></i> ${r.force ? 'יידרס בשמירה' : 'דרוס את הציון הקיים'}</button></div>`;
+            warn += `<span class="ge-ex"><i class="fas fa-exclamation-triangle"></i> כבר עודכן (${i.existing.passed ? 'עבר' : 'לא עבר'})</span>
+                <button type="button" class="ge-ow ${r.force ? 'on' : ''}" data-ow aria-pressed="${r.force}">${r.force ? 'יידרס בשמירה' : 'דרוס את הציון הקיים'}</button>`;
         }
-        if (i.restricted) warn += `<div class="ge-wl"><span class="ge-bad"><i class="fas fa-ban"></i> הבחינה מיועדת לכיתה ${esc(i.restricted)} ומעלה</span></div>`;
-        if (r.note) warn += `<div class="ge-wl"><span class="ge-bad"><i class="fas fa-times-circle"></i> ${esc(r.note)}</span></div>`;
+        if (i.restricted) warn += `<span class="ge-bad"><i class="fas fa-ban"></i> מיועדת לכיתה ${esc(i.restricted)} ומעלה</span>`;
+        if (r.note) warn += `<span class="ge-bad" title="${esc(r.note)}"><i class="fas fa-times-circle"></i> ${esc(r.note)}</span>`;
         el.querySelector('.ge-warn').innerHTML = warn;
         el.classList.toggle('has-warn', !!i.existing || !!i.restricted);
         el.classList.toggle('has-ow', !!(i.existing && r.force));
@@ -204,7 +204,7 @@ export class ExamUpdateManager {
         const btn = $('geSave');
         if (!send.length || btn.disabled) return;
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
-        this.report = null; this.paintReport();
+        this.report = null; this.paintReport(); this.flash(null);
 
         const r = await this.call('POST', '/student-exams', {
             student_code: this.student.student_code,
@@ -238,20 +238,51 @@ export class ExamUpdateManager {
     }
 
     // ============================================================
-    //  "מה כבר נבחן" (צד) — צפייה בלבד
+    //  היסטוריית בחינות — מודל נפרד, עם עריכה (✎: מוסיף את הבחינה לרשימה לתיקון)
     // ============================================================
+    mountHist() {
+        if ($('geHistModal')) return;
+        document.body.insertAdjacentHTML('beforeend', `
+        <div id="geHistModal" class="modal hidden" style="z-index:9990"><div class="modal-content ge-hm">
+            <div class="modal-header"><h3 id="geHTitle"><i class="fas fa-history"></i> היסטוריית בחינות</h3><button class="close-modal-btn" id="geHClose" aria-label="סגור">&times;</button></div>
+            <div class="ge-htiles" id="geHTiles"></div>
+            <div class="ge-htools"><input id="geHQ" placeholder="חיפוש לפי קוד, מסכת או פרק..." autocomplete="off"><div class="ge-seg" id="geHSeg"></div></div>
+            <div class="ge-hlist" id="geHList"></div>
+            <div class="ge-hnote"><i class="fas fa-info-circle"></i> ✎ מוסיף את הבחינה לרשימת ההזנה לתיקון. כדי לשנות ציון קיים צריך ללחוץ שם על "דרוס את הציון הקיים" ולשמור.</div>
+        </div></div>`);
+    }
+
+    openHist() { this.hQ = ''; this.hSeg = 'all'; $('geHQ').value = ''; this.paintHist(); $('geHistModal').classList.remove('hidden'); }
+    closeHist() { $('geHistModal').classList.add('hidden'); }
+
     paintHist() {
-        if (!$('geHList')) return;
-        const all = this.student.exams.filter(e => e.passed !== null), q = this.hQ.trim().toLowerCase();
+        const s = this.student, st = s.stats || {}, all = s.exams.filter(e => e.passed !== null), q = this.hQ.trim().toLowerCase();
         const rows = all.filter(e => (this.hSeg === 'all' || (this.hSeg === 'pass') === e.passed) && (!q || `${e.exam_code} ${Object.values(e.details || {}).join(' ')}`.toLowerCase().includes(q)));
-        $('geHCount').textContent = `(${all.length})`;
+        $('geHTitle').innerHTML = `<i class="fas fa-history"></i> היסטוריית בחינות · ${esc(`${s.first_name || ''} ${s.last_name || ''}`.trim())}`;
+        const tile = (v, l, c = '') => `<div class="ge-tile ${c}"><b>${v}</b><span>${l}</span></div>`;
+        $('geHTiles').innerHTML = tile(all.length, 'נבחן') + tile(st.total_passed ?? 0, 'עברו', 'ok') + tile(Math.max(0, all.length - (st.total_passed ?? 0)), 'לא עברו', 'bad') + tile(money(st.total_reward), 'מלגה', 'money');
         $('geHSeg').innerHTML = [['all', 'הכל'], ['pass', 'עבר'], ['fail', 'לא עבר']].map(([v, t]) => `<button type="button" data-hseg="${v}" class="${this.hSeg === v ? 'on' : ''}">${t}</button>`).join('');
         const groups = new Map();
         rows.forEach(e => { const k = (e.details || {}).masechet || 'כללי'; (groups.get(k) || groups.set(k, []).get(k)).push(e); });
         $('geHList').innerHTML = rows.length ? [...groups].map(([m, list]) => `<div class="ge-gh">${esc(m)}<em>${list.filter(e => e.passed).length}/${list.length}</em></div>` + list.map(e => `
             <div class="ge-hr"><b>${esc(e.exam_code)}</b><span class="w">${esc(this.desc(e).split(' · ').slice(1).join(' · '))}</span>
-                <span class="ge-pill ${e.passed ? 'ok' : 'bad'}">${e.passed ? '✓ עבר' : '✕ לא עבר'}</span><span class="dt">${heb(e.updated_at)}</span></div>`).join('')).join('')
+                <span class="ge-pill ${e.passed ? 'ok' : 'bad'}">${e.passed ? '✓ עבר' : '✕ לא עבר'}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}</span>
+                <button type="button" data-fix="${esc(e.exam_code)}" title="תקן: הוסף לרשימת ההזנה עם הסטטוס ההפוך">✎</button></div>`).join('')).join('')
             : `<div class="ge-empty">${all.length ? 'לא נמצאו תוצאות' : 'התלמיד עדיין לא נבחן באף בחינה'}</div>`;
+    }
+
+    // ✎: הבחינה נכנסת לרשימת ההזנה עם הסטטוס ההפוך. "דרוס" לא מסומן אוטומטית — צריך ללחוץ עליו בשורה.
+    stageFix(code) {
+        const cur = this.mine(code);
+        if (!cur || cur.passed === null) return;
+        let r = this.rows.find(x => x.code === code) || this.rows.find(x => !x.code && x.status === null);
+        if (!r) { this.addRow(); r = this.rows[this.rows.length - 1]; }
+        r.code = code; r.status = !cur.passed; r.force = false; r.note = '';
+        const el = this.container.querySelector(`.ge-row[data-id="${r.id}"]`);
+        el.querySelector('.ge-code').value = code;
+        this.closeHist(); this.refreshRows();
+        el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1600);
+        this.flash(`בחינה ${code} נוספה לרשימה לתיקון (${cur.passed ? 'עבר ← לא עבר' : 'לא עבר ← עבר'}). לחץ בשורה על "דרוס את הציון הקיים" ואז על שמירה.`);
     }
 
     // ============================================================
@@ -261,7 +292,6 @@ export class ExamUpdateManager {
         const c = this.container, rowOf = t => { const el = t.closest('.ge-row'); return el ? { el, r: this.rows.find(x => x.id === +el.dataset.id) } : {}; };
 
         c.addEventListener('input', e => {
-            if (e.target.id === 'geHQ') { this.hQ = e.target.value; return this.paintHist(); }
             if (!e.target.classList.contains('ge-code')) return;
             const { el, r } = rowOf(e.target);
             r.code = e.target.value.trim(); r.note = '';
@@ -276,8 +306,8 @@ export class ExamUpdateManager {
             if (t.closest('#geSwitch') || t.closest('#geBack')) return this.onSwitch && this.onSwitch();
             if (t.closest('#geAddRow')) return this.addRow();
             if (t.closest('[data-rx]')) { this.report = null; return this.paintReport(); }
-            const hs = t.closest('[data-hseg]');
-            if (hs) { this.hSeg = hs.dataset.hseg; return this.paintHist(); }
+            if (t.closest('#geHistBtn')) return this.openHist();
+            if (t.closest('[data-mx]')) return this.flash(null);
 
             const sg = t.closest('.ge-sg[data-code]');
             if (sg) {
@@ -300,6 +330,18 @@ export class ExamUpdateManager {
             }
             if (!t.closest('.ge-codewrap')) c.querySelectorAll('.ge-sug').forEach(b => b.classList.add('hidden'));   // לחיצה מחוץ להצעות סוגרת אותן
         });
+
+        // מודל ההיסטוריה (נמצא מחוץ למיכל)
+        const hm = $('geHistModal');
+        $('geHClose').addEventListener('click', () => this.closeHist());
+        hm.addEventListener('click', e => {
+            if (e.target === hm) return this.closeHist();
+            const hs = e.target.closest('[data-hseg]');
+            if (hs) { this.hSeg = hs.dataset.hseg; return this.paintHist(); }
+            const fx = e.target.closest('[data-fix]');
+            if (fx) this.stageFix(fx.dataset.fix);
+        });
+        $('geHQ').addEventListener('input', e => { this.hQ = e.target.value; this.paintHist(); });
     }
 
     css() {
@@ -307,53 +349,56 @@ export class ExamUpdateManager {
         const st = document.createElement('style');
         st.id = 'geStyles';
         st.textContent = `
-        .ge-root{display:flex;flex-direction:column;gap:10px;height:100%;min-height:0}
+        .ge-root{display:flex;flex-direction:column;gap:8px;height:100%;min-height:0}
         .ge-card{background:#fff;border:1px solid var(--border-color);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-        .ge-top{display:flex;align-items:center;gap:14px;padding:12px 16px;flex-wrap:wrap;flex:none}
-        .ge-av{width:48px;height:48px;border-radius:50%;background:var(--primary-color);color:#fff;font-size:1.4rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
-        .ge-id{flex:1;min-width:160px}.ge-id h2{margin:0 0 4px;font-size:1.2rem}.ge-tags{display:flex;gap:6px}.ge-tags span{background:#f1f5f9;border-radius:6px;padding:1px 9px;font-size:.78rem;color:#475569}
-        .ge-tiles{display:flex;gap:8px}.ge-tile{background:#f8fafc;border:1px solid var(--border-color);border-radius:10px;padding:6px 14px;text-align:center;min-width:76px}
-        .ge-tile b{display:block;font-size:1rem}.ge-tile span{font-size:.7rem;color:#64748b}.ge-tile.ok{background:#ecfdf5;border-color:#a7f3d0}.ge-tile.ok b{color:#047857}
+        .ge-top{display:flex;align-items:center;gap:12px;padding:8px 14px;flex-wrap:wrap;flex:none}
+        .ge-av{width:38px;height:38px;border-radius:50%;background:var(--primary-color);color:#fff;font-size:1.15rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+        .ge-id{flex:1;min-width:160px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ge-id h2{margin:0;font-size:1.08rem}.ge-tags{display:flex;gap:6px}.ge-tags span{background:#f1f5f9;border-radius:6px;padding:0 8px;font-size:.76rem;color:#475569}
+        .ge-tiles,.ge-htiles{display:flex;gap:6px}.ge-tile{background:#f8fafc;border:1px solid var(--border-color);border-radius:9px;padding:3px 12px;text-align:center;min-width:70px}
+        .ge-tile b{display:block;font-size:.92rem;line-height:1.25}.ge-tile span{font-size:.66rem;color:#64748b}.ge-tile.ok{background:#ecfdf5;border-color:#a7f3d0}.ge-tile.ok b{color:#047857}
         .ge-tile.bad{background:#fef2f2;border-color:#fecaca}.ge-tile.bad b{color:#dc2626}.ge-tile.money b{color:#0369a1}
-        .ge-main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:10px;flex:1;min-height:0}
-        .ge-entry,.ge-hist{display:flex;flex-direction:column;min-height:0;overflow:hidden}
-        .ge-eh{padding:14px 18px 6px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.ge-eh h3{margin:0 0 3px;font-size:1.05rem;display:flex;gap:8px;align-items:center}.ge-eh h3 i{color:var(--primary-color)}.ge-eh em{font-style:normal;color:#94a3b8;font-weight:600}
-        .ge-eh p{margin:0;font-size:.8rem;color:#64748b}.ge-eh p.ge-caution{color:#b45309;font-weight:600;margin-top:2px}
+        .ge-entry{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+        .ge-eh{padding:10px 16px 4px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex:none}.ge-eh h3{margin:0 0 2px;font-size:1rem;display:flex;gap:8px;align-items:center}.ge-eh h3 i{color:var(--primary-color)}
+        .ge-eh p{margin:0;font-size:.78rem;color:#64748b}.ge-caution{color:#b45309;font-weight:600;margin-right:6px}
         .ge-add{border-style:dashed;border-color:var(--primary-color);color:var(--primary-color);flex:none}
+        .ge-msg{margin:4px 16px 0;padding:6px 12px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;display:flex;gap:10px;align-items:flex-start;font-size:.82rem;flex:none}.ge-msg div{flex:1}.ge-msg button{border:none;background:none;font-size:1.1rem;cursor:pointer;color:inherit;opacity:.6}.ge-msg.hidden{display:none}
         .ge-form{display:flex;flex-direction:column;flex:1;min-height:0}
-        .ge-rows{flex:1;overflow:auto;padding:6px 16px 120px;display:flex;flex-direction:column;gap:10px}
-        .ge-row{display:grid;grid-template-columns:30px 1fr auto 32px;gap:12px;align-items:center;background:#fff;border:1px solid var(--border-color);border-radius:12px;padding:12px 14px;transition:border-color .15s,box-shadow .15s}
-        .ge-row:focus-within{border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
-        .ge-row.done{border-right:4px solid #10b981}.ge-row.has-warn{background:#fffbeb;border-color:#fcd34d}.ge-row.has-ow{background:#fef2f2;border-color:#f87171}.ge-row.has-err{border-color:#fca5a5}
-        .ge-n{width:26px;height:26px;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.78rem;font-weight:800;display:flex;align-items:center;justify-content:center}
-        .ge-rb{display:flex;flex-direction:column;gap:6px;min-width:0}
-        .ge-det{min-height:20px;font-size:.88rem;font-weight:600;color:var(--primary-color);display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ge-mut{color:#94a3b8;font-weight:500}
-        .ge-ty{border-radius:99px;padding:0 9px;font-size:.7rem;font-weight:800;border:1px solid}.ge-ty.m{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.ge-ty.g{background:#fffbeb;color:#92400e;border-color:#fde68a}
-        .ge-codewrap{position:relative}.ge-code{width:100%;padding:9px 12px;font-size:.95rem;border:1px solid var(--border-color);border-radius:9px;outline:none;background:#f8fafc}
-        .ge-code:focus{border-color:var(--primary-color);background:#fff}
-        .ge-sug{position:absolute;top:calc(100% + 4px);right:0;left:0;background:#fff;border:1px solid var(--border-color);border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);z-index:20;overflow:hidden;max-height:300px;overflow-y:auto}
-        .ge-sg{display:flex;gap:10px;align-items:center;padding:8px 12px;cursor:pointer;font-size:.86rem}.ge-sg b{min-width:42px}.ge-sg span{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-sg:hover{background:#eff6ff}.ge-sg.none{color:#94a3b8;cursor:default;justify-content:center}.ge-sg.none:hover{background:none}
-        .ge-sg i{font-style:normal;font-size:.72rem;font-weight:700}i.ok{color:#047857}i.bad{color:#b91c1c}
-        .ge-warn{display:flex;flex-direction:column;gap:6px}.ge-warn:empty{display:none}
-        .ge-wl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.82rem}.ge-ex{color:#b45309;font-weight:700}.ge-bad{color:#b91c1c;font-weight:700}
-        .ge-ow{border:2px solid #dc2626;background:#fff;color:#b91c1c;border-radius:9px;padding:3px 12px;font-weight:800;font-size:.8rem;cursor:pointer;display:inline-flex;gap:6px;align-items:center;transition:.15s}
+        .ge-rows{flex:1;overflow:auto;padding:4px 16px 90px}
+        .ge-row{display:grid;grid-template-columns:24px 150px minmax(0,1fr) auto 26px;gap:10px;align-items:center;padding:4px 8px;border-bottom:1px solid #eef2f7;border-right:3px solid transparent;transition:background .15s}
+        .ge-row:nth-child(even){background:#f8fafc}.ge-row:focus-within{background:#eff6ff}
+        .ge-row.done{border-right-color:#10b981}.ge-row.has-warn{background:#fffbeb;border-right-color:#f59e0b}.ge-row.has-ow{background:#fef2f2;border-right-color:#dc2626}.ge-row.has-err{border-right-color:#dc2626}
+        .ge-row.flash{animation:geFlash 1.5s}@keyframes geFlash{0%,60%{background:#fef9c3}100%{}}
+        .ge-n{width:22px;height:22px;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.7rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+        .ge-codewrap{position:relative}.ge-code{width:100%;height:30px;padding:0 10px;font-size:.88rem;border:1px solid var(--border-color);border-radius:8px;outline:none;background:#fff}
+        .ge-code:focus{border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+        .ge-mid{display:flex;align-items:center;gap:4px 12px;flex-wrap:wrap;min-width:0;font-size:.84rem}
+        .ge-det{display:flex;align-items:center;gap:7px;min-width:0;flex:1 1 200px;color:var(--primary-color);font-weight:600}.ge-det .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-mut{color:#cbd5e1;font-weight:500}
+        .ge-ty{flex:none;border-radius:99px;padding:0 8px;font-size:.66rem;font-weight:800;border:1px solid}.ge-ty.m{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.ge-ty.g{background:#fffbeb;color:#92400e;border-color:#fde68a}
+        .ge-warn{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ge-warn:empty{display:none}.ge-ex{color:#b45309;font-weight:700;font-size:.78rem}.ge-bad{color:#b91c1c;font-weight:700;font-size:.78rem}
+        .ge-ow{border:2px solid #dc2626;background:#fff;color:#b91c1c;border-radius:8px;padding:1px 10px;font-weight:800;font-size:.75rem;cursor:pointer;transition:.15s;line-height:1.5}
         .ge-ow:hover{background:#fef2f2}.ge-ow.on{background:#dc2626;color:#fff}
-        .ge-tog{display:inline-flex;gap:6px}.ge-tog button{border:2px solid var(--border-color);background:#fff;border-radius:10px;padding:8px 16px;font-weight:800;font-size:.86rem;cursor:pointer;color:#64748b;display:inline-flex;gap:6px;align-items:center;transition:.15s}
-        .ge-tog button:hover{background:#f8fafc}.ge-tog button.on[data-st=true]{background:#059669;border-color:#059669;color:#fff}.ge-tog button.on[data-st=false]{background:#dc2626;border-color:#dc2626;color:#fff}
-        .ge-x{border:none;background:none;color:#cbd5e1;cursor:pointer;font-size:.95rem}.ge-x:hover:not(:disabled){color:#dc2626}.ge-x:disabled{opacity:.4;cursor:default}
-        .ge-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--border-color);background:#f8fafc;flex:none}
-        .ge-fh{font-size:.8rem;color:#b45309;font-weight:600}.ge-save{padding:9px 22px;font-weight:800}
-        #geReport{flex:none;padding:0 16px 10px}.ge-rep{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border-color);border-radius:12px;padding:10px 14px;background:#fff;font-size:.85rem}
-        .ge-rep.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ge-rep>button{border:none;background:none;font-size:1.3rem;cursor:pointer;color:#94a3b8}.ge-rgs{flex:1;display:flex;flex-direction:column;gap:6px}.ge-rt{font-weight:800}
-        .ge-rg ul{margin:3px 18px 0;padding:0}.ge-rg.ok{color:#047857}.ge-rg.warn{color:#b45309}.ge-rg.bad{color:#b91c1c}
-        .ge-htools{padding:6px 14px;display:flex;flex-direction:column;gap:6px}.ge-htools input{padding:6px 10px;border:1px solid var(--border-color);border-radius:8px;outline:none;background:#f8fafc}
-        .ge-seg{display:inline-flex;border:1px solid var(--border-color);border-radius:8px;overflow:hidden;align-self:flex-start}.ge-seg button{border:none;background:#fff;padding:3px 12px;font-size:.78rem;font-weight:600;cursor:pointer;color:#475569}.ge-seg button+button{border-right:1px solid var(--border-color)}.ge-seg button.on{background:var(--primary-color);color:#fff}
-        .ge-hlist{flex:1;overflow:auto}.ge-gh{background:#1e293b;color:#fff;padding:5px 14px;font-size:.8rem;display:flex;justify-content:space-between;position:sticky;top:0}.ge-gh em{font-style:normal;opacity:.8}
-        .ge-hr{display:grid;grid-template-columns:42px 1fr auto 52px;gap:6px;align-items:center;padding:5px 14px;border-bottom:1px solid #eef2f7;font-size:.8rem}.ge-hr:nth-child(even){background:#f8fafc}
-        .ge-hr .w{color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-hr .dt{color:#94a3b8;font-size:.7rem;text-align:left}
-        .ge-pill{border-radius:99px;padding:0 8px;font-size:.7rem;font-weight:700}.ge-pill.ok{background:#d1fae5;color:#047857}.ge-pill.bad{background:#fee2e2;color:#b91c1c}
+        .ge-sug{position:absolute;top:calc(100% + 3px);right:0;width:420px;max-width:80vw;background:#fff;border:1px solid var(--border-color);border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.18);z-index:30;overflow:hidden;max-height:300px;overflow-y:auto}
+        .ge-sg{display:flex;gap:10px;align-items:center;padding:7px 12px;cursor:pointer;font-size:.84rem}.ge-sg b{min-width:40px}.ge-sg span{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-sg:hover{background:#eff6ff}.ge-sg.none{color:#94a3b8;cursor:default;justify-content:center}.ge-sg.none:hover{background:none}
+        .ge-sg i{font-style:normal;font-size:.7rem;font-weight:700}i.ok{color:#047857}i.bad{color:#b91c1c}
+        .ge-tog{display:inline-flex;gap:4px}.ge-tog button{border:1px solid var(--border-color);background:#fff;border-radius:8px;height:30px;padding:0 12px;font-weight:700;font-size:.8rem;cursor:pointer;color:#64748b;transition:.12s}
+        .ge-tog button:hover{background:#f1f5f9}.ge-tog button.on[data-st=true]{background:#059669;border-color:#059669;color:#fff}.ge-tog button.on[data-st=false]{background:#dc2626;border-color:#dc2626;color:#fff}
+        .ge-x{border:none;background:none;color:#cbd5e1;cursor:pointer;font-size:.85rem}.ge-x:hover:not(:disabled){color:#dc2626}.ge-x:disabled{opacity:.35;cursor:default}
+        .ge-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 16px;border-top:1px solid var(--border-color);background:#f8fafc;flex:none}
+        .ge-fh{font-size:.8rem;color:#b45309;font-weight:600}.ge-save{padding:7px 20px;font-weight:800}
+        #geReport{flex:none;padding:0 16px 8px;max-height:30vh;overflow:auto}.ge-rep{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border-color);border-radius:10px;padding:8px 12px;background:#fff;font-size:.82rem}
+        .ge-rep.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}.ge-rep>button{border:none;background:none;font-size:1.3rem;cursor:pointer;color:#94a3b8}.ge-rgs{flex:1;display:flex;flex-direction:column;gap:4px}.ge-rt{font-weight:800}
+        .ge-rg ul{margin:2px 18px 0;padding:0}.ge-rg.ok{color:#047857}.ge-rg.warn{color:#b45309}.ge-rg.bad{color:#b91c1c}
+        .ge-hm{max-width:760px;width:94%;height:auto;max-height:90vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden}
+        .ge-htiles{padding:12px 16px 0}.ge-htools{padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ge-htools input{flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--border-color);border-radius:8px;outline:none;background:#f8fafc}
+        .ge-seg{display:inline-flex;border:1px solid var(--border-color);border-radius:8px;overflow:hidden}.ge-seg button{border:none;background:#fff;padding:4px 14px;font-size:.8rem;font-weight:600;cursor:pointer;color:#475569}.ge-seg button+button{border-right:1px solid var(--border-color)}.ge-seg button.on{background:var(--primary-color);color:#fff}
+        .ge-hlist{flex:1;min-height:200px;max-height:52vh;overflow:auto;border-top:1px solid var(--border-color)}.ge-gh{background:#1e293b;color:#fff;padding:5px 16px;font-size:.8rem;display:flex;justify-content:space-between;position:sticky;top:0}.ge-gh em{font-style:normal;opacity:.8}
+        .ge-hr{display:grid;grid-template-columns:46px 1fr auto 56px 60px 28px;gap:8px;align-items:center;padding:5px 16px;border-bottom:1px solid #eef2f7;font-size:.82rem}.ge-hr:nth-child(even){background:#f8fafc}
+        .ge-hr .w{color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-hr .m{color:#0369a1;font-weight:700;text-align:left}.ge-hr .dt{color:#94a3b8;font-size:.72rem;text-align:left}
+        .ge-hr button{border:1px solid var(--border-color);background:#fff;border-radius:7px;width:26px;height:26px;cursor:pointer;color:#475569}.ge-hr button:hover{background:#eff6ff;border-color:#93c5fd;color:var(--primary-color)}
+        .ge-pill{border-radius:99px;padding:0 8px;font-size:.7rem;font-weight:700;white-space:nowrap}.ge-pill.ok{background:#d1fae5;color:#047857}.ge-pill.bad{background:#fee2e2;color:#b91c1c}
+        .ge-hnote{padding:8px 16px;font-size:.76rem;color:#64748b;background:#f8fafc;border-top:1px solid var(--border-color)}
         .ge-empty{padding:26px 10px;text-align:center;color:#94a3b8;font-size:.85rem}.ge-fail{padding:30px;text-align:center;color:#991b1b}
-        @media(max-width:1000px){.ge-main{grid-template-columns:1fr}.ge-hist{max-height:320px}.ge-row{grid-template-columns:28px 1fr 30px}.ge-tog{grid-column:2/3}}`;
+        @media(max-width:900px){.ge-row{grid-template-columns:24px 1fr 26px}.ge-mid{grid-column:1/-1;order:5}.ge-tog{grid-column:1/-1;order:6}}`;
         document.head.appendChild(st);
     }
 }
