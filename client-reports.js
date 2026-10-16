@@ -61,6 +61,7 @@ export const DEFAULT_DESIGN = {
     // פריסה
     cols: 'auto',          // auto | 2 | 3 | 4 | 5
     fontScale: '1',        // 0.9 | 1 | 1.1
+    passOf: 'attempted',   // בכרטיס "עברו": המספר אחרי "מתוך" — attempted | total | none
     // טקסטים קבועים בדוח (ריק = ברירת מחדל)
     texts: {
         colCode: 'קוד', colMark: 'הישג', colReward: 'מלגה',
@@ -143,6 +144,7 @@ export function sanitizeDesign(raw) {
     });
     if (['auto', '2', '3', '4', '5'].includes(String(raw.cols))) d.cols = String(raw.cols);
     if (['0.9', '1', '1.1'].includes(String(raw.fontScale))) d.fontScale = String(raw.fontScale);
+    if (['attempted', 'total', 'none'].includes(raw.passOf)) d.passOf = raw.passOf;
     if (raw.texts && typeof raw.texts === 'object') {
         Object.keys(DEFAULT_DESIGN.texts).forEach(k => {
             if (typeof raw.texts[k] === 'string') {
@@ -162,7 +164,7 @@ export function sanitizeDesign(raw) {
 export const isDefaultDesign = d => JSON.stringify(sanitizeDesign(d)) === JSON.stringify(DEFAULT_DESIGN);
 
 // ---------- אפשרויות הדפסה (מקומיות, לא נשמרות בשרת) ----------
-const DEFAULT_PRINT = { hideUnattempted: false, duplex: false, pagesMode: 'auto' };
+const DEFAULT_PRINT = { hideUnattempted: false, duplex: false, pagesMode: 'auto', skipNoExams: false };
 const DESIGN_CACHE_KEY = 'peer_report_design_v1';
 const PRINT_KEY = 'peer_report_print_v1';
 
@@ -431,6 +433,7 @@ export class ReportManager {
             return {
                 hideUnattempted: p.hideUnattempted === true,
                 duplex: p.duplex === true,
+                skipNoExams: p.skipNoExams === true,
                 pagesMode: ['auto', '1', '2'].includes(p.pagesMode) ? p.pagesMode : 'auto'
             };
         } catch (e) { return { ...DEFAULT_PRINT }; }
@@ -773,6 +776,9 @@ export class ReportManager {
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;" title="תלמיד עם עמוד אחד מקבל גב ריק, כדי שהבא אחריו יתחיל בדף חדש">
                         <input type="checkbox" data-p="duplex" ${p.duplex ? 'checked' : ''} style="width: 16px; height: 16px;"> הדפסה דו צדדית
                     </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;" title="בהפקת כיתה שלמה: לא לכלול דוח לתלמיד שלא נבחן באף בחינה">
+                        <input type="checkbox" data-p="skipNoExams" ${p.skipNoExams ? 'checked' : ''} style="width: 16px; height: 16px;"> בכיתה שלמה: דלג על תלמידים שלא נבחנו כלל
+                    </label>
                 </div>
             </div>
         `;
@@ -852,13 +858,29 @@ export class ReportManager {
             const response = await fetch(`${this.apiBase}/student-summary${queryParams}`);
             if (response.ok) {
                 const data = await response.json();
-                const students = Array.isArray(data) ? data : (data ? [data] : []);
+                let students = Array.isArray(data) ? data : (data ? [data] : []);
+
+                // בהפקת כיתה שלמה: אפשר לדלג על תלמידים שלא נבחנו באף בחינה
+                let skipped = 0;
+                if (this.print.skipNoExams && String(queryParams).startsWith('?class_grade=')) {
+                    const attemptedOf = (st) => (st.stats && st.stats.total_attempted != null)
+                        ? st.stats.total_attempted
+                        : (st.exams || []).filter(e => e.passed === true || e.passed === false).length;
+                    const kept = students.filter(st => attemptedOf(st) > 0);
+                    skipped = students.length - kept.length;
+                    students = kept;
+                }
+
                 if (students.length === 0) {
-                    await window.customAlert('לא נמצאו נתונים לחיפוש זה.', true);
+                    await window.customAlert(skipped ? 'אף תלמיד בכיתה הזו עדיין לא נבחן, ולכן אין דוחות להפקה.' : 'לא נמצאו נתונים לחיפוש זה.', true);
                 } else {
                     this.lastRenderedStudents = students;
                     this.lastReportName = reportName || 'דוחות';
                     await this.buildReportHtml(students);
+                    if (skipped) {
+                        const msg = `דולגו ${skipped} תלמידים שלא נבחנו באף בחינה.`;
+                        if (typeof window.notify === 'function') window.notify(msg, 'info'); else window.customAlert(msg);
+                    }
                 }
             } else {
                 await window.customAlert('שגיאה במשיכת נתונים מהשרת.', true);
@@ -1109,6 +1131,8 @@ export class ReportManager {
                 ${sw('gemaraByChapter', 'בגמרא: כותרת לפי שם הפרק במקום שם המסכת')}
                 ${sw('showHebrewDate', 'תאריך עברי בכותרת')}
                 ${sw('showLegend', 'מקרא בתחתית העמוד')}
+                <div class="rd-field"><label class="rd-lbl">בכרטיס "עברו": המספר אחרי "מתוך"</label>
+                    <select data-d="passOf">${[['attempted', 'הבחינות שהתלמיד נבחן בהן (עברו 45 מתוך 55)'], ['total', 'כל הבחינות הרלוונטיות לכיתה (עברו 45 מתוך 198)'], ['none', 'בלי "מתוך"']].map(([v, t]) => `<option value="${v}" ${d.passOf === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
             </div>`;
         }
         pane.innerHTML = html;
@@ -1216,7 +1240,7 @@ export class ReportManager {
         // כרטיסי סיכום לפי הסדר וההצגה שנבחרו
         const cards = {
             attempted: `<div class="rp-stat">${fillTpl(T.statAttempted, attempted)} ${esc(T.statOf)} ${total}</div>`,
-            passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}</div>`,
+            passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}${o.passOf === 'none' ? '' : ` ${esc(T.statOf)} ${o.passOf === 'total' ? total : attempted}`}</div>`,
             failed: `<div class="rp-stat bad">${fillTpl(T.statFailed, failed)}</div>`,
             money: o.showReward ? `<div class="rp-stat money">${fillTpl(T.statMoney, '₪' + reward.toFixed(1))}</div>` : ''
         };
