@@ -64,10 +64,10 @@ export const DEFAULT_DESIGN = {
     // טקסטים קבועים בדוח (ריק = ברירת מחדל)
     texts: {
         colCode: 'קוד', colMark: 'הישג', colReward: 'מלגה',
-        statAttempted: 'נבחן ב-', statOf: 'מתוך', statPassed: 'עברו', statFailed: 'לא עברו', statMoney: 'סך מלגה',
+        statAttempted: 'נבחן ב-$ בחינות', statOf: 'מתוך', statPassed: 'עברו $ בחינות', statFailed: 'לא עברו $ בחינות', statMoney: 'סך מלגה $',
         grade: 'כיתה', code: 'קוד', typeM: 'משניות', typeG: 'גמרא',
         legPass: 'עבר', legFail: 'לא עבר', legNone: 'שורה ללא סימון – טרם נבחן',
-        page: 'עמוד', pageOf: 'מתוך', bsd: 'בס״ד', empty: 'לא נמצאו מבחנים להצגה',
+        page: 'עמוד', pageOf: 'מתוך', bsd: 'בס״ד', empty: 'לא נמצאו בחינות להצגה',
         legChapter: 'האות ליד הקוד = מספר הפרק'
     },
     // צבעים
@@ -85,13 +85,16 @@ export const DEFAULT_DESIGN = {
 
 export const TEXT_LABELS = [
     ['colCode', 'כותרת עמודה: קוד'], ['colMark', 'כותרת עמודה: הישג'], ['colReward', 'כותרת עמודה: מלגה'],
-    ['statAttempted', 'כרטיס סיכום: נבחן ב-'], ['statOf', 'כרטיס סיכום: מתוך'], ['statPassed', 'כרטיס סיכום: עברו'],
-    ['statFailed', 'כרטיס סיכום: לא עברו'], ['statMoney', 'כרטיס סיכום: סך מלגה'],
+    ['statAttempted', 'כרטיס: נבחן ($ = המספר)'], ['statOf', 'כרטיס: מתוך (אחרי המספר)'], ['statPassed', 'כרטיס: עברו ($ = המספר)'],
+    ['statFailed', 'כרטיס: לא עברו ($ = המספר)'], ['statMoney', 'כרטיס: סך מלגה ($ = הסכום)'],
     ['grade', 'המילה "כיתה"'], ['code', 'המילה "קוד" (ליד התלמיד)'], ['typeM', 'תווית משניות'], ['typeG', 'תווית גמרא'],
     ['legPass', 'מקרא: עבר'], ['legFail', 'מקרא: לא עבר'], ['legNone', 'מקרא: טרם נבחן'],
-    ['page', 'המילה "עמוד"'], ['pageOf', 'המילה "מתוך" (עמודים)'], ['bsd', 'בס״ד'], ['empty', 'הודעה כשאין מבחנים'],
+    ['page', 'המילה "עמוד"'], ['pageOf', 'המילה "מתוך" (עמודים)'], ['bsd', 'בס״ד'], ['empty', 'הודעה כשאין בחינות'],
     ['legChapter', 'מקרא: האות ליד הקוד']
 ];
+
+// ברירות המחדל הישנות — אם הן שמורות בשרת, מתעדכנות לחדשות (טקסט שהותאם אישית לא נוגעים בו)
+const LEGACY_TEXTS = { statAttempted: 'נבחן ב-', statPassed: 'עברו', statFailed: 'לא עברו', statMoney: 'סך מלגה', empty: 'לא נמצאו מבחנים להצגה' };
 
 export const COLOR_LABELS = [
     ['line', 'קו וכותרת עליונה'],
@@ -142,7 +145,10 @@ export function sanitizeDesign(raw) {
     if (['0.9', '1', '1.1'].includes(String(raw.fontScale))) d.fontScale = String(raw.fontScale);
     if (raw.texts && typeof raw.texts === 'object') {
         Object.keys(DEFAULT_DESIGN.texts).forEach(k => {
-            if (typeof raw.texts[k] === 'string') d.texts[k] = raw.texts[k].trim().slice(0, 40) || DEFAULT_DESIGN.texts[k];
+            if (typeof raw.texts[k] === 'string') {
+                const v = raw.texts[k].trim().slice(0, 40);
+                d.texts[k] = (!v || v === LEGACY_TEXTS[k]) ? DEFAULT_DESIGN.texts[k] : v;
+            }
         });
     }
     if (raw.colors && typeof raw.colors === 'object') {
@@ -199,7 +205,7 @@ export function formatHebrewDate(date = new Date()) {
         const year = parseInt(get('year') || get('relatedYear'), 10);
         const month = get('month');
         if (!day || !year || !month) throw new Error('missing parts');
-        return `${toHebrewNumeral(day)} ב${month} ה${toHebrewNumeral(year % 1000 || year)}`;
+        return `${toHebrewNumeral(day)} ${month} ה${toHebrewNumeral(year % 1000 || year)}`;
     } catch (e) {
         return date.toLocaleDateString('he-IL-u-ca-hebrew');
     }
@@ -212,6 +218,12 @@ function darken(hex, f) {
     const n = parseInt(hex.slice(1), 16);
     const ch = v => Math.max(0, Math.round(v * (1 - f))).toString(16).padStart(2, '0');
     return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
+}
+
+// תבנית כרטיס: ה-$ מוחלף במספר (מודגש). בלי $ — הטקסט ואחריו המספר.
+function fillTpl(tpl, val) {
+    const t = esc(tpl);
+    return t.includes('$') ? t.replace('$', () => `<b>${val}</b>`) : `${t} <b>${val}</b>`;
 }
 
 function designVars(d) {
@@ -749,7 +761,7 @@ export class ReportManager {
                 <div style="margin-top: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 18px; display: flex; flex-wrap: wrap; gap: 14px 26px; align-items: center;">
                     <span style="font-weight: 700; color: #0f172a;"><i class="fas fa-print"></i> אפשרויות הדפסה</span>
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
-                        <input type="checkbox" data-p="hideUnattempted" ${p.hideUnattempted ? 'checked' : ''} style="width: 16px; height: 16px;"> הסתר מבחנים שלא בוצעו
+                        <input type="checkbox" data-p="hideUnattempted" ${p.hideUnattempted ? 'checked' : ''} style="width: 16px; height: 16px;"> הסתר בחינות שלא בוצעו
                     </label>
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">אורך הדוח:
                         <select data-p="pagesMode" style="${inputStyle}">
@@ -885,8 +897,8 @@ export class ReportManager {
                         <div class="rd-prev-bar">
                             <span>תצוגה חיה — דוגמה:
                                 <select id="rdSample">
-                                    <option value="small">תלמיד עם מעט מבחנים</option>
-                                    <option value="large">תלמיד עם הרבה מבחנים</option>
+                                    <option value="small">תלמיד עם מעט בחינות</option>
+                                    <option value="large">תלמיד עם הרבה בחינות</option>
                                     <option value="real">תלמיד אמיתי מהמערכת</option>
                                 </select>
                             </span>
@@ -1052,7 +1064,7 @@ export class ReportManager {
             </div>
             <div class="rd-group">
                 <h4>טקסטים קבועים בדוח <button class="rd-link" data-reset="texts">איפוס טקסטים</button></h4>
-                <div class="rd-hint">אפשר לשנות כל מילה שמופיעה בדוח. שדה ריק חוזר לברירת המחדל.</div>
+                <div class="rd-hint">אפשר לשנות כל מילה שמופיעה בדוח. בכרטיסי הסיכום הסימן $ הוא מקום המספר, למשל: נבחן ב-$ בחינות. שדה ריק חוזר לברירת המחדל.</div>
                 <div class="rd-tgrid">${TEXT_LABELS.map(([k, label]) => `<div class="rd-field"><label class="rd-lbl">${label}</label><input type="text" data-d="texts.${k}" value="${esc(d.texts[k])}" placeholder="${esc(DEFAULT_DESIGN.texts[k])}" maxlength="40" autocomplete="off"></div>`).join('')}</div>
             </div>`;
         } else if (this.rdTab === 'layout') {
@@ -1093,7 +1105,7 @@ export class ReportManager {
                 ${sw('showSummary', 'סיכום בכותרת כל מסכת (עברו / סה"כ)')}
                 ${sw('showTypeLabels', 'תווית "משניות" / "גמרא" בכותרת מסכת')}
                 ${sw('showStudentCode', 'קוד תלמיד בפרטי התעודה')}
-                ${sw('showChapterLetter', 'אות הפרק ליד קוד המבחן (במשניות)')}
+                ${sw('showChapterLetter', 'אות הפרק ליד קוד הבחינה (במשניות)')}
                 ${sw('gemaraByChapter', 'בגמרא: כותרת לפי שם הפרק במקום שם המסכת')}
                 ${sw('showHebrewDate', 'תאריך עברי בכותרת')}
                 ${sw('showLegend', 'מקרא בתחתית העמוד')}
@@ -1203,10 +1215,10 @@ export class ReportManager {
 
         // כרטיסי סיכום לפי הסדר וההצגה שנבחרו
         const cards = {
-            attempted: `<div class="rp-stat">${esc(T.statAttempted)}<b>${attempted}</b> ${esc(T.statOf)} ${total}</div>`,
-            passed: `<div class="rp-stat ok">${esc(T.statPassed)} <b>${passed}</b></div>`,
-            failed: `<div class="rp-stat bad">${esc(T.statFailed)} <b>${failed}</b></div>`,
-            money: o.showReward ? `<div class="rp-stat money">${esc(T.statMoney)} <b>₪${reward.toFixed(1)}</b></div>` : ''
+            attempted: `<div class="rp-stat">${fillTpl(T.statAttempted, attempted)} ${esc(T.statOf)} ${total}</div>`,
+            passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}</div>`,
+            failed: `<div class="rp-stat bad">${fillTpl(T.statFailed, failed)}</div>`,
+            money: o.showReward ? `<div class="rp-stat money">${fillTpl(T.statMoney, '₪' + reward.toFixed(1))}</div>` : ''
         };
         const visibleStats = o.showStats ? o.statsOrder.filter(id => o.statsVisible[id] && cards[id]) : [];
         const bodyH = computeBodyH(visibleStats.length > 0, !!note);
@@ -1378,14 +1390,14 @@ export class ReportManager {
     }
 
     exportToExcel(students) {
-        const header = ['קוד תלמיד', 'שם פרטי', 'שם משפחה', 'כיתה', 'סוג', 'מסכת', 'קוד מבחן', 'פירוט', 'סטטוס', 'מלגה'];
+        const header = ['קוד תלמיד', 'שם פרטי', 'שם משפחה', 'כיתה', 'סוג', 'מסכת', 'קוד בחינה', 'פירוט', 'סטטוס', 'מלגה'];
         const lines = [header.map(csvCell).join(',')];
 
         students.forEach(student => {
             const base = [student.student_code, student.first_name, student.last_name, student.class_grade || ''];
             const exams = student.exams || [];
             if (exams.length === 0) {
-                lines.push([...base, '', '', '', 'ללא מבחנים', '', ''].map(csvCell).join(','));
+                lines.push([...base, '', '', '', 'ללא בחינות', '', ''].map(csvCell).join(','));
                 return;
             }
             exams.forEach(ex => {
