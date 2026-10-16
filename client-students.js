@@ -11,6 +11,11 @@ const heb = ts => { const d = new Date(String(ts || '').replace(' ', 'T')); retu
 const $ = id => document.getElementById(id);
 
 const TYPE = { mishnayot: 'משניות', gemara: 'גמרא' };
+const pad = n => String(n).padStart(2, '0');
+const nowStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const ic = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICONS = { error: ic('<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>'), warning: ic('<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.4v.01"/>'),
+                info: ic('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/>'), success: ic('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>') };
 const STATUS = { true: ['✓ עבר', 'ok'], false: ['✕ לא עבר', 'bad'], null: ['טרם נבחן', 'none'] };
 
 export class StudentManager {
@@ -28,14 +33,13 @@ export class StudentManager {
 
     // ---------- שרת ----------
     async call(method, path, body) {
-        const opt = { method };
+        const opt = { method, silent: true };   // silent: המעטפת הגלובלית לא מקפיצה טוסט; השגיאה מוצגת כאן
         if (body !== undefined) { opt.headers = { 'Content-Type': 'application/json' }; opt.body = JSON.stringify(body); }
         try {
             const res = await fetch(`${this.apiBase}${path}`, opt);
             return { ok: res.ok, status: res.status, data: await res.json().catch(() => null) };
         } catch (e) {
-            await window.customAlert('שגיאת תקשורת מול השרת.', true);
-            return { ok: false, status: 0, data: null };
+            return { ok: false, status: 0, data: { message: 'שגיאת תקשורת מול השרת. בדוק את החיבור ונסה שוב.' } };
         }
     }
     errText(r, fallback) { return (r.data && (r.data.message || r.data.error)) || fallback; }
@@ -51,6 +55,22 @@ export class StudentManager {
         };
     }
     find(code) { return this.students.find(s => s.student_code === code); }
+    // אחרי עריכת תוצאה: מחשבים מחדש נבחן / עברו / מלגה מרשימת הבחינות
+    recalc(code) {
+        const rows = this.cards.get(code) || [], old = this.sum.get(code) || {};
+        this.sum.set(code, { ...old, total_available_exams: rows.length, total_attempted: rows.filter(e => e.passed !== null).length,
+            total_passed: rows.filter(e => e.passed === true).length, total_reward: rows.reduce((a, e) => a + (e.passed === true ? (e.reward_earned || 0) : 0), 0) });
+    }
+    // רענון שאר המסכים: פעם אחת, אחרי סדרת שינויים
+    markDirty() { this._pending = true; clearTimeout(this._t); this._t = setTimeout(() => this.flushSync(), 1500); }
+    flushSync() { clearTimeout(this._t); if (this._pending) { this._pending = false; if (this.onRefresh) this.onRefresh(); } }
+    async loadCard(code) {
+        const r = await this.call('GET', `/student-summary?student_code=${encodeURIComponent(code)}`);
+        const me = r.ok && Array.isArray(r.data) ? r.data[0] : null;
+        if (!me) return false;
+        this.cards.set(code, me.exams); this.sum.set(code, me.stats);
+        return true;
+    }
     fullName(s) { return `${s.first_name || ''} ${s.last_name || ''}`.trim(); }
 
     rowsData() {
@@ -71,7 +91,7 @@ export class StudentManager {
     // ============================================================
     render(students) {
         this.students = students || [];
-        this.cards.clear();
+        if (!this.ed && !this.cardCode) this.cards.clear();
         const classes = [...new Set(this.students.map(s => s.class_grade).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'he'));
         this.container.innerHTML = `
         <div class="stu-root">
@@ -131,18 +151,12 @@ export class StudentManager {
     //  כרטיס תלמיד: מה הוא נבחן
     // ============================================================
     async openCard(code) {
-        const s = this.find(code);
-        if (!s) return;
+        if (!this.find(code)) return;
         this.cardCode = code;
         this.seg = 'taken';
         this.paintCard();
         $('stuOv').classList.add('open'); $('stuDr').classList.add('open');
-        if (!this.cards.has(code)) {
-            const r = await this.call('GET', `/student-summary?student_code=${encodeURIComponent(code)}`);
-            const me = r.ok && Array.isArray(r.data) ? r.data[0] : null;
-            this.cards.set(code, me ? me.exams : []);
-            if (me) this.sum.set(code, me.stats);
-        }
+        if (!this.cards.has(code) && !(await this.loadCard(code))) this.cards.set(code, null);
         if (this.cardCode === code) this.paintCard();
     }
 
@@ -162,9 +176,10 @@ export class StudentManager {
             </div>
             <div class="stu-tiles">${tile(st.available != null ? `${st.attempted} מתוך ${st.available}` : st.attempted, 'נבחן')}${tile(st.passed, 'עברו', 'ok')}${tile(Math.max(0, st.attempted - st.passed), 'לא עברו', 'bad')}${tile(money(st.reward), 'מלגה', 'money')}</div>
             <div class="stu-btns" style="padding:0 18px 12px"><button class="btn btn-secondary btn-sm" data-edit><i class="fas fa-pen"></i> עריכת פרטים</button>
+                <button class="btn btn-secondary btn-sm" data-edit-exams><i class="fas fa-list-check"></i> עריכת בחינות</button>
                 <button class="btn btn-primary btn-sm" data-grades><i class="fas fa-edit"></i> הזנת בחינות</button></div>
             <div class="stu-lh"><b>מה נבחן</b><div class="stu-segc" id="stuSeg">${this.segHtml(exams)}</div></div>
-            <div class="stu-list">${exams ? this.listHtml(exams) : '<div class="stu-empty">טוען...</div>'}</div>`;
+            <div class="stu-list">${exams === null ? '<div class="stu-empty">לא ניתן לטעון את הבחינות. סגור ופתח שוב.</div>' : (exams ? this.listHtml(exams) : '<div class="stu-empty">טוען...</div>')}</div>`;
     }
 
     segHtml(exams) {
@@ -175,70 +190,206 @@ export class StudentManager {
 
     listHtml(exams) {
         const shown = exams.filter(e => this.seg === 'all' || (this.seg === 'taken') === (e.passed !== null));
-        if (!shown.length) return `<div class="stu-empty">${this.seg === 'taken' ? 'התלמיד עדיין לא נבחן באף בחינה' : 'אין בחינות להצגה'}</div>`;
+        return shown.length ? this.groupsHtml(shown, false) : `<div class="stu-empty">${this.seg === 'taken' ? 'התלמיד עדיין לא נבחן באף בחינה' : 'אין בחינות להצגה'}</div>`;
+    }
+
+    // editable=false: רשימת צפייה. editable=true: כפתורי עבר / לא עבר / הסר לכל בחינה + "הכל עבר" לכל מסכת
+    groupsHtml(rows, editable) {
         const groups = new Map();
-        shown.forEach(e => { const d = e.details || {}, k = `${e.exam_type}|${d.masechet}`; if (!groups.has(k)) groups.set(k, { d, t: e.exam_type, rows: [] }); groups.get(k).rows.push(e); });
-        return [...groups.values()].map(g => `<div class="stu-gh"><b>${esc(g.d.masechet || 'כללי')}</b><span>${TYPE[g.t] || ''}</span><em>${g.rows.filter(e => e.passed).length}/${g.rows.length}</em></div>` +
-            g.rows.map(e => {
+        rows.forEach(e => { const d = e.details || {}, k = `${e.exam_type}|${d.masechet}`; if (!groups.has(k)) groups.set(k, { d, t: e.exam_type, rows: [] }); groups.get(k).rows.push(e); });
+        this.groupCodes = [];
+        return [...groups.values()].map(g => {
+            const i = this.groupCodes.push(g.rows.map(e => e.exam_code)) - 1;
+            const head = `<div class="stu-gh"><b>${esc(g.d.masechet || 'כללי')}</b><span>${TYPE[g.t] || ''}</span>
+                ${editable ? `<button type="button" class="stu-gb" data-gset="${i}" title="סמן את כל הבחינות במסכת כעבר">הכל עבר</button>` : ''}<em>${g.rows.filter(e => e.passed).length}/${g.rows.length}</em></div>`;
+            return head + g.rows.map(e => {
                 const d = e.details || {}, [txt, cls] = STATUS[e.passed];
                 const what = e.exam_type === 'gemara' ? `${d.from_page || ''} – ${d.to_page || ''}` : `פרק ${d.chapter_name || d.chapter_num || ''}`;
-                return `<div class="stu-r"><b>${esc(e.exam_code)}</b><span class="w">${esc(what)}${d.chapter_title ? ` <i>${esc(d.chapter_title)}</i>` : ''}</span>
-                    <span class="stu-pill ${cls}">${txt}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}</span></div>`;
-            }).join('')).join('');
+                const label = `<span class="w">${esc(what)}${d.chapter_title ? ` <i>${esc(d.chapter_title)}</i>` : ''}</span>`;
+                if (!editable) return `<div class="stu-r"><b>${esc(e.exam_code)}</b>${label}<span class="stu-pill ${cls}">${txt}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}</span></div>`;
+                const on = v => e.passed === v ? ` on ${v ? 'ok' : 'bad'}` : '';
+                return `<div class="stu-r stu-xr ${e.busy ? 'busy' : ''} ${cls}" data-code="${esc(e.exam_code)}"><b>${esc(e.exam_code)}</b>${label}
+                    <div class="stu-set"><button type="button" data-set="true" class="${on(true)}" title="עבר">✓</button><button type="button" data-set="false" class="${on(false)}" title="לא עבר">✕</button>
+                    <button type="button" data-set="none" title="הסר את התוצאה (טרם נבחן)" ${e.passed === null ? 'disabled' : ''}>⌫</button></div>
+                    <span class="fb ${e.err ? 'bad' : ''}">${e.err ? esc(e.err) : (e.saved ? 'נשמר ✓' : (e.passed !== null ? heb(e.updated_at) : ''))}</span></div>`;
+            }).join('');
+        }).join('');
     }
 
     // ============================================================
-    //  הוספה / עריכה
+    //  מודל הוספה / עריכה — לשוניות: פרטים | בחינות. הודעות בתוך המודל (טוסט רק בסיום פעולה)
     // ============================================================
-    openForm(code = null) {
+    say(type, text) {
+        const el = $('stuAlert');
+        if (!text) { el.className = 'stu-alert hidden'; el.innerHTML = ''; return; }
+        el.className = `stu-alert ${type}`;
+        el.innerHTML = `<span class="ic">${ICONS[type]}</span><div>${esc(text)}</div><button type="button" class="stu-ax" data-ax aria-label="סגור">&times;</button>`;
+    }
+    fieldErr(id, msg) {
+        const f = $(id) && $(id).closest('.stu-f');
+        if (!f) return;                      // תיבות סימון / שדות נסתרים אינם שדות טקסט
+        f.classList.toggle('err', !!msg); f.querySelector('.stu-ferr').textContent = msg || '';
+    }
+
+    openForm(code = null, tab = 'details') {
         const s = code ? this.find(code) : null;
+        this.ed = { code: s ? s.student_code : null, q: '', seg: 'taken' };
         $('stuForm').reset();
+        ['fFirst', 'fLast', 'fClass', 'fCode'].forEach(id => this.fieldErr(id, ''));
+        this.say(null);
         $('fOrig').value = s ? s.student_code : '';
-        $('stuFormTitle').innerHTML = s ? '<i class="fas fa-pen"></i> עריכת פרטי תלמיד' : '<i class="fas fa-user-plus"></i> תלמיד חדש';
+        $('stuFormTitle').innerHTML = s ? `<i class="fas fa-pen"></i> ${esc(this.fullName(s))}` : '<i class="fas fa-user-plus"></i> תלמיד חדש';
         $('fAddCode').style.display = s ? 'none' : '';
         $('fEditCode').style.display = s ? 'flex' : 'none';
         $('fCode').disabled = false;
+        $('stuTabs').style.display = s ? '' : 'none';
+        const classes = [...new Set(this.students.map(x => x.class_grade).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'he'));
+        $('fClassChips').innerHTML = classes.map(c => `<button type="button" data-cls="${esc(c)}">${esc(c)}</button>`).join('');
+        const nums = this.students.map(x => parseInt(x.student_code, 10)).filter(n => !isNaN(n));
+        $('fAutoHint').textContent = `הקוד הבא בערך: ${nums.length ? Math.max(...nums) + 1 : 1000}`;
         if (s) {
             $('fFirst').value = s.first_name || ''; $('fLast').value = s.last_name || ''; $('fClass').value = s.class_grade || '';
             $('fPhone').value = (s.phones || []).join(', '); $('fCurCode').textContent = s.student_code;
         }
         $('stuFormModal').classList.remove('hidden');
-        setTimeout(() => $('fFirst').focus(), 50);
+        this.tab(s && tab === 'exams' ? 'exams' : 'details');
+        if (!s || tab !== 'exams') setTimeout(() => $('fFirst').focus(), 50);
+    }
+
+    closeForm() {
+        $('stuFormModal').classList.add('hidden');
+        this.ed = null;
+        this.flushSync();
+    }
+
+    tab(name) {
+        this.ed.tab = name;
+        document.querySelectorAll('#stuTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+        $('stuForm').classList.toggle('hidden', name !== 'details');
+        $('stuExamsPane').classList.toggle('hidden', name !== 'exams');
+        $('stuFootDetails').classList.toggle('hidden', name !== 'details');
+        $('stuFootExams').classList.toggle('hidden', name !== 'exams');
+        this.say(null);
+        if (name === 'exams') this.openExams();
+    }
+
+    validate() {
+        const orig = $('fOrig').value, e = {};
+        const v = { first: $('fFirst').value.trim(), last: $('fLast').value.trim(), cls: $('fClass').value.trim(), code: $('fCode').value.trim() };
+        if (!v.first) e.fFirst = 'חובה להזין שם פרטי';
+        if (!v.last) e.fLast = 'חובה להזין שם משפחה';
+        if (!v.cls) e.fClass = 'חובה להזין כיתה. לא ניתן לרשום תלמיד ללא כיתה';
+        if (!orig && !$('fAuto').checked) {
+            if (!v.code) e.fCode = 'הזן קוד, או סמן הקצאה אוטומטית';
+            else if (!/^[0-9A-Za-z\u0590-\u05FF_-]{1,20}$/.test(v.code)) e.fCode = 'קוד לא תקין (עד 20 תווים: אותיות, ספרות או מקף)';
+            else if (this.find(v.code)) e.fCode = 'הקוד כבר קיים במערכת';
+        }
+        ['fFirst', 'fLast', 'fClass', 'fCode'].forEach(id => this.fieldErr(id, e[id]));
+        const first = Object.keys(e)[0];
+        if (first) { this.say('error', 'יש להשלים את השדות המסומנים באדום.'); $(first).focus(); }
+        return !first;
+    }
+
+    // שגיאת שרת: מסומנת על השדה הרלוונטי + הודעה בתוך המודל
+    serverError(r, fallback) {
+        const msg = this.errText(r, fallback);
+        if (/כיתה/.test(msg)) this.fieldErr('fClass', msg);
+        else if (/שם פרטי/.test(msg)) this.fieldErr('fFirst', msg);
+        else if (/שם משפחה/.test(msg)) this.fieldErr('fLast', msg);
+        else if (r.status === 409 || /קוד/.test(msg)) this.fieldErr('fCode', msg);
+        this.say('error', msg);
     }
 
     async save() {
+        this.say(null);
+        if (!this.validate()) return;
         const orig = $('fOrig').value, btn = $('fSave'), label = btn.innerHTML;
         const body = { first_name: $('fFirst').value.trim(), last_name: $('fLast').value.trim(), class_grade: $('fClass').value.trim(),
                        phones: $('fPhone').value.split(/[,\s;]+/).filter(Boolean) };
-        if (!orig && !$('fAuto').checked) {
-            const c = $('fCode').value.trim();
-            if (!c) return window.customAlert('יש להזין קוד תלמיד, או לסמן "הקצה קוד אוטומטית".', true);
-            body.student_code = c;
-        }
+        if (!orig && !$('fAuto').checked) body.student_code = $('fCode').value.trim();
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר...';
         const r = orig ? await this.call('PUT', `/students/${encodeURIComponent(orig)}`, body) : await this.call('POST', '/students', body);
         btn.disabled = false; btn.innerHTML = label;
-        if (!r.ok) {
-            const exists = r.status === 400 && /exists/i.test(this.errText(r, ''));
-            return window.customAlert(exists ? 'קוד התלמיד כבר קיים במערכת. בחר קוד אחר.' : 'השמירה נכשלה: ' + this.errText(r, 'שגיאה לא ידועה'), true);
-        }
-        $('stuFormModal').classList.add('hidden');
-        window.customAlert(orig ? 'פרטי התלמיד עודכנו.' : `התלמיד נוסף. קוד התלמיד: ${r.data.student_code}`);
-        this.cards.clear();
-        if (this.onRefresh) this.onRefresh();
+        if (!r.ok) return this.serverError(r, 'השמירה נכשלה. נסה שוב.');
+        this.cards.clear(); this.sum.delete(orig);
+        this.closeForm();
+        window.customAlert(orig ? 'פרטי התלמיד עודכנו.' : `התלמיד נוסף. קוד התלמיד: ${r.data.student_code}`);   // טוסט: המודל נסגר
+        this._pending = true; this.flushSync();
     }
 
     async changeCode() {
         const old = $('fOrig').value;
         const next = await window.customPrompt(`הזן את הקוד החדש שיחליף את ${old}:`);
         if (next === null || !next.trim()) return;
-        if (next.trim() === old) return window.customAlert('הקוד החדש זהה לקוד הקיים.', true);
+        if (next.trim() === old) return this.say('warning', 'הקוד החדש זהה לקוד הקיים. לא בוצע שינוי.');
         const r = await this.call('PUT', `/students/${encodeURIComponent(old)}/change-code`, { new_student_code: next.trim() });
-        if (!r.ok) return window.customAlert(r.status === 409 ? 'הקוד החדש כבר תפוס על ידי תלמיד אחר.' : 'שינוי הקוד נכשל: ' + this.errText(r, 'נסה שוב'), true);
-        $('stuFormModal').classList.add('hidden');
+        if (!r.ok) return this.serverError(r, 'שינוי הקוד נכשל. נסה שוב.');
+        this.cards.clear(); this.closeCard(); this.closeForm();
         window.customAlert(`הקוד שונה ל-${next.trim()} בכל רישומי המערכת.`);
-        this.cards.clear(); this.closeCard();
-        if (this.onRefresh) this.onRefresh();
+        this._pending = true; this.flushSync();
+    }
+
+    // ---------- לשונית "בחינות": עריכת מה שהתלמיד ביצע ----------
+    async openExams() {
+        const code = this.ed.code;
+        this.ed.q = ''; this.ed.seg = 'taken'; $('stuExQ').value = '';
+        $('stuExList').innerHTML = '<div class="stu-empty">טוען בחינות...</div>';
+        if (!this.cards.get(code) && !(await this.loadCard(code))) {
+            $('stuExList').innerHTML = '<div class="stu-empty">לא ניתן לטעון את הבחינות.</div>';
+            return this.say('error', 'לא ניתן לטעון את הבחינות של התלמיד. סגור ופתח שוב.');
+        }
+        this.paintExams();
+    }
+
+    paintExams() {
+        if (!this.ed || !this.ed.code) return;
+        const code = this.ed.code, rows = this.cards.get(code) || [], term = this.ed.q.trim().toLowerCase(), st = this.stats(this.find(code) || {});
+        const taken = rows.filter(e => e.passed !== null).length;
+        const shown = rows.filter(e => (this.ed.seg === 'all' || (this.ed.seg === 'taken') === (e.passed !== null))
+            && (!term || `${e.exam_code} ${Object.values(e.details || {}).join(' ')}`.toLowerCase().includes(term)));
+        $('stuTabCount').textContent = `(${taken})`;
+        $('stuExSeg').innerHTML = [['taken', 'נבחן', taken], ['pending', 'טרם נבחן', rows.length - taken], ['all', 'הכל', rows.length]]
+            .map(([v, t, n]) => `<button type="button" data-seg="${v}" class="${this.ed.seg === v ? 'on' : ''}">${t} (${n})</button>`).join('');
+        $('stuExSum').innerHTML = `נבחן <b>${st.attempted}</b> מתוך ${st.available ?? rows.length} · עברו <b class="stu-ok">${st.passed}</b> · <b class="stu-money">${money(st.reward)}</b>`;
+        const box = $('stuExList'), top = box.scrollTop;
+        box.innerHTML = shown.length ? this.groupsHtml(shown, true) : `<div class="stu-empty">${term ? 'לא נמצאו בחינות תואמות' : (this.ed.seg === 'taken' ? 'התלמיד עדיין לא נבחן באף בחינה. עבור ל"טרם נבחן" כדי לסמן.' : 'אין בחינות להצגה')}</div>`;
+        box.scrollTop = top;
+    }
+
+    // קובע תוצאה (true / false) או מסיר אותה (null) — נשמר מיד, והמשוב מופיע על השורה עצמה
+    async setResult(code, val) {
+        const sc = this.ed.code, rows = this.cards.get(sc) || [], row = rows.find(e => e.exam_code === code);
+        if (!row || row.passed === val || row.busy) return;
+        row.busy = true; row.err = ''; this.paintExams();
+        const r = val === null
+            ? await this.call('DELETE', `/student-exams/${encodeURIComponent(sc)}/${encodeURIComponent(code)}`)
+            : await this.call('POST', '/student-exams', { student_code: sc, exams: [{ exam_code: code, passed: val, force_update: true }] });
+        row.busy = false;
+        const problem = !r.ok ? this.errText(r, 'השמירה נכשלה') : ((r.data && r.data.errors && r.data.errors[0]) ? r.data.errors[0].reason : '');
+        if (problem) { row.err = problem; return this.paintExams(); }
+        this.applyResult(sc, row, val);
+    }
+
+    applyResult(sc, row, val) {
+        row.passed = val; row.reward_earned = val ? (row.potential_reward || 0) : 0; row.updated_at = val === null ? null : nowStr(); row.err = ''; row.saved = true;
+        this.recalc(sc); this.markDirty();
+        this.paintExams(); this.paint(); if (this.cardCode === sc) this.paintCard();
+        setTimeout(() => { row.saved = false; if (this.ed && this.ed.code === sc && this.ed.tab === 'exams') this.paintExams(); }, 2200);
+    }
+
+    // "הכל עבר" לכל המסכת — בקשה אחת
+    async setGroupPassed(i) {
+        const sc = this.ed.code, rows = this.cards.get(sc) || [];
+        const list = rows.filter(e => (this.groupCodes[i] || []).includes(e.exam_code) && e.passed !== true);
+        if (!list.length) return this.say('info', 'כל הבחינות במסכת כבר מסומנות כעבר.');
+        list.forEach(e => { e.busy = true; e.err = ''; }); this.paintExams();
+        const r = await this.call('POST', '/student-exams', { student_code: sc, exams: list.map(e => ({ exam_code: e.exam_code, passed: true, force_update: true })) });
+        list.forEach(e => { e.busy = false; });
+        if (!r.ok) { list.forEach(e => { e.err = this.errText(r, 'השמירה נכשלה'); }); return this.paintExams(); }
+        const bad = new Map(((r.data && r.data.errors) || []).map(x => [x.exam_code, x.reason]));
+        list.forEach(e => { bad.has(e.exam_code) ? (e.err = bad.get(e.exam_code)) : this.applyResult(sc, e, true); });
+        this.paintExams();
+        if (bad.size) this.say('warning', `${list.length - bad.size} בחינות עודכנו, ${bad.size} לא עודכנו (הסיבה מופיעה בשורה).`);
     }
 
     exportCsv() {
@@ -280,20 +431,34 @@ export class StudentManager {
         $('stuDr').addEventListener('click', e => {
             const t = e.target;
             if (t.closest('[data-close]')) return this.closeCard();
-            if (t.closest('[data-edit]')) return this.openForm(this.cardCode);
+            if (t.closest('[data-edit]')) return this.openForm(this.cardCode, 'details');
+            if (t.closest('[data-edit-exams]')) return this.openForm(this.cardCode, 'exams');
             if (t.closest('[data-grades]')) { const code = this.cardCode; this.closeCard(); if (this.onGrades) this.onGrades(code); return; }
             const seg = t.closest('[data-seg]');
             if (seg) { this.seg = seg.dataset.seg; this.paintCard(); }
         });
 
+        // ----- מודל הוספה / עריכה -----
+        const M = $('stuFormModal');
         $('stuForm').addEventListener('submit', e => { e.preventDefault(); this.save(); });
-        $('fAuto').addEventListener('change', e => { $('fCode').disabled = e.target.checked; if (e.target.checked) $('fCode').value = ''; });
+        $('stuForm').addEventListener('input', e => { if (e.target.id) { this.fieldErr(e.target.id, ''); } this.say(null); });
+        $('stuForm').addEventListener('click', e => { const c = e.target.closest('[data-cls]'); if (c) { $('fClass').value = c.dataset.cls; this.fieldErr('fClass', ''); } });
+        $('fAuto').addEventListener('change', e => { $('fCode').disabled = e.target.checked; if (e.target.checked) { $('fCode').value = ''; this.fieldErr('fCode', ''); } $('fAutoHint').style.visibility = e.target.checked ? 'visible' : 'hidden'; });
         $('fChange').addEventListener('click', () => this.changeCode());
-        $('stuFormClose').addEventListener('click', () => $('stuFormModal').classList.add('hidden'));
-        $('fCancel').addEventListener('click', () => $('stuFormModal').classList.add('hidden'));
+        ['stuFormClose', 'fCancel', 'fDone'].forEach(id => $(id).addEventListener('click', () => this.closeForm()));
+        $('stuTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) this.tab(b.dataset.tab); });
+        $('stuAlert').addEventListener('click', e => { if (e.target.closest('[data-ax]')) this.say(null); });
+        $('stuExQ').addEventListener('input', e => { this.ed.q = e.target.value; this.paintExams(); });
+        $('stuExSeg').addEventListener('click', e => { const b = e.target.closest('[data-seg]'); if (b) { this.ed.seg = b.dataset.seg; this.paintExams(); } });
+        $('stuExList').addEventListener('click', e => {
+            const g = e.target.closest('[data-gset]');
+            if (g) return this.setGroupPassed(+g.dataset.gset);
+            const b = e.target.closest('[data-set]'), row = e.target.closest('.stu-xr');
+            if (b && row) this.setResult(row.dataset.code, b.dataset.set === 'none' ? null : b.dataset.set === 'true');
+        });
         document.addEventListener('keydown', e => {
             if (e.key !== 'Escape') return;
-            if (!$('stuFormModal').classList.contains('hidden')) $('stuFormModal').classList.add('hidden');
+            if (!M.classList.contains('hidden')) this.closeForm();
             else if (this.cardCode) this.closeCard();
         });
     }
@@ -301,23 +466,34 @@ export class StudentManager {
     // ---------- רכיבים קבועים (נטענים פעם אחת) ----------
     mount() {
         if ($('stuDr')) return;
-        const f = (id, label, extra = '') => `<div class="stu-f"><label>${label}</label><input id="${id}" ${extra}></div>`;
+        const f = (id, label, extra = '') => `<div class="stu-f"><label for="${id}">${label}</label><input id="${id}" ${extra}><small class="stu-ferr"></small></div>`;
         document.body.insertAdjacentHTML('beforeend', `
         <div id="stuOv" class="stu-ov"></div><aside id="stuDr" class="stu-dr" aria-label="כרטיס תלמיד"></aside>
-        <div id="stuFormModal" class="modal hidden" style="z-index:9990"><div class="modal-content" style="max-width:520px;height:auto">
-            <div class="modal-header"><h3 id="stuFormTitle"></h3><button class="close-modal-btn" id="stuFormClose">&times;</button></div>
-            <form id="stuForm" class="modal-body stu-form" autocomplete="off">
+        <div id="stuFormModal" class="modal hidden" style="z-index:9990"><div class="modal-content stu-mc">
+            <div class="modal-header"><h3 id="stuFormTitle"></h3><button class="close-modal-btn" id="stuFormClose" aria-label="סגור">&times;</button></div>
+            <div class="stu-tabs" id="stuTabs"><button type="button" data-tab="details" class="on">פרטי תלמיד</button><button type="button" data-tab="exams">בחינות שבוצעו <em id="stuTabCount"></em></button></div>
+            <div id="stuAlert" class="stu-alert hidden" role="alert"></div>
+            <form id="stuForm" class="stu-pane" autocomplete="off" novalidate>
                 <input type="hidden" id="fOrig">
                 <div class="stu-2">${f('fFirst', 'שם פרטי', 'required')}${f('fLast', 'שם משפחה', 'required')}</div>
-                <div class="stu-2">${f('fClass', 'כיתה')}${f('fPhone', 'טלפון (אפשר כמה, מופרדים בפסיק)', 'placeholder="0501234567"')}</div>
+                <div class="stu-2">
+                    <div class="stu-f"><label for="fClass">כיתה <i class="stu-req">חובה</i></label><input id="fClass" required><small class="stu-ferr"></small><div class="stu-chips" id="fClassChips"></div></div>
+                    ${f('fPhone', 'טלפון (אפשר כמה, מופרדים בפסיק)', 'placeholder="0501234567"')}</div>
                 <div class="stu-box" id="fAddCode">${f('fCode', 'קוד תלמיד (ייחודי)', 'placeholder="הקש קוד רצוי"')}
-                    <label class="stu-chk"><input type="checkbox" id="fAuto"> הקצה קוד עוקב אוטומטית</label></div>
-                <div class="stu-box" id="fEditCode" style="display:none;justify-content:space-between;align-items:center">
+                    <label class="stu-chk"><input type="checkbox" id="fAuto"> הקצה קוד עוקב אוטומטית <span class="stu-mut" id="fAutoHint" style="visibility:hidden"></span></label></div>
+                <div class="stu-box" id="fEditCode" style="display:none;flex-direction:row;justify-content:space-between;align-items:center">
                     <div><span class="stu-mut">קוד נוכחי</span><br><b id="fCurCode" style="font-size:1.2rem;color:var(--primary-color)"></b></div>
                     <button type="button" class="btn btn-secondary btn-sm" id="fChange"><i class="fas fa-exchange-alt"></i> החלף קוד</button></div>
-                <div class="stu-btns" style="justify-content:flex-end"><button type="button" class="btn btn-outline" id="fCancel">ביטול</button>
-                    <button type="submit" class="btn btn-primary" id="fSave"><i class="fas fa-save"></i> שמור</button></div>
-            </form></div></div>`);
+            </form>
+            <div id="stuExamsPane" class="stu-pane hidden">
+                <div class="stu-extools"><div class="stu-search"><i class="fas fa-search"></i><input id="stuExQ" placeholder="חיפוש לפי קוד, מסכת או פרק..." autocomplete="off"></div><div class="stu-segc" id="stuExSeg"></div></div>
+                <div class="stu-exsum" id="stuExSum"></div>
+                <div class="stu-exlist" id="stuExList"></div>
+            </div>
+            <div class="stu-mfoot" id="stuFootDetails"><button type="button" class="btn btn-outline" id="fCancel">ביטול</button>
+                <button type="submit" form="stuForm" class="btn btn-primary" id="fSave"><i class="fas fa-save"></i> שמור</button></div>
+            <div class="stu-mfoot hidden" id="stuFootExams"><span class="stu-mut" style="margin-left:auto">כל שינוי נשמר מיד</span><button type="button" class="btn btn-primary" id="fDone">סיום</button></div>
+        </div></div>`);
     }
 
     css() {
@@ -376,6 +552,29 @@ export class StudentManager {
         .stu-f input{width:100%;padding:8px;border:1px solid var(--border-color);border-radius:6px;outline:none}.stu-f input:focus{border-color:var(--primary-color)}
         .stu-box{background:#f8fafc;border:1px solid var(--border-color);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
         .stu-chk{display:flex;gap:8px;align-items:center;font-size:.85rem;cursor:pointer}
+        .stu-mc{max-width:680px;width:94%;height:auto;max-height:92vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden}
+        .stu-tabs{display:flex;gap:4px;padding:8px 14px 0;background:#f8fafc;border-bottom:1px solid var(--border-color)}
+        .stu-tabs button{border:none;background:none;padding:9px 16px;font-weight:700;font-size:.88rem;color:#64748b;cursor:pointer;border-bottom:3px solid transparent}
+        .stu-tabs button.on{color:var(--primary-color);border-bottom-color:var(--primary-color);background:#fff;border-radius:8px 8px 0 0}.stu-tabs em{font-style:normal;color:#94a3b8;font-weight:600}
+        .stu-alert{display:flex;gap:10px;align-items:flex-start;margin:12px 18px 0;padding:10px 12px;border-radius:10px;border:1px solid;font-size:.86rem;line-height:1.5;animation:stuIn .2s}
+        .stu-alert .ic{flex:none;width:20px;height:20px;margin-top:1px}.stu-alert svg{width:20px;height:20px}.stu-alert div{flex:1}.stu-ax{border:none;background:none;font-size:1.2rem;line-height:1;cursor:pointer;color:inherit;opacity:.6}
+        .stu-alert.error{background:#fef2f2;border-color:#fecaca;color:#991b1b}.stu-alert.warning{background:#fffbeb;border-color:#fde68a;color:#92400e}
+        .stu-alert.info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}.stu-alert.success{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
+        @keyframes stuIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+        .stu-pane{padding:16px 18px;display:flex;flex-direction:column;gap:14px;overflow:auto;flex:1;min-height:0}.hidden.stu-pane{display:none}
+        .stu-f.err input{border-color:#dc2626;background:#fef2f2}.stu-ferr{display:block;color:#b91c1c;font-size:.76rem;min-height:0;margin-top:3px}
+        .stu-req{font-style:normal;font-size:.68rem;color:#b91c1c;background:#fee2e2;border-radius:99px;padding:0 7px;margin-right:4px}
+        .stu-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.stu-chips button{border:1px solid var(--border-color);background:#fff;border-radius:99px;padding:1px 11px;font-size:.78rem;cursor:pointer}.stu-chips button:hover{background:#eff6ff;border-color:#93c5fd}
+        .stu-mfoot{display:flex;justify-content:flex-end;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--border-color);background:#f8fafc}.stu-mfoot.hidden{display:none}
+        .stu-extools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.stu-exsum{font-size:.84rem;color:#475569;background:#f8fafc;border:1px solid var(--border-color);border-radius:8px;padding:6px 12px}
+        .stu-exlist{flex:1;min-height:220px;max-height:46vh;overflow:auto;border:1px solid var(--border-color);border-radius:10px}
+        .stu-xr{grid-template-columns:46px 1fr auto 86px;padding:6px 14px}.stu-xr.busy{opacity:.5;pointer-events:none}
+        .stu-xr.ok{background:#f0fdf4}.stu-xr.bad{background:#fef2f2}
+        .stu-set{display:inline-flex;gap:3px}.stu-set button{border:1px solid var(--border-color);background:#fff;width:30px;height:28px;border-radius:7px;cursor:pointer;font-weight:800;color:#64748b}
+        .stu-set button:hover:not(:disabled){background:#eff6ff}.stu-set button:disabled{opacity:.3;cursor:default}
+        .stu-set button.on.ok{background:#059669;border-color:#059669;color:#fff}.stu-set button.on.bad{background:#dc2626;border-color:#dc2626;color:#fff}
+        .stu-xr .fb{font-size:.74rem;color:#64748b;text-align:left}.stu-xr .fb.bad{color:#b91c1c;font-weight:600;white-space:normal}
+        .stu-gb{margin-right:auto;margin-left:10px;border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;border-radius:99px;padding:0 10px;font-size:.72rem;cursor:pointer}.stu-gb:hover{background:rgba(255,255,255,.18)}
         @media(max-width:700px){.stu-2{grid-template-columns:1fr}.stu-tiles{grid-template-columns:1fr 1fr}.stu-r{grid-template-columns:44px 1fr auto}.stu-r .m,.stu-r .dt{display:none}}`;
         document.head.appendChild(st);
     }
