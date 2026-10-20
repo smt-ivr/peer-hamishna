@@ -3,6 +3,8 @@ import { StudentManager } from './client-students.js';
 import { ExamManager } from './client-exams.js';
 import { HistoryManager } from './client-history.js';
 import { ReportManager } from './client-reports.js';
+import { DashboardManager } from './client-dashboard.js';
+import { AdminManager } from './client-admin.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 
@@ -314,6 +316,8 @@ let studentManager;
 let examListManager;
 let historyManager;
 let reportManager;
+let dashboardManager;
+let adminManager;
 let refreshAllData;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -485,6 +489,7 @@ async function initApp() {
         if(examListManager) examListManager.render(allExams);
         if(reportManager) reportManager.setStudents(allStudents);
         if(historyManager) historyManager.loadAndRender(allStudents, allExams);
+        if(dashboardManager) dashboardManager.load();
     };
 
     examManager = new ExamUpdateManager(API_BASE, document.getElementById('student-portal'), onSwitchStudent, refreshAllData);
@@ -492,6 +497,9 @@ async function initApp() {
     examListManager = new ExamManager(document.getElementById('view-exams'), API_BASE, refreshAllData);
     historyManager = new HistoryManager(document.getElementById('view-history'), API_BASE, openStudentCard, refreshAllData);
     reportManager = new ReportManager(document.getElementById('view-reports'), API_BASE);
+    dashboardManager = new DashboardManager(document.getElementById('view-dashboard'), API_BASE, openStudentCard);
+    adminManager = new AdminManager(document.getElementById('view-admin'), API_BASE, document.getElementById('adminMenuItem'));
+    adminManager.init();
     
     setupTabs();
     setupSearchBox();
