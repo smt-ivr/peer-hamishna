@@ -5,6 +5,7 @@ import { HistoryManager } from './client-history.js';
 import { ReportManager } from './client-reports.js';
 import { DashboardManager } from './client-dashboard.js';
 import { AdminManager } from './client-admin.js';
+import { setupLoginScreen, logEntry, setupMobileNav } from './client-login.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
 
@@ -323,6 +324,7 @@ let refreshAllData;
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loginBtn').addEventListener('click', performLogin);
     document.getElementById('logoutBtn').addEventListener('click', performLogout);
+    setupLoginScreen();
     
     const apiKeyInput = document.getElementById('apiKeyInput');
     apiKeyInput.addEventListener('keydown', (e) => {
@@ -334,6 +336,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // אם ה-IP כבר מאושר בזיכרון, מדלגים על הבדיקה ונכנסים מיד
     if (localStorage.getItem('peer_ip_allowed') === 'true') {
         fetchAuthAndSetupUI();
+        logEntry(API_BASE);
         await initApp();
     } else {
         await checkAuthAndInit();
@@ -399,6 +402,7 @@ async function checkAuthAndInit() {
             }
             hideAuthOverlay();
             updateTopbarInfo(data);
+            logEntry(API_BASE);
             await initApp();
         } else {
             authMessage.innerText = data.message || 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
@@ -446,13 +450,19 @@ async function performLogin() {
     localStorage.setItem('peer_api_key', key);
     
     try {
-        const response = await fetch(`${API_BASE}/auth-check`);
+        // אותה בדיקה כמו auth-check, דרך נתיב הכניסה שגם רושם את הניסיון בהיסטוריה
+        const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, mode: 'manual' })
+        });
         const data = await response.json();
 
         if (data.is_authorized) {
             if (data.is_ip_allowed) {
                 localStorage.setItem('peer_ip_allowed', 'true');
             }
+            try { sessionStorage.setItem('peer_entry_logged', '1'); } catch (e) {}
             
             hideAuthOverlay();
             updateTopbarInfo(data);
@@ -502,6 +512,7 @@ async function initApp() {
     adminManager.init();
     
     setupTabs();
+    setupMobileNav();
     setupSearchBox();
     await refreshAllData();
 }

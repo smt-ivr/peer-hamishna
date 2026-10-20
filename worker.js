@@ -8,6 +8,9 @@ import clientHistoryJs from './client-history.js';
 import clientReportsJs from './client-reports.js'; // התווסף
 import clientDashboardJs from './client-dashboard.js';
 import clientAdminJs from './client-admin.js';
+import clientLoginJs from './client-login.js';
+import loginCss from './login.css';
+import mobileCss from './mobile.css';
 
 export default {
   async fetch(request, env, ctx) {
@@ -41,6 +44,15 @@ export default {
 
     if (path === '/peer/client-dashboard.js') {
       return new Response(clientDashboardJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });
+    }
+    if (path === '/peer/client-login.js') {
+      return new Response(clientLoginJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });
+    }
+    if (path === '/peer/login.css') {
+      return new Response(loginCss, { status: 200, headers: { 'Content-Type': 'text/css; charset=utf-8' } });
+    }
+    if (path === '/peer/mobile.css') {
+      return new Response(mobileCss, { status: 200, headers: { 'Content-Type': 'text/css; charset=utf-8' } });
     }
     if (path === '/peer/client-admin.js') {
       return new Response(clientAdminJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });
