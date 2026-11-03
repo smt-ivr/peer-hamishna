@@ -494,7 +494,6 @@ export class StudentManager {
             this.openCard(tr.dataset.code);
         });
 
-        $('stuOv').addEventListener('click', () => this.closeCard());
         $('stuDr').addEventListener('click', e => {
             const t = e.target;
             if (t.closest('[data-close]')) return this.closeCard();

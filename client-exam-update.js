@@ -335,7 +335,6 @@ export class ExamUpdateManager {
         const hm = $('geHistModal');
         $('geHClose').addEventListener('click', () => this.closeHist());
         hm.addEventListener('click', e => {
-            if (e.target === hm) return this.closeHist();
             const hs = e.target.closest('[data-hseg]');
             if (hs) { this.hSeg = hs.dataset.hseg; return this.paintHist(); }
             const fx = e.target.closest('[data-fix]');
