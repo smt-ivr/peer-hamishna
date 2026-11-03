@@ -91,7 +91,7 @@ export class PhoneManager {
         const sugg = d.suggestions && d.suggestions.length ? `<div class="ph-sugg"><span class="ph-mut">עדכנו ציונים בטלפון בעבר:</span>
             ${d.suggestions.map(s => `<button class="ph-chip" data-ph="add-sugg" data-v="${esc(s.phone)}" title="${s.updates} עדכונים">${esc(fmtPhone(s.phone))} <i class="fas fa-plus"></i></button>`).join('')}</div>` : '';
         return `
-            ${d.numbers.length ? '' : '<div class="ph-note"><i class="fas fa-info-circle"></i> הרשימה ריקה, ולכן כרגע כל מספר יכול לעדכן. מרגע שיתווסף מספר ראשון, רק מספרים מהרשימה יוכלו לעדכן ציונים.</div>'}
+            ${d.numbers.length ? '' : '<div class="ph-note warn"><i class="fas fa-exclamation-triangle"></i> הרשימה ריקה, ולכן כרגע אף אחד לא יכול לעדכן ציונים בטלפון. רק מספרים שיתווספו לכאן יוכלו לעדכן.</div>'}
             <div class="card ph-card">
                 <div class="ph-bar"><b>מספרים שמורשים לעדכן ציונים</b><button class="btn btn-primary btn-sm" data-ph="new"><i class="fas fa-plus"></i> הוספת מספר</button></div>
                 ${this.editing ? this.formHtml() : ''}
@@ -262,6 +262,7 @@ export class PhoneManager {
         .ph-st{border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:99px;padding:1px 10px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit}.ph-st.on{border-color:#a7f3d0;background:#ecfdf5;color:#047857}
         .ph-acts{white-space:nowrap;text-align:left}.ph-ico{background:none;border:none;color:#64748b;cursor:pointer;padding:4px 6px;border-radius:4px}.ph-ico:hover{background:#f1f5f9;color:var(--primary-color)}.ph-ico.danger:hover{color:var(--danger)}
         .ph-empty{text-align:center;color:#64748b;padding:18px}
+        .ph-note.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
         .ph-note{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:9px 12px;font-size:.85rem;display:flex;gap:8px;align-items:center}
         .ph-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#f8fafc;border:1px solid var(--border-color);border-radius:8px;padding:10px;margin-bottom:8px}
         .ph-form [name=name]{width:170px}.ph-form [name=phone]{width:140px}
