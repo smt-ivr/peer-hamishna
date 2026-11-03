@@ -3,6 +3,7 @@ import stylesCss from './styles.css';
 import clientAppJs from './client-app.js';
 import clientExamUpdateJs from './client-exam-update.js';
 import clientStudentsJs from './client-students.js';
+import clientStudentListJs from './client-student-list.js';
 import clientExamsJs from './client-exams.js';
 import clientHistoryJs from './client-history.js';
 import clientReportsJs from './client-reports.js'; // התווסף
@@ -31,6 +32,9 @@ export default {
     }
     if (path === '/peer/client-students.js') {
       return new Response(clientStudentsJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });
+    }
+    if (path === '/peer/client-student-list.js') {
+      return new Response(clientStudentListJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });
     }
     if (path === '/peer/client-exams.js') {
       return new Response(clientExamsJs, { status: 200, headers: { 'Content-Type': 'application/javascript; charset=utf-8' } });

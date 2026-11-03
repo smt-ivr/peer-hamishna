@@ -3,6 +3,7 @@
 //  new StudentManager(container, apiBase, onGrades(code), onRefresh())
 // ============================================================
 import { formatHebrewDate } from './client-reports.js';
+import { StudentListExporter } from './client-student-list.js';
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const csv = v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; };
@@ -98,7 +99,8 @@ export class StudentManager {
             <div class="stu-card stu-head">
                 <div><h3><i class="fas fa-users"></i> ניהול תלמידים</h3><div class="stu-kpis" id="stuKpis"></div></div>
                 <div class="stu-btns">
-                    <button class="btn btn-outline btn-sm" id="stuExport"><i class="fas fa-file-excel"></i> ייצוא</button>
+                    <button class="btn btn-outline btn-sm" id="stuExport"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
+                    <button class="btn btn-secondary btn-sm" id="stuPrintList" title="רשימה מעוצבת להדפסה / PDF — לפי א״ב משפחות, שם, כיתות או כיתה אחת"><i class="fas fa-print"></i> רשימה להדפסה / PDF</button>
                     <button class="btn btn-primary btn-sm" id="stuAdd"><i class="fas fa-user-plus"></i> תלמיד חדש</button>
                 </div>
             </div>
@@ -463,6 +465,12 @@ export class StudentManager {
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
+    // רשימה מעוצבת להדפסה / PDF — נפתחת עם הכיתה והסינון שנבחרו כעת במסך
+    openPrintList() {
+        if (!this.listExporter) this.listExporter = new StudentListExporter();
+        this.listExporter.open(this.students, s => this.stats(s), { scope: this.f.cls, status: this.f.status });
+    }
+
     // ============================================================
     //  חיבור אירועים (פעם אחת)
     // ============================================================
@@ -474,6 +482,7 @@ export class StudentManager {
             const t = e.target;
             if (t.closest('#stuAdd')) return this.openForm();
             if (t.closest('#stuExport')) return this.exportCsv();
+            if (t.closest('#stuPrintList')) return this.openPrintList();
             if (t.closest('#stuNoneKpi')) { this.f.status = 'none'; this.render(this.students); return; }
             const seg = t.closest('#stuStatus button');
             if (seg) { this.f.status = seg.dataset.v; this.render(this.students); return; }
