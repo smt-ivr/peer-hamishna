@@ -5,6 +5,7 @@ import { HistoryManager } from './client-history.js';
 import { ReportManager } from './client-reports.js';
 import { DashboardManager } from './client-dashboard.js';
 import { AdminManager } from './client-admin.js';
+import { PhoneManager } from './client-phone.js';
 import { setupLoginScreen, logEntry, setupMobileNav } from './client-login.js';
 
 const API_BASE = 'https://smti.uk/peer/api';
@@ -319,6 +320,7 @@ let historyManager;
 let reportManager;
 let dashboardManager;
 let adminManager;
+let phoneManager;
 let refreshAllData;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -509,7 +511,8 @@ async function initApp() {
     reportManager = new ReportManager(document.getElementById('view-reports'), API_BASE);
     dashboardManager = new DashboardManager(document.getElementById('view-dashboard'), API_BASE, openStudentCard);
     adminManager = new AdminManager(document.getElementById('view-admin'), API_BASE, document.getElementById('adminMenuItem'));
-    adminManager.init();
+    phoneManager = new PhoneManager(document.getElementById('view-phone'), API_BASE, document.getElementById('phoneMenuItem'));
+    adminManager.init().then(isSuper => phoneManager.show(isSuper));
     
     setupTabs();
     setupMobileNav();
