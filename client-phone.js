@@ -138,7 +138,6 @@ export class PhoneManager {
     closeModal() { const m = document.getElementById('phModal'); if (m) m.classList.add('hidden'); this.editing = null; }
     bindModal(m) {
         m.addEventListener('click', ev => {
-            if (ev.target === m) return this.closeModal();
             const b = ev.target.closest('[data-phm]');
             if (!b || b.disabled) return;
             if (b.dataset.phm === 'close') return this.closeModal();
