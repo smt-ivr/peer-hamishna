@@ -100,7 +100,7 @@ export class StudentManager {
                 <div><h3><i class="fas fa-users"></i> ניהול תלמידים</h3><div class="stu-kpis" id="stuKpis"></div></div>
                 <div class="stu-btns">
                     <button class="btn btn-outline btn-sm" id="stuExport"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
-                    <button class="btn btn-secondary btn-sm" id="stuPrintList" title="רשימה מעוצבת להדפסה / PDF — לפי א״ב משפחות, שם, כיתות או כיתה אחת"><i class="fas fa-print"></i> רשימה להדפסה / PDF</button>
+                    <button class="btn btn-secondary btn-sm" id="stuPrintList" title="רשימת שמות וקודים להדפסה / PDF"><i class="fas fa-print"></i> רשימה להדפסה / PDF</button>
                     <button class="btn btn-primary btn-sm" id="stuAdd"><i class="fas fa-user-plus"></i> תלמיד חדש</button>
                 </div>
             </div>
@@ -467,8 +467,8 @@ export class StudentManager {
 
     // רשימה מעוצבת להדפסה / PDF — נפתחת עם הכיתה והסינון שנבחרו כעת במסך
     openPrintList() {
-        if (!this.listExporter) this.listExporter = new StudentListExporter();
-        this.listExporter.open(this.students, s => this.stats(s), { scope: this.f.cls, status: this.f.status });
+        if (!this.listExporter) this.listExporter = new StudentListExporter(this.apiBase);
+        this.listExporter.open(this.students, { scope: this.f.cls });
     }
 
     // ============================================================
