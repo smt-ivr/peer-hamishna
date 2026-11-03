@@ -94,7 +94,6 @@ export class PhoneManager {
             ${d.numbers.length ? '' : '<div class="ph-note warn"><i class="fas fa-exclamation-triangle"></i> הרשימה ריקה, ולכן כרגע אף אחד לא יכול לעדכן ציונים בטלפון. רק מספרים שיתווספו לכאן יוכלו לעדכן.</div>'}
             <div class="card ph-card">
                 <div class="ph-bar"><b>מספרים שמורשים לעדכן ציונים</b><button class="btn btn-primary btn-sm" data-ph="new"><i class="fas fa-plus"></i> הוספת מספר</button></div>
-                ${this.editing ? this.formHtml() : ''}
                 <table class="ph-t"><thead><tr><th>שם</th><th>טלפון</th><th>מתי מורשה</th><th>מצב</th><th>שיחה אחרונה</th><th></th></tr></thead>
                 <tbody>${d.numbers.length ? d.numbers.map(row).join('') : '<tr><td colspan="6" class="ph-empty">עדיין לא נוספו מספרים</td></tr>'}</tbody></table>
                 ${sugg}
@@ -108,19 +107,50 @@ export class PhoneManager {
             </div>`;
     }
 
-    formHtml() {
-        const e = this.editing, days = new Set(e.days);
-        return `<form class="ph-form" data-ph-form>
-            <input name="name" class="ph-in" value="${esc(e.name)}" placeholder="שם" required>
-            <input name="phone" class="ph-in" dir="ltr" value="${esc(e.phone)}" placeholder="0501234567" inputmode="tel" required>
-            <label class="ph-chk"><input type="checkbox" name="sched" ${e.sched_enabled ? 'checked' : ''}> רק בשעות מסוימות</label>
-            <span class="ph-sched ${e.sched_enabled ? '' : 'hidden'}">
-                <span class="ph-days">${DAYS.map((l, i) => `<label class="${days.has(i) ? 'on' : ''}"><input type="checkbox" name="day" value="${i}" ${days.has(i) ? 'checked' : ''}>${l}</label>`).join('')}</span>
-                <input type="time" name="time_from" class="ph-in" value="${esc(e.time_from)}"> עד <input type="time" name="time_to" class="ph-in" value="${esc(e.time_to)}"></span>
-            <span class="ph-fa"><button type="button" class="btn btn-outline btn-sm" data-ph="cancel">ביטול</button>
-                <button type="submit" class="btn btn-primary btn-sm">${e.id ? 'שמירה' : 'הוספה'}</button></span>
-            <div class="ph-ferr" data-ph-ferr></div>
-        </form>`;
+    // ---------- מודל הוספה / עריכה ----------
+    openModal(e) {
+        this.editing = e;
+        const days = new Set(e.days);
+        let m = document.getElementById('phModal');
+        if (!m) {
+            document.body.insertAdjacentHTML('beforeend', '<div id="phModal" class="modal hidden" style="z-index:9990"><div class="modal-content ph-mc"></div></div>');
+            m = document.getElementById('phModal');
+            this.bindModal(m);
+        }
+        m.firstElementChild.innerHTML = `
+            <div class="modal-header"><h3>${e.id ? '<i class="fas fa-pen"></i> עריכת מספר' : '<i class="fas fa-plus-circle"></i> מספר מורשה חדש'}</h3>
+                <button type="button" class="close-modal-btn" data-phm="close" aria-label="סגור">&times;</button></div>
+            <form class="ph-mform" id="phForm" data-ph-form autocomplete="off">
+                <label>שם<input name="name" class="ph-in" value="${esc(e.name)}" required></label>
+                <label>מספר טלפון<input name="phone" class="ph-in" dir="ltr" value="${esc(e.phone)}" placeholder="0501234567" inputmode="tel" required></label>
+                <label class="ph-chk"><input type="checkbox" name="sched" ${e.sched_enabled ? 'checked' : ''}> רק בימים ובשעות מסוימים</label>
+                <div class="ph-sched ${e.sched_enabled ? '' : 'hidden'}">
+                    <span class="ph-days">${DAYS.map((l, i) => `<label class="${days.has(i) ? 'on' : ''}"><input type="checkbox" name="day" value="${i}" ${days.has(i) ? 'checked' : ''}>${l}</label>`).join('')}</span>
+                    <span class="ph-hm">משעה <input type="time" name="time_from" class="ph-in" value="${esc(e.time_from)}"> עד <input type="time" name="time_to" class="ph-in" value="${esc(e.time_to)}"></span>
+                </div>
+                <div class="ph-ferr" data-ph-ferr></div>
+            </form>
+            <div class="ph-mfoot"><button type="button" class="btn btn-outline" data-phm="close">ביטול</button>
+                <button type="submit" form="phForm" class="btn btn-primary" data-phm="save"><i class="fas fa-save"></i> ${e.id ? 'שמירה' : 'הוספה'}</button></div>`;
+        m.classList.remove('hidden');
+        setTimeout(() => { const i = m.querySelector(e.name ? '[name="phone"]' : '[name="name"]'); if (i) i.focus(); }, 30);
+    }
+    closeModal() { const m = document.getElementById('phModal'); if (m) m.classList.add('hidden'); this.editing = null; }
+    bindModal(m) {
+        m.addEventListener('click', ev => {
+            if (ev.target === m) return this.closeModal();
+            const b = ev.target.closest('[data-phm]');
+            if (!b || b.disabled) return;
+            if (b.dataset.phm === 'close') return this.closeModal();
+        });
+        m.addEventListener('change', ev => {
+            const t = ev.target;
+            if (t.name === 'day') t.parentElement.classList.toggle('on', t.checked);
+            if (t.name === 'sched') m.querySelector('.ph-sched').classList.toggle('hidden', !t.checked);
+        });
+        m.addEventListener('submit', ev => { ev.preventDefault(); this.saveNumber(ev.target, m.querySelector('[data-phm="save"]')); });
+        m.addEventListener('input', () => { const el = m.querySelector('[data-ph-ferr]'); if (el) el.textContent = ''; });
+        document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !m.classList.contains('hidden')) this.closeModal(); });
     }
 
     readForm(form) {
@@ -129,11 +159,14 @@ export class PhoneManager {
             days: [...form.querySelectorAll('[name="day"]:checked')].map(x => Number(x.value)), time_from: v('time_from') || '00:00', time_to: v('time_to') || '23:59' };
     }
 
-    async saveNumber(form) {
+    async saveNumber(form, btn) {
         const e = this.readForm(form), errEl = $(form, '[data-ph-ferr]');
+        if (!e.name || !e.phone) { errEl.textContent = 'יש להזין שם ומספר טלפון.'; return; }
+        if (btn) btn.disabled = true;
         const r = e.id ? await this.call('PUT', `/numbers?id=${e.id}`, e) : await this.call('POST', '/numbers', e);
+        if (btn) btn.disabled = false;
         if (!r.ok) { errEl.textContent = this.err(r, 'השמירה נכשלה.'); return; }
-        this.editing = null;
+        this.closeModal();
         window.notify(e.id ? 'המספר עודכן' : 'המספר נוסף', 'success', { duration: 2000 });
         this.load();
     }
@@ -217,9 +250,8 @@ export class PhoneManager {
             const act = b.dataset.ph, v = b.dataset.v, num = this.data && this.data.numbers.find(n => String(n.id) === String(v));
             if (act === 'reload') return this.load();
             if (act === 'tab') { this.tab = v; this.render(); if (v === 'log') this.loadLog(); return; }
-            if (act === 'new' || act === 'add-sugg') { this.editing = blank(act === 'add-sugg' ? v : ''); this.render(); const i = $(c, '[data-ph-form] [name="name"]'); if (i) i.focus(); return; }
-            if (act === 'edit' && num) { this.editing = { ...num, days: parseDays(num.days), sched_enabled: !!num.sched_enabled }; this.render(); return; }
-            if (act === 'cancel') { this.editing = null; return this.render(); }
+            if (act === 'new' || act === 'add-sugg') return this.openModal(blank(act === 'add-sugg' ? v : ''));
+            if (act === 'edit' && num) return this.openModal({ ...num, days: parseDays(num.days), sched_enabled: !!num.sched_enabled });
             if (act === 'toggle' && num) return this.toggleNumber(num);
             if (act === 'del' && num) return this.deleteNumber(num);
             if (act === 'bact') { this.blocked.action = v; this.blkDirty = true; return this.render(); }
@@ -228,17 +260,11 @@ export class PhoneManager {
             if (act === 'log-more') return this.loadLog(true);
             if (act === 'upd') return this.toggleUpdates(v);
         });
-        c.addEventListener('change', ev => {
-            const t = ev.target;
-            if (t.name === 'day') t.parentElement.classList.toggle('on', t.checked);
-            if (t.name === 'sched') $(t.closest('form'), '.ph-sched').classList.toggle('hidden', !t.checked);
-        });
         c.addEventListener('input', ev => {
             const t = ev.target;
             if (t.dataset.b) { this.blocked[t.dataset.b] = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
             if (t.matches('[data-ph-logq]')) { clearTimeout(this._lq); this.log.q = t.value; this._lq = setTimeout(() => this.loadLog(), 350); }
         });
-        c.addEventListener('submit', ev => { if (ev.target.matches('[data-ph-form]')) { ev.preventDefault(); this.saveNumber(ev.target); } });
     }
 
     css() {
@@ -264,14 +290,19 @@ export class PhoneManager {
         .ph-empty{text-align:center;color:#64748b;padding:18px}
         .ph-note.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
         .ph-note{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:9px 12px;font-size:.85rem;display:flex;gap:8px;align-items:center}
-        .ph-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#f8fafc;border:1px solid var(--border-color);border-radius:8px;padding:10px;margin-bottom:8px}
-        .ph-form [name=name]{width:170px}.ph-form [name=phone]{width:140px}
+        .ph-mc{max-width:440px;width:94%;height:auto;border-radius:12px;overflow:hidden}
+        .ph-mform{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+        .ph-mform>label:not(.ph-chk){display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:#475569}
+        .ph-mform .ph-in{padding:8px 10px;font-size:.92rem}
+        .ph-sched{display:flex;flex-direction:column;align-items:flex-start;gap:10px;background:#f8fafc;border:1px solid var(--border-color);border-radius:8px;padding:10px 12px}
+        .ph-hm{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:#475569}
+        .ph-mfoot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border-color);background:#f8fafc}
         .ph-chk{display:inline-flex;align-items:center;gap:5px;font-size:.85rem;cursor:pointer}
-        .ph-sched{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.85rem}.ph-sched.hidden{display:none}
+        .ph-sched.hidden{display:none}
         .ph-days{display:inline-flex;gap:2px}.ph-days input{display:none}
         .ph-days label{width:26px;height:26px;border:1px solid var(--border-color);border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;cursor:pointer;background:#fff;color:#64748b;user-select:none}
         .ph-days label.on{background:var(--primary-color);border-color:var(--primary-color);color:#fff}
-        .ph-fa{display:inline-flex;gap:6px;margin-right:auto}.ph-ferr{width:100%;color:#b91c1c;font-size:.82rem}.ph-ferr:empty{display:none}
+        .ph-ferr{width:100%;color:#b91c1c;font-size:.82rem}.ph-ferr:empty{display:none}
         .ph-sugg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
         .ph-chip{border:1px dashed #93c5fd;background:#fff;color:#1d4ed8;border-radius:99px;padding:2px 10px;font-size:.78rem;cursor:pointer;font-family:ui-monospace,Menlo,Consolas,monospace;direction:ltr}
         .ph-blk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.88rem}
@@ -281,7 +312,7 @@ export class PhoneManager {
         .ph-upd{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:99px;padding:0 9px;font-size:.76rem;font-weight:700;cursor:pointer}
         .ph-det td{background:#f8fafc;font-size:.82rem;line-height:1.8;padding:6px 18px}
         .ph-fail{text-align:center;padding:40px 20px;color:#475569;display:flex;flex-direction:column;gap:12px;align-items:center}.ph-fail>i{font-size:2rem;color:#94a3b8}
-        @media(max-width:768px){.ph-t{font-size:.8rem}.ph-form [name=name],.ph-form [name=phone]{width:100%}}`;
+        @media(max-width:768px){.ph-t{font-size:.8rem}}`;
         document.head.appendChild(st);
     }
 }
