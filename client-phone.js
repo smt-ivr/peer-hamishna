@@ -1,7 +1,7 @@
 // ============================================================
-//  client-phone.js — מספרים מורשים לקו עדכון הציונים (למנהל-על בלבד)
+//  client-phone.js — מספרים מורשים לקו עדכון הציונים (מנהל-על + הרשאה מלאה)
 //  new PhoneManager(container, apiBase, menuItem)
-//  לשוניות: מספרים מורשים | יומן שיחות. ההגנה האמיתית בשרת (phone_access.js).
+//  לשוניות: מספרים מורשים | יומן שיחות | היסטוריית שינויים. ההגנה האמיתית בשרת (phone_access.js).
 // ============================================================
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -10,6 +10,20 @@ const DAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];   // 0 = ראשון
 
 const fmtPhone = p => { p = String(p || ''); return p.length === 10 ? `${p.slice(0, 3)}-${p.slice(3)}` : p.length === 9 ? `${p.slice(0, 2)}-${p.slice(2)}` : p; };
 const fmtTime = ts => { const m = /^\d{2}(\d{2})-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(ts || ''); return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : ''; };
+const untilOf = v => { const x = String(v || '').trim(); return !x ? '' : x.length === 10 ? x + ' 23:59' : x.slice(0, 16); };
+const pad = n => String(n).padStart(2, '0');
+const localStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+// בחירה מהירה של תוקף (מחושב לפי השעון של המחשב)
+const QUICK = [['', 'ללא הגבלה'], ['1d', 'יום'], ['7d', 'שבוע'], ['1m', 'חודש'], ['3m', '3 חודשים'], ['1y', 'שנה']];
+function quickUntil(k) {
+    if (!k) return '';
+    const d = new Date();
+    if (k.endsWith('d')) d.setDate(d.getDate() + parseInt(k, 10));
+    if (k.endsWith('m')) d.setMonth(d.getMonth() + parseInt(k, 10));
+    if (k.endsWith('y')) d.setFullYear(d.getFullYear() + 1);
+    return localStr(d);
+}
+const ACTIONS = { add: 'נוסף', edit: 'נערך', delete: 'נמחק', enable: 'הופעל', disable: 'הושבת', extend: 'הוארך', settings: 'הגדרות' };
 const parseDays = s => String(s ?? '').split(',').filter(x => x !== '').map(Number);
 const actionText = a => !a ? '' : a === 'continue' ? '—' : a === 'hangup' ? 'נותק' : a.startsWith('goto:') ? `הועבר לשלוחה ⁦${a.slice(5)}⁩` : a;
 function daysText(days) {
@@ -32,12 +46,13 @@ export class PhoneManager {
         this.data = null;
         this.editing = null;
         this.log = { rows: [], hasMore: false, result: '', q: '', open: {}, loaded: false };
+        this.aud = { rows: [], hasMore: false, q: '', loaded: false };
         this.css();
         this.bind();
         if (menuItem) menuItem.addEventListener('click', () => this.load());
     }
 
-    show(isSuper) { if (this.menuItem) this.menuItem.classList.toggle('hidden', !isSuper); }
+    show(allowed) { if (this.menuItem) this.menuItem.classList.toggle('hidden', !allowed); }
 
     async call(method, path, body) {
         const opt = { method, silent: true };
@@ -62,6 +77,7 @@ export class PhoneManager {
         this.editMinutes = r.data.settings.edit_minutes ?? 5;
         this.render();
         if (this.tab === 'log') this.loadLog();
+        if (this.tab === 'audit') this.loadAudit();
     }
 
     render() {
@@ -72,8 +88,8 @@ export class PhoneManager {
         <div class="ph-wrap">
             <div class="ph-head"><h2><i class="fas fa-phone-alt"></i> הרשאות טלפון</h2>
                 <span class="ph-mut">קו עדכון הציונים · היום: ${t.calls} שיחות, ${t.blocked} נחסמו, ${t.updates} ציונים עודכנו</span></div>
-            <div class="ph-tabs">${tab('numbers', `מספרים מורשים (${this.data.numbers.length})`)}${tab('log', 'יומן שיחות')}</div>
-            ${this.tab === 'numbers' ? this.numbersHtml() : this.logHtml()}
+            <div class="ph-tabs">${tab('numbers', `מספרים מורשים (${this.data.numbers.length})`)}${tab('log', 'יומן שיחות')}${tab('audit', 'היסטוריית שינויים')}</div>
+            ${this.tab === 'numbers' ? this.numbersHtml() : this.tab === 'log' ? this.logHtml() : this.auditHtml()}
         </div>`;
     }
 
@@ -82,22 +98,28 @@ export class PhoneManager {
     // ============================================================
     numbersHtml() {
         const d = this.data, b = this.blocked;
-        const row = n => `<tr class="${n.active ? '' : 'off'}">
+        const now = (d.now || '').slice(0, 16);
+        const row = n => {
+            const until = untilOf(n.valid_until), expired = until && now > until;
+            const perms = [n.can_override ? '<span class="ph-ov">שינוי כל ציון</span>' : '', n.can_manage ? '<span class="ph-ov mg">ניהול בטלפון</span>' : ''].join('');
+            return `<tr class="${n.active && !expired ? '' : 'off'}">
             <td><b>${esc(n.name)}</b></td><td dir="ltr" class="ph-ph">${esc(fmtPhone(n.phone))}</td>
             <td>${n.sched_enabled ? `${daysText(parseDays(n.days))} <span dir="ltr">${esc(n.time_from)}–${esc(n.time_to)}</span>` : 'תמיד'}</td>
-            <td>${n.can_override ? '<span class="ph-ov">כל ציון</span>' : '<span class="ph-mut">רק שלו, בזמן המוגדר</span>'}</td>
-            <td><button class="ph-st ${n.active ? 'on' : ''}" data-ph="toggle" data-v="${n.id}" title="לחיצה: ${n.active ? 'השבתה' : 'הפעלה'}">${n.active ? 'פעיל' : 'מושבת'}</button></td>
-            <td class="ph-mut">${n.last_call ? fmtTime(n.last_call) : ''}</td>
-            <td class="ph-acts"><button class="ph-ico" data-ph="edit" data-v="${n.id}" title="עריכה"><i class="fas fa-pen"></i></button>
+            <td class="${expired ? 'bad' : ''}">${until ? `${expired ? 'פג ב-' : 'עד '}${esc(fmtTime(until))}` : '<span class="ph-mut">ללא הגבלה</span>'}</td>
+            <td>${perms || '<span class="ph-mut">—</span>'}</td>
+            <td>${expired && n.active ? '<span class="ph-st">פג תוקף</span>' : `<button class="ph-st ${n.active ? 'on' : ''}" data-ph="toggle" data-v="${n.id}" title="לחיצה: ${n.active ? 'השבתה' : 'הפעלה'}">${n.active ? 'פעיל' : 'מושבת'}</button>`}</td>
+            <td><button class="ph-link" data-ph="act" data-v="${n.id}" title="כל מה שהמספר עשה">${n.updates ? `${n.updates} עדכונים` : 'פעילות'}${n.last_call ? ` · ${esc(fmtTime(n.last_call))}` : ''}</button></td>
+            <td class="ph-acts"><button class="ph-ico" data-ph="act" data-v="${n.id}" title="פעילות"><i class="fas fa-list-ul"></i></button><button class="ph-ico" data-ph="edit" data-v="${n.id}" title="עריכה"><i class="fas fa-pen"></i></button>
                 <button class="ph-ico danger" data-ph="del" data-v="${n.id}" title="מחיקה"><i class="fas fa-trash-alt"></i></button></td></tr>`;
+        };
         const sugg = d.suggestions && d.suggestions.length ? `<div class="ph-sugg"><span class="ph-mut">עדכנו ציונים בטלפון בעבר:</span>
             ${d.suggestions.map(s => `<button class="ph-chip" data-ph="add-sugg" data-v="${esc(s.phone)}" title="${s.updates} עדכונים">${esc(fmtPhone(s.phone))} <i class="fas fa-plus"></i></button>`).join('')}</div>` : '';
         return `
             ${d.numbers.length ? '' : '<div class="ph-note warn"><i class="fas fa-exclamation-triangle"></i> הרשימה ריקה, ולכן כרגע אף אחד לא יכול לעדכן ציונים בטלפון. רק מספרים שיתווספו לכאן יוכלו לעדכן.</div>'}
             <div class="card ph-card">
                 <div class="ph-bar"><b>מספרים שמורשים לעדכן ציונים</b><button class="btn btn-primary btn-sm" data-ph="new"><i class="fas fa-plus"></i> הוספת מספר</button></div>
-                <table class="ph-t"><thead><tr><th>שם</th><th>טלפון</th><th>מתי מורשה</th><th>שינוי ציון קיים</th><th>מצב</th><th>שיחה אחרונה</th><th></th></tr></thead>
-                <tbody>${d.numbers.length ? d.numbers.map(row).join('') : '<tr><td colspan="7" class="ph-empty">עדיין לא נוספו מספרים</td></tr>'}</tbody></table>
+                <table class="ph-t"><thead><tr><th>שם</th><th>טלפון</th><th>מתי מורשה</th><th>תוקף</th><th>הרשאות נוספות</th><th>מצב</th><th>פעילות</th><th></th></tr></thead>
+                <tbody>${d.numbers.length ? d.numbers.map(row).join('') : '<tr><td colspan="8" class="ph-empty">עדיין לא נוספו מספרים</td></tr>'}</tbody></table>
                 ${sugg}
             </div>
             <div class="card ph-card ph-set">
@@ -129,7 +151,11 @@ export class PhoneManager {
             <form class="ph-mform" id="phForm" data-ph-form autocomplete="off">
                 <label>שם<input name="name" class="ph-in" value="${esc(e.name)}" required></label>
                 <label>מספר טלפון<input name="phone" class="ph-in" dir="ltr" value="${esc(e.phone)}" placeholder="0501234567" inputmode="tel" required></label>
+                <div class="ph-exp"><span class="ph-lbl">תוקף ההרשאה</span>
+                    <span class="ph-quick">${QUICK.map(([k, l]) => `<button type="button" data-quick="${k}">${l}</button>`).join('')}</span>
+                    <span class="ph-hm">עד <input type="datetime-local" name="valid_until" class="ph-in" value="${esc(untilOf(e.valid_until).replace(' ', 'T'))}"> <span class="ph-mut" data-exp-note>${e.valid_until ? '' : 'ללא הגבלה'}</span></span></div>
                 <label class="ph-chk"><input type="checkbox" name="can_override" ${e.can_override ? 'checked' : ''}> מורשה לשנות כל ציון שכבר עודכן (גם ציון שהוזן ממקום אחר)</label>
+                <label class="ph-chk"><input type="checkbox" name="can_manage" ${e.can_manage ? 'checked' : ''}> מורשה לנהל הרשאות טלפון דרך הטלפון (0 וסולמית במקום קוד תלמיד)</label>
                 <label class="ph-chk"><input type="checkbox" name="sched" ${e.sched_enabled ? 'checked' : ''}> רק בימים ובשעות מסוימים</label>
                 <div class="ph-sched ${e.sched_enabled ? '' : 'hidden'}">
                     <span class="ph-days">${DAYS.map((l, i) => `<label class="${days.has(i) ? 'on' : ''}"><input type="checkbox" name="day" value="${i}" ${days.has(i) ? 'checked' : ''}>${l}</label>`).join('')}</span>
@@ -149,8 +175,17 @@ export class PhoneManager {
             if (!b || b.disabled) return;
             if (b.dataset.phm === 'close') return this.closeModal();
         });
+        m.addEventListener('click', ev => {
+            const q = ev.target.closest('[data-quick]');
+            if (!q) return;
+            const inp = m.querySelector('[name="valid_until"]'), v = quickUntil(q.dataset.quick);
+            inp.value = v.replace(' ', 'T');
+            m.querySelector('[data-exp-note]').textContent = v ? '' : 'ללא הגבלה';
+            m.querySelectorAll('[data-quick]').forEach(b => b.classList.toggle('on', b === q));
+        });
         m.addEventListener('change', ev => {
             const t = ev.target;
+            if (t.name === 'valid_until') { m.querySelector('[data-exp-note]').textContent = t.value ? '' : 'ללא הגבלה'; m.querySelectorAll('[data-quick]').forEach(b => b.classList.remove('on')); }
             if (t.name === 'day') t.parentElement.classList.toggle('on', t.checked);
             if (t.name === 'sched') m.querySelector('.ph-sched').classList.toggle('hidden', !t.checked);
         });
@@ -161,7 +196,8 @@ export class PhoneManager {
 
     readForm(form) {
         const v = n => form.querySelector(`[name="${n}"]`).value;
-        return { ...this.editing, name: v('name').trim(), phone: v('phone').trim(), can_override: form.querySelector('[name="can_override"]').checked, sched_enabled: form.querySelector('[name="sched"]').checked,
+        return { ...this.editing, name: v('name').trim(), phone: v('phone').trim(), can_override: form.querySelector('[name="can_override"]').checked, can_manage: form.querySelector('[name="can_manage"]').checked,
+            valid_until: v('valid_until'), sched_enabled: form.querySelector('[name="sched"]').checked,
             days: [...form.querySelectorAll('[name="day"]:checked')].map(x => Number(x.value)), time_from: v('time_from') || '00:00', time_to: v('time_to') || '23:59' };
     }
 
@@ -247,17 +283,88 @@ export class PhoneManager {
     }
 
     // ============================================================
+    //  פעילות של מספר: כל מה שעשה ועדכן
+    // ============================================================
+    async openActivity(num) {
+        let m = document.getElementById('phAct');
+        if (!m) {
+            document.body.insertAdjacentHTML('beforeend', '<div id="phAct" class="modal hidden" style="z-index:9991"><div class="modal-content ph-ac"></div></div>');
+            m = document.getElementById('phAct');
+            m.addEventListener('click', ev => { if (ev.target.closest('[data-pha="close"]')) m.classList.add('hidden'); });
+            document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !m.classList.contains('hidden')) m.classList.add('hidden'); });
+        }
+        const head = `<div class="modal-header"><h3><i class="fas fa-list-ul"></i> ${esc(num.name)} <span class="ph-mut" dir="ltr">${esc(fmtPhone(num.phone))}</span></h3>
+            <button type="button" class="close-modal-btn" data-pha="close" aria-label="סגור">&times;</button></div>`;
+        m.firstElementChild.innerHTML = head + '<div class="ph-acb"><div class="ph-empty"><i class="fas fa-spinner fa-spin"></i></div></div>';
+        m.classList.remove('hidden');
+        const r = await this.call('GET', `/activity?phone=${encodeURIComponent(num.phone)}`);
+        const body = m.querySelector('.ph-acb');
+        if (!r.ok || !r.data) { body.innerHTML = `<div class="ph-empty">${esc(this.err(r, 'שגיאה בטעינה.'))}</div>`; return; }
+        const d = r.data, R = d.reasons || {};
+        // ציר זמן אחד: שיחות, עדכונים, פעולות ניהול שביצע בטלפון, ושינויים שנעשו בהרשאה שלו
+        const items = [
+            ...d.log.map(x => ({ t: x.created_at, k: x.event === 'call' ? 'call' : 'upd', x })),
+            ...d.manage.map(x => ({ t: x.created_at, k: 'mng', x })),
+            ...d.permission_history.map(x => ({ t: x.created_at, k: 'perm', x }))
+        ].sort((a, b) => (a.t < b.t ? 1 : a.t > b.t ? -1 : 0));
+        const line = ({ k, x }) => {
+            const tm = `<span class="ph-mut ph-tm">${esc(fmtTime(x.created_at))}</span>`;
+            if (k === 'call') { const ok = String(x.reason).startsWith('ok_'); return `<div class="ph-ev call">${tm}<i class="fas fa-phone"></i> שיחה · <span class="${ok ? 'ok' : 'bad'}">${esc(R[x.reason] || x.reason)}</span>${ok ? '' : ` · ${esc(actionText(x.action))}`}</div>`; }
+            if (k === 'upd') return `<div class="ph-ev upd">${tm}<i class="fas fa-pen"></i> <b>${esc(x.student_name)}</b> (${esc(x.student_code)}) · מבחן <b>${esc(x.exam_code)}</b> · <span class="${x.passed === 1 ? 'ok' : 'bad'}">${x.reason === 'changed' ? 'שונה ל' : ''}${x.passed === 1 ? 'עבר' : 'לא עבר'}</span></div>`;
+            if (k === 'mng') return `<div class="ph-ev mng">${tm}<i class="fas fa-user-shield"></i> ${ACTIONS[x.action] || x.action} הרשאה למספר <span dir="ltr">${esc(fmtPhone(x.phone))}</span>${x.details ? ` · <span class="ph-mut">${esc(x.details)}</span>` : ''}</div>`;
+            return `<div class="ph-ev perm">${tm}<i class="fas fa-key"></i> ההרשאה שלו ${ACTIONS[x.action] || x.action} ${x.source === 'phone' ? 'בטלפון' : 'באתר'} ע"י ${esc(x.actor || '')}${x.details ? ` · <span class="ph-mut">${esc(x.details)}</span>` : ''}</div>`;
+        };
+        const st = d.stats;
+        body.innerHTML = `<div class="ph-acs"><span><b>${st.calls}</b> שיחות</span><span><b class="bad">${st.blocked}</b> נחסמו</span><span><b class="ok">${st.saved}</b> ציונים הוזנו</span><span><b>${st.changed}</b> ציונים שונו</span><span><b>${d.manage.length}</b> פעולות ניהול</span></div>
+            <div class="ph-evs">${items.length ? items.map(line).join('') : '<div class="ph-empty">אין עדיין פעילות</div>'}</div>`;
+    }
+
+    // ============================================================
+    //  היסטוריית שינויים בהרשאות
+    // ============================================================
+    async loadAudit(more = false) {
+        const A = this.aud, qs = new URLSearchParams();
+        if (A.q.trim()) qs.set('q', A.q.trim());
+        if (more && A.rows.length) qs.set('before_id', String(A.rows[A.rows.length - 1].id));
+        const seq = (this.audSeq = (this.audSeq || 0) + 1);
+        const r = await this.call('GET', `/audit?${qs}`);
+        if (seq !== this.audSeq || this.tab !== 'audit') return;
+        if (!r.ok || !r.data) return window.notify(this.err(r, 'שגיאה בטעינה.'), 'error');
+        A.rows = more ? A.rows.concat(r.data.rows) : r.data.rows; A.hasMore = r.data.has_more; A.loaded = true;
+        this.paintAudit();
+    }
+    auditHtml() {
+        return `<div class="card ph-card"><div class="ph-bar"><input class="ph-in ph-grow" data-ph-audq placeholder="חיפוש לפי שם, מספר או מי ביצע..." value="${esc(this.aud.q)}"></div>
+            <div data-ph-aud>${this.aud.loaded ? '' : '<div class="ph-empty"><i class="fas fa-spinner fa-spin"></i></div>'}</div></div>`;
+    }
+    paintAudit() {
+        const box = $(this.container, '[data-ph-aud]');
+        if (!box) return;
+        const A = this.aud;
+        const rows = A.rows.map(r => `<tr><td class="ph-mut">${esc(fmtTime(r.created_at))}</td>
+            <td><span class="ph-act a-${esc(r.action)}">${ACTIONS[r.action] || esc(r.action)}</span></td>
+            <td>${r.action === 'settings' ? '<span class="ph-mut">הגדרות הקו</span>' : `<b>${esc(r.name || '')}</b> <span dir="ltr" class="ph-ph">${esc(fmtPhone(r.phone))}</span>`}</td>
+            <td class="ph-det2">${esc(r.details || '')}</td>
+            <td>${r.source === 'phone' ? '<i class="fas fa-phone"></i> ' : '<i class="fas fa-desktop"></i> '}${esc(r.actor || '')}</td></tr>`).join('');
+        box.innerHTML = `<table class="ph-t"><thead><tr><th>מתי</th><th>פעולה</th><th>מספר</th><th>מה השתנה</th><th>מי ביצע</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="5" class="ph-empty">אין עדיין שינויים</td></tr>'}</tbody></table>
+            ${A.hasMore ? '<div style="text-align:center;padding:10px"><button class="btn btn-outline btn-sm" data-ph="aud-more">טען עוד</button></div>' : ''}`;
+    }
+
+    // ============================================================
     bind() {
         const c = this.container;
-        const blank = (phone = '') => ({ id: null, name: '', phone, can_override: false, sched_enabled: false, days: [0, 1, 2, 3, 4, 5], time_from: '08:00', time_to: '22:00' });
+        const blank = (phone = '') => ({ id: null, name: '', phone, can_override: false, can_manage: false, valid_until: '', sched_enabled: false, days: [0, 1, 2, 3, 4, 5], time_from: '08:00', time_to: '22:00' });
         c.addEventListener('click', ev => {
             const b = ev.target.closest('[data-ph]');
             if (!b || b.disabled) return;
             const act = b.dataset.ph, v = b.dataset.v, num = this.data && this.data.numbers.find(n => String(n.id) === String(v));
             if (act === 'reload') return this.load();
-            if (act === 'tab') { this.tab = v; this.render(); if (v === 'log') this.loadLog(); return; }
+            if (act === 'tab') { this.tab = v; this.render(); if (v === 'log') this.loadLog(); if (v === 'audit') this.loadAudit(); return; }
             if (act === 'new' || act === 'add-sugg') return this.openModal(blank(act === 'add-sugg' ? v : ''));
-            if (act === 'edit' && num) return this.openModal({ ...num, days: parseDays(num.days), sched_enabled: !!num.sched_enabled, can_override: !!num.can_override });
+            if (act === 'edit' && num) return this.openModal({ ...num, days: parseDays(num.days), sched_enabled: !!num.sched_enabled, can_override: !!num.can_override, can_manage: !!num.can_manage });
+            if (act === 'act' && num) return this.openActivity(num);
+            if (act === 'aud-more') return this.loadAudit(true);
             if (act === 'toggle' && num) return this.toggleNumber(num);
             if (act === 'del' && num) return this.deleteNumber(num);
             if (act === 'bact') { this.blocked.action = v; this.blkDirty = true; return this.render(); }
@@ -270,6 +377,7 @@ export class PhoneManager {
             const t = ev.target;
             if (t.matches('[data-min]')) { this.editMinutes = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
             if (t.dataset.b) { this.blocked[t.dataset.b] = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
+            if (t.matches('[data-ph-audq]')) { clearTimeout(this._aq); this.aud.q = t.value; this._aq = setTimeout(() => this.loadAudit(), 350); return; }
             if (t.matches('[data-ph-logq]')) { clearTimeout(this._lq); this.log.q = t.value; this._lq = setTimeout(() => this.loadLog(), 350); }
         });
     }
@@ -315,6 +423,18 @@ export class PhoneManager {
         .ph-set{display:flex;flex-direction:column;gap:12px}
         .ph-blk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.88rem}.ph-min{width:70px;text-align:center}
         .ph-sfoot{display:flex;justify-content:flex-end;border-top:1px solid #f1f5f9;padding-top:10px}
+        .ph-ov.mg{background:#fef3c7;color:#92400e}.ph-ov+.ph-ov{margin-right:4px}
+        .ph-link{border:none;background:none;color:var(--primary-color);cursor:pointer;font-size:.8rem;padding:0;font-family:inherit}.ph-link:hover{text-decoration:underline}
+        .ph-exp{display:flex;flex-direction:column;gap:6px}.ph-lbl{font-size:.8rem;font-weight:600;color:#475569}
+        .ph-quick{display:inline-flex;flex-wrap:wrap;gap:4px}.ph-quick button{border:1px solid var(--border-color);background:#fff;border-radius:99px;padding:2px 11px;font-size:.78rem;cursor:pointer;font-family:inherit}
+        .ph-quick button.on,.ph-quick button:hover{background:var(--primary-color);border-color:var(--primary-color);color:#fff}
+        .ph-ac{max-width:720px;width:94%;height:auto;max-height:88vh;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+        .ph-acb{overflow:auto;padding:12px 16px}.ph-acs{display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;color:#475569;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border-color)}.ph-acs b{color:#0f172a}
+        .ph-ev{display:flex;gap:8px;align-items:baseline;padding:6px 4px;border-bottom:1px solid #f1f5f9;font-size:.86rem;flex-wrap:wrap}.ph-ev>i{color:#94a3b8;width:14px;text-align:center}
+        .ph-ev.upd>i{color:var(--primary-color)}.ph-ev.mng>i,.ph-ev.perm>i{color:#b45309}.ph-tm{min-width:92px}
+        .ph-act{border-radius:99px;padding:1px 9px;font-size:.75rem;font-weight:700;background:#f1f5f9;color:#475569;white-space:nowrap}
+        .ph-act.a-add,.ph-act.a-enable,.ph-act.a-extend{background:#ecfdf5;color:#047857}.ph-act.a-delete,.ph-act.a-disable{background:#fef2f2;color:#b91c1c}.ph-act.a-edit,.ph-act.a-settings{background:#eff6ff;color:#1d4ed8}
+        .ph-det2{font-size:.8rem;color:#334155;max-width:420px}
         .ph-ov{background:#ede9fe;color:#6d28d9;border-radius:99px;padding:1px 9px;font-size:.75rem;font-weight:700;white-space:nowrap}
         .ph-seg{display:inline-flex;border:1px solid var(--border-color);border-radius:6px;overflow:hidden;background:#fff}
         .ph-seg button{border:none;background:none;padding:5px 11px;font-size:.8rem;font-weight:600;color:#475569;cursor:pointer;font-family:inherit}

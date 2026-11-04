@@ -48,7 +48,8 @@ export class AdminManager {
         try {
             const res = await fetch(`${this.apiBase}/auth-check`);
             const data = await res.json();
-            this.isSuper = data && data.access_level === SUPER;
+            this.level = data && data.access_level;
+            this.isSuper = this.level === SUPER;
         } catch (e) { this.isSuper = false; }
         if (this.menuItem) this.menuItem.classList.toggle('hidden', !this.isSuper);
         return this.isSuper;

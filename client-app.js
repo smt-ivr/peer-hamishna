@@ -512,7 +512,8 @@ async function initApp() {
     dashboardManager = new DashboardManager(document.getElementById('view-dashboard'), API_BASE, openStudentCard);
     adminManager = new AdminManager(document.getElementById('view-admin'), API_BASE, document.getElementById('adminMenuItem'));
     phoneManager = new PhoneManager(document.getElementById('view-phone'), API_BASE, document.getElementById('phoneMenuItem'));
-    adminManager.init().then(isSuper => phoneManager.show(isSuper));
+    // הרשאות טלפון: מנהל-על והרשאה מלאה. ניהול הרשאות הגישה לאתר: מנהל-על בלבד
+    adminManager.init().then(() => phoneManager.show(['super_admin', 'admin'].includes(adminManager.level)));
     
     setupTabs();
     setupMobileNav();
