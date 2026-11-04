@@ -59,6 +59,7 @@ export class PhoneManager {
         this.data = r.data;
         this.data.numbers.sort((a, b) => String(a.name).localeCompare(String(b.name), 'he', { numeric: true }));
         this.blocked = { ...r.data.settings.blocked };
+        this.editMinutes = r.data.settings.edit_minutes ?? 5;
         this.render();
         if (this.tab === 'log') this.loadLog();
     }
@@ -84,6 +85,7 @@ export class PhoneManager {
         const row = n => `<tr class="${n.active ? '' : 'off'}">
             <td><b>${esc(n.name)}</b></td><td dir="ltr" class="ph-ph">${esc(fmtPhone(n.phone))}</td>
             <td>${n.sched_enabled ? `${daysText(parseDays(n.days))} <span dir="ltr">${esc(n.time_from)}–${esc(n.time_to)}</span>` : 'תמיד'}</td>
+            <td>${n.can_override ? '<span class="ph-ov">כל ציון</span>' : '<span class="ph-mut">רק שלו, בזמן המוגדר</span>'}</td>
             <td><button class="ph-st ${n.active ? 'on' : ''}" data-ph="toggle" data-v="${n.id}" title="לחיצה: ${n.active ? 'השבתה' : 'הפעלה'}">${n.active ? 'פעיל' : 'מושבת'}</button></td>
             <td class="ph-mut">${n.last_call ? fmtTime(n.last_call) : ''}</td>
             <td class="ph-acts"><button class="ph-ico" data-ph="edit" data-v="${n.id}" title="עריכה"><i class="fas fa-pen"></i></button>
@@ -94,16 +96,20 @@ export class PhoneManager {
             ${d.numbers.length ? '' : '<div class="ph-note warn"><i class="fas fa-exclamation-triangle"></i> הרשימה ריקה, ולכן כרגע אף אחד לא יכול לעדכן ציונים בטלפון. רק מספרים שיתווספו לכאן יוכלו לעדכן.</div>'}
             <div class="card ph-card">
                 <div class="ph-bar"><b>מספרים שמורשים לעדכן ציונים</b><button class="btn btn-primary btn-sm" data-ph="new"><i class="fas fa-plus"></i> הוספת מספר</button></div>
-                <table class="ph-t"><thead><tr><th>שם</th><th>טלפון</th><th>מתי מורשה</th><th>מצב</th><th>שיחה אחרונה</th><th></th></tr></thead>
-                <tbody>${d.numbers.length ? d.numbers.map(row).join('') : '<tr><td colspan="6" class="ph-empty">עדיין לא נוספו מספרים</td></tr>'}</tbody></table>
+                <table class="ph-t"><thead><tr><th>שם</th><th>טלפון</th><th>מתי מורשה</th><th>שינוי ציון קיים</th><th>מצב</th><th>שיחה אחרונה</th><th></th></tr></thead>
+                <tbody>${d.numbers.length ? d.numbers.map(row).join('') : '<tr><td colspan="7" class="ph-empty">עדיין לא נוספו מספרים</td></tr>'}</tbody></table>
                 ${sugg}
             </div>
-            <div class="card ph-card ph-blk">
-                <b>מספר לא מורשה שמתקשר:</b>
+            <div class="card ph-card ph-set">
+                <div class="ph-blk"><b>שינוי ציון שכבר עודכן:</b> כל מספר מורשה יכול לשנות ציון שהזין בעצמו מהטלפון שלו, עד
+                    <input class="ph-in ph-min" type="number" min="0" max="1440" data-min value="${esc(this.editMinutes)}"> דקות אחרי העדכון
+                    <span class="ph-mut">(0 = לא ניתן. מספרים עם הרשאת "כל ציון" יכולים לשנות תמיד)</span></div>
+                <div class="ph-blk"><b>מספר לא מורשה שמתקשר:</b>
                 <span class="ph-seg"><button class="${b.action === 'hangup' ? 'on' : ''}" data-ph="bact" data-v="hangup">ניתוק</button><button class="${b.action === 'goto' ? 'on' : ''}" data-ph="bact" data-v="goto">העברה לשלוחה</button></span>
                 ${b.action === 'goto' ? `<input class="ph-in ph-folder" dir="ltr" data-b="folder" value="${esc(b.folder)}" placeholder="/5">` : ''}
                 <input class="ph-in ph-grow" data-b="message" value="${esc(b.message)}" placeholder="הודעה שתושמע (ריק = בלי הודעה)">
-                <button class="btn btn-primary btn-sm" data-ph="save-blk" ${this.blkDirty ? '' : 'disabled'}><i class="fas fa-save"></i> שמירה</button>
+                </div>
+                <div class="ph-sfoot"><button class="btn btn-primary btn-sm" data-ph="save-blk" ${this.blkDirty ? '' : 'disabled'}><i class="fas fa-save"></i> שמירת הגדרות</button></div>
             </div>`;
     }
 
@@ -123,6 +129,7 @@ export class PhoneManager {
             <form class="ph-mform" id="phForm" data-ph-form autocomplete="off">
                 <label>שם<input name="name" class="ph-in" value="${esc(e.name)}" required></label>
                 <label>מספר טלפון<input name="phone" class="ph-in" dir="ltr" value="${esc(e.phone)}" placeholder="0501234567" inputmode="tel" required></label>
+                <label class="ph-chk"><input type="checkbox" name="can_override" ${e.can_override ? 'checked' : ''}> מורשה לשנות כל ציון שכבר עודכן (גם ציון שהוזן ממקום אחר)</label>
                 <label class="ph-chk"><input type="checkbox" name="sched" ${e.sched_enabled ? 'checked' : ''}> רק בימים ובשעות מסוימים</label>
                 <div class="ph-sched ${e.sched_enabled ? '' : 'hidden'}">
                     <span class="ph-days">${DAYS.map((l, i) => `<label class="${days.has(i) ? 'on' : ''}"><input type="checkbox" name="day" value="${i}" ${days.has(i) ? 'checked' : ''}>${l}</label>`).join('')}</span>
@@ -154,7 +161,7 @@ export class PhoneManager {
 
     readForm(form) {
         const v = n => form.querySelector(`[name="${n}"]`).value;
-        return { ...this.editing, name: v('name').trim(), phone: v('phone').trim(), sched_enabled: form.querySelector('[name="sched"]').checked,
+        return { ...this.editing, name: v('name').trim(), phone: v('phone').trim(), can_override: form.querySelector('[name="can_override"]').checked, sched_enabled: form.querySelector('[name="sched"]').checked,
             days: [...form.querySelectorAll('[name="day"]:checked')].map(x => Number(x.value)), time_from: v('time_from') || '00:00', time_to: v('time_to') || '23:59' };
     }
 
@@ -181,7 +188,7 @@ export class PhoneManager {
         this.load();
     }
     async saveBlocked() {
-        const r = await this.call('PUT', '/settings', { settings: { blocked: this.blocked } });
+        const r = await this.call('PUT', '/settings', { settings: { edit_minutes: parseInt(this.editMinutes, 10) || 0, blocked: this.blocked } });
         if (!r.ok) return window.notify(this.err(r, 'השמירה נכשלה.'), 'error');
         this.blkDirty = false;
         window.notify('נשמר', 'success', { duration: 2000 });
@@ -221,7 +228,7 @@ export class PhoneManager {
             const ok = String(r.reason).startsWith('ok_'), open = L.open[r.id];
             const upd = r.updates ? `<button class="ph-upd" data-ph="upd" data-v="${r.id}">${r.updates} <i class="fas fa-chevron-${open ? 'up' : 'down'}"></i></button>` : '';
             const det = open ? `<tr class="ph-det"><td colspan="6">${open === 'loading' ? '<i class="fas fa-spinner fa-spin"></i>' : open.map(u =>
-                `<div>${esc(u.created_at.slice(11, 16))} · <b>${esc(u.student_name)}</b> (${esc(u.student_code)}) · מבחן <b>${esc(u.exam_code)}</b> · <span class="${u.passed === 1 ? 'ok' : 'bad'}">${u.passed === 1 ? 'עבר' : 'לא עבר'}</span></div>`).join('')}</td></tr>` : '';
+                `<div>${esc(u.created_at.slice(11, 16))} · <b>${esc(u.student_name)}</b> (${esc(u.student_code)}) · מבחן <b>${esc(u.exam_code)}</b> · <span class="${u.passed === 1 ? 'ok' : 'bad'}">${u.reason === 'changed' ? 'שונה ל' : ''}${u.passed === 1 ? 'עבר' : 'לא עבר'}</span></div>`).join('')}</td></tr>` : '';
             return `<tr><td class="ph-mut">${esc(fmtTime(r.created_at))}</td><td dir="ltr" class="ph-ph">${r.phone ? esc(fmtPhone(r.phone)) : 'חסוי'}</td>
                 <td>${esc(r.number_name || '')}</td><td class="${ok ? 'ok' : 'bad'}">${esc(R[r.reason] || r.reason)}</td><td>${esc(actionText(r.action))}</td><td>${upd}</td></tr>${det}`;
         }).join('');
@@ -242,7 +249,7 @@ export class PhoneManager {
     // ============================================================
     bind() {
         const c = this.container;
-        const blank = (phone = '') => ({ id: null, name: '', phone, sched_enabled: false, days: [0, 1, 2, 3, 4, 5], time_from: '08:00', time_to: '22:00' });
+        const blank = (phone = '') => ({ id: null, name: '', phone, can_override: false, sched_enabled: false, days: [0, 1, 2, 3, 4, 5], time_from: '08:00', time_to: '22:00' });
         c.addEventListener('click', ev => {
             const b = ev.target.closest('[data-ph]');
             if (!b || b.disabled) return;
@@ -250,7 +257,7 @@ export class PhoneManager {
             if (act === 'reload') return this.load();
             if (act === 'tab') { this.tab = v; this.render(); if (v === 'log') this.loadLog(); return; }
             if (act === 'new' || act === 'add-sugg') return this.openModal(blank(act === 'add-sugg' ? v : ''));
-            if (act === 'edit' && num) return this.openModal({ ...num, days: parseDays(num.days), sched_enabled: !!num.sched_enabled });
+            if (act === 'edit' && num) return this.openModal({ ...num, days: parseDays(num.days), sched_enabled: !!num.sched_enabled, can_override: !!num.can_override });
             if (act === 'toggle' && num) return this.toggleNumber(num);
             if (act === 'del' && num) return this.deleteNumber(num);
             if (act === 'bact') { this.blocked.action = v; this.blkDirty = true; return this.render(); }
@@ -261,6 +268,7 @@ export class PhoneManager {
         });
         c.addEventListener('input', ev => {
             const t = ev.target;
+            if (t.matches('[data-min]')) { this.editMinutes = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
             if (t.dataset.b) { this.blocked[t.dataset.b] = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
             if (t.matches('[data-ph-logq]')) { clearTimeout(this._lq); this.log.q = t.value; this._lq = setTimeout(() => this.loadLog(), 350); }
         });
@@ -304,7 +312,10 @@ export class PhoneManager {
         .ph-ferr{width:100%;color:#b91c1c;font-size:.82rem}.ph-ferr:empty{display:none}
         .ph-sugg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
         .ph-chip{border:1px dashed #93c5fd;background:#fff;color:#1d4ed8;border-radius:99px;padding:2px 10px;font-size:.78rem;cursor:pointer;font-family:ui-monospace,Menlo,Consolas,monospace;direction:ltr}
-        .ph-blk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.88rem}
+        .ph-set{display:flex;flex-direction:column;gap:12px}
+        .ph-blk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.88rem}.ph-min{width:70px;text-align:center}
+        .ph-sfoot{display:flex;justify-content:flex-end;border-top:1px solid #f1f5f9;padding-top:10px}
+        .ph-ov{background:#ede9fe;color:#6d28d9;border-radius:99px;padding:1px 9px;font-size:.75rem;font-weight:700;white-space:nowrap}
         .ph-seg{display:inline-flex;border:1px solid var(--border-color);border-radius:6px;overflow:hidden;background:#fff}
         .ph-seg button{border:none;background:none;padding:5px 11px;font-size:.8rem;font-weight:600;color:#475569;cursor:pointer;font-family:inherit}
         .ph-seg button+button{border-right:1px solid var(--border-color)}.ph-seg button.on{background:var(--primary-color);color:#fff}
