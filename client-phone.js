@@ -101,7 +101,7 @@ export class PhoneManager {
         const now = (d.now || '').slice(0, 16);
         const row = n => {
             const until = untilOf(n.valid_until), expired = until && now > until;
-            const perms = [n.can_override ? '<span class="ph-ov">שינוי כל ציון</span>' : '', n.can_manage ? '<span class="ph-ov mg">ניהול בטלפון</span>' : ''].join('');
+            const perms = [n.has_pin ? '<span class="ph-ov pin"><i class="fas fa-lock"></i> סיסמה</span>' : '', n.can_override ? '<span class="ph-ov">שינוי כל ציון</span>' : '', n.can_manage ? '<span class="ph-ov mg">ניהול בטלפון</span>' : ''].join('');
             return `<tr class="${n.active && !expired ? '' : 'off'}">
             <td><b>${esc(n.name)}</b></td><td dir="ltr" class="ph-ph">${esc(fmtPhone(n.phone))}</td>
             <td>${n.sched_enabled ? `${daysText(parseDays(n.days))} <span dir="ltr">${esc(n.time_from)}–${esc(n.time_to)}</span>` : 'תמיד'}</td>
@@ -151,6 +151,9 @@ export class PhoneManager {
             <form class="ph-mform" id="phForm" data-ph-form autocomplete="off">
                 <label>שם<input name="name" class="ph-in" value="${esc(e.name)}" required></label>
                 <label>מספר טלפון<input name="phone" class="ph-in" dir="ltr" value="${esc(e.phone)}" placeholder="0501234567" inputmode="tel" required></label>
+                <label>סיסמה לטלפון (רשות, 4 עד 8 ספרות)<input name="pin" class="ph-in" dir="ltr" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"
+                    placeholder="${e.has_pin ? 'מוגדרת סיסמה · השאירו ריק כדי לא לשנות' : 'בלי סיסמה'}"></label>
+                ${e.has_pin ? '<label class="ph-chk"><input type="checkbox" name="pin_clear"> הסרת הסיסמה</label>' : ''}
                 <div class="ph-exp"><span class="ph-lbl">תוקף ההרשאה</span>
                     <span class="ph-quick">${QUICK.map(([k, l]) => `<button type="button" data-quick="${k}">${l}</button>`).join('')}</span>
                     <span class="ph-hm">עד <input type="datetime-local" name="valid_until" class="ph-in" value="${esc(untilOf(e.valid_until).replace(' ', 'T'))}"> <span class="ph-mut" data-exp-note>${e.valid_until ? '' : 'ללא הגבלה'}</span></span></div>
@@ -197,6 +200,7 @@ export class PhoneManager {
     readForm(form) {
         const v = n => form.querySelector(`[name="${n}"]`).value;
         return { ...this.editing, name: v('name').trim(), phone: v('phone').trim(), can_override: form.querySelector('[name="can_override"]').checked, can_manage: form.querySelector('[name="can_manage"]').checked,
+            pin: v('pin').trim(), pin_clear: !!(form.querySelector('[name="pin_clear"]') || {}).checked,
             valid_until: v('valid_until'), sched_enabled: form.querySelector('[name="sched"]').checked,
             days: [...form.querySelectorAll('[name="day"]:checked')].map(x => Number(x.value)), time_from: v('time_from') || '00:00', time_to: v('time_to') || '23:59' };
     }
@@ -204,6 +208,7 @@ export class PhoneManager {
     async saveNumber(form, btn) {
         const e = this.readForm(form), errEl = $(form, '[data-ph-ferr]');
         if (!e.name || !e.phone) { errEl.textContent = 'יש להזין שם ומספר טלפון.'; return; }
+        if (e.pin && !/^\d{4,8}$/.test(e.pin)) { errEl.textContent = 'הסיסמה חייבת להיות 4 עד 8 ספרות.'; return; }
         if (btn) btn.disabled = true;
         const r = e.id ? await this.call('PUT', `/numbers?id=${e.id}`, e) : await this.call('POST', '/numbers', e);
         if (btn) btn.disabled = false;
@@ -423,7 +428,7 @@ export class PhoneManager {
         .ph-set{display:flex;flex-direction:column;gap:12px}
         .ph-blk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.88rem}.ph-min{width:70px;text-align:center}
         .ph-sfoot{display:flex;justify-content:flex-end;border-top:1px solid #f1f5f9;padding-top:10px}
-        .ph-ov.mg{background:#fef3c7;color:#92400e}.ph-ov+.ph-ov{margin-right:4px}
+        .ph-ov.mg{background:#fef3c7;color:#92400e}.ph-ov.pin{background:#e0f2fe;color:#0369a1}.ph-ov+.ph-ov{margin-right:4px}
         .ph-link{border:none;background:none;color:var(--primary-color);cursor:pointer;font-size:.8rem;padding:0;font-family:inherit}.ph-link:hover{text-decoration:underline}
         .ph-exp{display:flex;flex-direction:column;gap:6px}.ph-lbl{font-size:.8rem;font-weight:600;color:#475569}
         .ph-quick{display:inline-flex;flex-wrap:wrap;gap:4px}.ph-quick button{border:1px solid var(--border-color);background:#fff;border-radius:99px;padding:2px 11px;font-size:.78rem;cursor:pointer;font-family:inherit}
