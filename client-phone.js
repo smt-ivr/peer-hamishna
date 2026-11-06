@@ -23,7 +23,7 @@ function quickUntil(k) {
     if (k.endsWith('y')) d.setFullYear(d.getFullYear() + 1);
     return localStr(d);
 }
-const ACTIONS = { add: 'נוסף', edit: 'נערך', delete: 'נמחק', enable: 'הופעל', disable: 'הושבת', extend: 'הוארך', settings: 'הגדרות' };
+const ACTIONS = { add: 'נוסף', edit: 'נערך', delete: 'נמחק', enable: 'הופעל', disable: 'הושבת', extend: 'הוארך', settings: 'הגדרות', student_phone_add: 'טלפון נוסף לתלמיד', student_phone_remove: 'טלפון הוסר מתלמיד' };
 const parseDays = s => String(s ?? '').split(',').filter(x => x !== '').map(Number);
 const actionText = a => !a ? '' : a === 'continue' ? '—' : a === 'hangup' ? 'נותק' : a.startsWith('goto:') ? `הועבר לשלוחה ⁦${a.slice(5)}⁩` : a;
 function daysText(days) {
@@ -166,7 +166,7 @@ export class PhoneManager {
                     <span class="ph-quick">${QUICK.map(([k, l]) => `<button type="button" data-quick="${k}">${l}</button>`).join('')}</span>
                     <span class="ph-hm">עד <input type="datetime-local" name="valid_until" class="ph-in" value="${esc(untilOf(e.valid_until).replace(' ', 'T'))}"> <span class="ph-mut" data-exp-note>${e.valid_until ? '' : 'ללא הגבלה'}</span></span></div>
                 <label class="ph-chk"><input type="checkbox" name="can_override" ${e.can_override ? 'checked' : ''}> מורשה לשנות כל ציון שכבר עודכן (גם ציון שהוזן ממקום אחר)</label>
-                <label class="ph-chk"><input type="checkbox" name="can_manage" ${e.can_manage ? 'checked' : ''}> מורשה לנהל הרשאות טלפון דרך הטלפון (0 וסולמית במקום קוד תלמיד)</label>
+                <label class="ph-chk"><input type="checkbox" name="can_manage" ${e.can_manage ? 'checked' : ''}> מנהל בטלפון: ניהול הרשאות וטלפונים של תלמידים (0 וסולמית), וצפייה בכל תלמיד באזור האישי</label>
                 <label class="ph-chk"><input type="checkbox" name="sched" ${e.sched_enabled ? 'checked' : ''}> רק בימים ובשעות מסוימים</label>
                 <div class="ph-sched ${e.sched_enabled ? '' : 'hidden'}">
                     <span class="ph-days">${DAYS.map((l, i) => `<label class="${days.has(i) ? 'on' : ''}"><input type="checkbox" name="day" value="${i}" ${days.has(i) ? 'checked' : ''}>${l}</label>`).join('')}</span>
@@ -292,7 +292,7 @@ export class PhoneManager {
     // יומן קו התלמידים: כל אירוע — שיחה, כניסה לתלמיד (מורשה / נדחה), שמיעת פירוט, בדיקת מבחן
     paintStudentLog(box) {
         const L = this.log;
-        const T = { ok_open: ['שיחה נכנסה', 'ok'], line_closed: ['הקו סגור', 'bad'], no_caller_id: ['מספר חסוי', 'bad'], ok: ['נכנס לאזור האישי', 'ok'],
+        const T = { ok_open: ['שיחה נכנסה', 'ok'], line_closed: ['הקו סגור', 'bad'], no_caller_id: ['מספר חסוי', 'bad'], ok: ['נכנס לאזור האישי', 'ok'], ok_manager: ['מנהל נכנס לאזור האישי', 'ok'],
                     wrong_code: ['קוד תלמיד שגוי', 'bad'], phone_mismatch: ['הטלפון לא רשום אצל התלמיד', 'bad'], too_many: ['יותר מדי ניסיונות, נותק', 'bad'],
                     summary: ['שמע פירוט', ''], exam: ['בדק מבחן', ''] };
         const rows = L.rows.map(r => {
@@ -300,7 +300,7 @@ export class PhoneManager {
             const exam = r.reason === 'exam' ? ` <b>${esc(r.exam_code)}</b> · <span class="${r.passed === 1 ? 'ok' : r.passed == null ? 'ph-mut' : 'bad'}">${r.passed === 1 ? 'עבר' : r.passed == null ? 'טרם נבחן' : 'לא עבר'}</span>` : '';
             return `<tr><td class="ph-mut">${esc(fmtTime(r.created_at))}</td><td dir="ltr" class="ph-ph">${r.phone ? esc(fmtPhone(r.phone)) : 'חסוי'}</td>
                 <td>${r.student_name ? `<b>${esc(r.student_name)}</b> <span class="ph-mut">(${esc(r.student_code)})</span>` : r.student_code ? `<span class="ph-mut">קוד ${esc(r.student_code)}</span>` : ''}</td>
-                <td class="${cls}">${label}${exam}</td></tr>`;
+                <td class="${cls}">${label}${r.reason === 'ok_manager' && r.number_name ? ` <span class="ph-mut">(${esc(r.number_name)})</span>` : ''}${exam}</td></tr>`;
         }).join('');
         box.innerHTML = `<table class="ph-t"><thead><tr><th>מתי</th><th>טלפון</th><th>תלמיד</th><th>מה קרה</th></tr></thead>
             <tbody>${rows || '<tr><td colspan="4" class="ph-empty">אין עדיין פעילות בקו התלמידים</td></tr>'}</tbody></table>
@@ -345,6 +345,7 @@ export class PhoneManager {
             const tm = `<span class="ph-mut ph-tm">${esc(fmtTime(x.created_at))}</span>`;
             if (k === 'call') { const ok = String(x.reason).startsWith('ok_'); return `<div class="ph-ev call">${tm}<i class="fas fa-phone"></i> שיחה · <span class="${ok ? 'ok' : 'bad'}">${esc(R[x.reason] || x.reason)}</span>${ok ? '' : ` · ${esc(actionText(x.action))}`}</div>`; }
             if (k === 'upd') return `<div class="ph-ev upd">${tm}<i class="fas fa-pen"></i> <b>${esc(x.student_name)}</b> (${esc(x.student_code)}) · מבחן <b>${esc(x.exam_code)}</b> · <span class="${x.passed === 1 ? 'ok' : 'bad'}">${x.reason === 'changed' ? 'שונה ל' : ''}${x.passed === 1 ? 'עבר' : 'לא עבר'}</span></div>`;
+            if (k === 'mng' && String(x.action).startsWith('student_phone')) return `<div class="ph-ev mng">${tm}<i class="fas fa-user-graduate"></i> ${ACTIONS[x.action]}: <b>${esc(x.name || '')}</b> <span dir="ltr">${esc(fmtPhone(x.phone))}</span></div>`;
             if (k === 'mng') return `<div class="ph-ev mng">${tm}<i class="fas fa-user-shield"></i> ${ACTIONS[x.action] || x.action} הרשאה למספר <span dir="ltr">${esc(fmtPhone(x.phone))}</span>${x.details ? ` · <span class="ph-mut">${esc(x.details)}</span>` : ''}</div>`;
             return `<div class="ph-ev perm">${tm}<i class="fas fa-key"></i> ההרשאה שלו ${ACTIONS[x.action] || x.action} ${x.source === 'phone' ? 'בטלפון' : 'באתר'} ע"י ${esc(x.actor || '')}${x.details ? ` · <span class="ph-mut">${esc(x.details)}</span>` : ''}</div>`;
         };
