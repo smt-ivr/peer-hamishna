@@ -75,6 +75,7 @@ export class PhoneManager {
         this.data.numbers.sort((a, b) => String(a.name).localeCompare(String(b.name), 'he', { numeric: true }));
         this.blocked = { ...r.data.settings.blocked };
         this.editMinutes = r.data.settings.edit_minutes ?? 5;
+        this.student = { enabled: true, require_phone: true, closed_message: '', ...(r.data.settings.student || {}) };
         this.render();
         if (this.tab === 'log') this.loadLog();
         if (this.tab === 'audit') this.loadAudit();
@@ -131,6 +132,13 @@ export class PhoneManager {
                 ${b.action === 'goto' ? `<input class="ph-in ph-folder" dir="ltr" data-b="folder" value="${esc(b.folder)}" placeholder="/5">` : ''}
                 <input class="ph-in ph-grow" data-b="message" value="${esc(b.message)}" placeholder="הודעה שתושמע (ריק = בלי הודעה)">
                 </div>
+                <div class="ph-blk ph-stu"><b><i class="fas fa-user-graduate"></i> קו התלמידים (אזור אישי):</b>
+                    <span class="ph-seg"><button class="${this.student.enabled ? 'on' : ''}" data-ph="stu-open" data-v="1">פתוח</button><button class="${!this.student.enabled ? 'on bad-on' : ''}" data-ph="stu-open" data-v="0">סגור</button></span>
+                    <label class="ph-chk"><input type="checkbox" data-stu="require_phone" ${this.student.require_phone ? 'checked' : ''}> כניסה רק מטלפון שרשום אצל התלמיד</label>
+                    ${this.student.enabled ? '' : `<input class="ph-in ph-grow" data-stu="closed_message" value="${esc(this.student.closed_message)}" placeholder="הודעה כשהקו סגור">`}</div>
+                ${(() => { const sp = d.student_phones || {}; const missing = (sp.total || 0) - (sp.with_phone || 0);
+                    return this.student.enabled && this.student.require_phone && missing > 0
+                        ? `<div class="ph-note warn"><i class="fas fa-exclamation-triangle"></i> רק ל-${sp.with_phone || 0} מתוך ${sp.total} תלמידים רשום טלפון. ${missing} התלמידים האחרים לא יוכלו להיכנס לאזור האישי עד שיוזן להם טלפון בניהול תלמידים (או עד שתבטלו את הסימון "כניסה רק מטלפון שרשום אצל התלמיד").</div>` : ''; })()}
                 <div class="ph-sfoot"><button class="btn btn-primary btn-sm" data-ph="save-blk" ${this.blkDirty ? '' : 'disabled'}><i class="fas fa-save"></i> שמירת הגדרות</button></div>
             </div>`;
     }
@@ -229,7 +237,7 @@ export class PhoneManager {
         this.load();
     }
     async saveBlocked() {
-        const r = await this.call('PUT', '/settings', { settings: { edit_minutes: parseInt(this.editMinutes, 10) || 0, blocked: this.blocked } });
+        const r = await this.call('PUT', '/settings', { settings: { edit_minutes: parseInt(this.editMinutes, 10) || 0, blocked: this.blocked, student: this.student } });
         if (!r.ok) return window.notify(this.err(r, 'השמירה נכשלה.'), 'error');
         this.blkDirty = false;
         window.notify('נשמר', 'success', { duration: 2000 });
@@ -243,6 +251,7 @@ export class PhoneManager {
         const L = this.log, qs = new URLSearchParams({ limit: '100' });
         if (L.result) qs.set('result', L.result);
         if (L.q.trim()) qs.set('q', L.q.trim());
+        if (L.line === 'student') qs.set('line', 'student');
         if (more && L.rows.length) qs.set('before_id', String(L.rows[L.rows.length - 1].id));
         const seq = (this.logSeq = (this.logSeq || 0) + 1);
         const r = await this.call('GET', `/log?${qs}`);
@@ -256,8 +265,9 @@ export class PhoneManager {
     logHtml() {
         const L = this.log, seg = (v, t) => `<button class="${L.result === v ? 'on' : ''}" data-ph="log-result" data-v="${v}">${t}</button>`;
         return `<div class="card ph-card">
-            <div class="ph-bar"><span class="ph-seg">${seg('', 'הכל')}${seg('allowed', 'אושרו')}${seg('blocked', 'נחסמו')}</span>
-                <input class="ph-in ph-grow" data-ph-logq placeholder="חיפוש לפי שם או מספר..." value="${esc(L.q)}"></div>
+            <div class="ph-bar"><span class="ph-seg"><button class="${L.line !== 'student' ? 'on' : ''}" data-ph="log-line" data-v="manager">קו עדכון ציונים</button><button class="${L.line === 'student' ? 'on' : ''}" data-ph="log-line" data-v="student">קו תלמידים</button></span>
+                <span class="ph-seg">${seg('', 'הכל')}${seg('allowed', L.line === 'student' ? 'מורשים' : 'אושרו')}${seg('blocked', 'נחסמו')}</span>
+                <input class="ph-in ph-grow" data-ph-logq placeholder="${L.line === 'student' ? 'חיפוש לפי תלמיד, קוד או מספר...' : 'חיפוש לפי שם או מספר...'}" value="${esc(L.q)}"></div>
             <div data-ph-log>${L.loaded ? '' : '<div class="ph-empty"><i class="fas fa-spinner fa-spin"></i></div>'}</div></div>`;
     }
 
@@ -265,6 +275,7 @@ export class PhoneManager {
         const box = $(this.container, '[data-ph-log]');
         if (!box) return;
         const L = this.log, R = this.data.reasons || {};
+        if (L.line === 'student') return this.paintStudentLog(box);
         const rows = L.rows.map(r => {
             const ok = String(r.reason).startsWith('ok_'), open = L.open[r.id];
             const upd = r.updates ? `<button class="ph-upd" data-ph="upd" data-v="${r.id}">${r.updates} <i class="fas fa-chevron-${open ? 'up' : 'down'}"></i></button>` : '';
@@ -275,6 +286,24 @@ export class PhoneManager {
         }).join('');
         box.innerHTML = `<table class="ph-t"><thead><tr><th>מתי</th><th>טלפון</th><th>שם</th><th>תוצאה</th><th>פעולה</th><th>ציונים</th></tr></thead>
             <tbody>${rows || '<tr><td colspan="6" class="ph-empty">אין שיחות</td></tr>'}</tbody></table>
+            ${L.hasMore ? '<div style="text-align:center;padding:10px"><button class="btn btn-outline btn-sm" data-ph="log-more">טען עוד</button></div>' : ''}`;
+    }
+
+    // יומן קו התלמידים: כל אירוע — שיחה, כניסה לתלמיד (מורשה / נדחה), שמיעת פירוט, בדיקת מבחן
+    paintStudentLog(box) {
+        const L = this.log;
+        const T = { ok_open: ['שיחה נכנסה', 'ok'], line_closed: ['הקו סגור', 'bad'], no_caller_id: ['מספר חסוי', 'bad'], ok: ['נכנס לאזור האישי', 'ok'],
+                    wrong_code: ['קוד תלמיד שגוי', 'bad'], phone_mismatch: ['הטלפון לא רשום אצל התלמיד', 'bad'], too_many: ['יותר מדי ניסיונות, נותק', 'bad'],
+                    summary: ['שמע פירוט', ''], exam: ['בדק מבחן', ''] };
+        const rows = L.rows.map(r => {
+            const [label, cls] = T[r.reason] || [r.reason, ''];
+            const exam = r.reason === 'exam' ? ` <b>${esc(r.exam_code)}</b> · <span class="${r.passed === 1 ? 'ok' : r.passed == null ? 'ph-mut' : 'bad'}">${r.passed === 1 ? 'עבר' : r.passed == null ? 'טרם נבחן' : 'לא עבר'}</span>` : '';
+            return `<tr><td class="ph-mut">${esc(fmtTime(r.created_at))}</td><td dir="ltr" class="ph-ph">${r.phone ? esc(fmtPhone(r.phone)) : 'חסוי'}</td>
+                <td>${r.student_name ? `<b>${esc(r.student_name)}</b> <span class="ph-mut">(${esc(r.student_code)})</span>` : r.student_code ? `<span class="ph-mut">קוד ${esc(r.student_code)}</span>` : ''}</td>
+                <td class="${cls}">${label}${exam}</td></tr>`;
+        }).join('');
+        box.innerHTML = `<table class="ph-t"><thead><tr><th>מתי</th><th>טלפון</th><th>תלמיד</th><th>מה קרה</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="4" class="ph-empty">אין עדיין פעילות בקו התלמידים</td></tr>'}</tbody></table>
             ${L.hasMore ? '<div style="text-align:center;padding:10px"><button class="btn btn-outline btn-sm" data-ph="log-more">טען עוד</button></div>' : ''}`;
     }
 
@@ -375,12 +404,19 @@ export class PhoneManager {
             if (act === 'bact') { this.blocked.action = v; this.blkDirty = true; return this.render(); }
             if (act === 'save-blk') return this.saveBlocked();
             if (act === 'log-result') { this.log.result = v; this.render(); return this.loadLog(); }
+            if (act === 'log-line') { this.log.line = v; this.log.rows = []; this.log.open = {}; this.log.loaded = false; this.render(); return this.loadLog(); }
+            if (act === 'stu-open') { this.student.enabled = v === '1'; this.blkDirty = true; return this.render(); }
             if (act === 'log-more') return this.loadLog(true);
             if (act === 'upd') return this.toggleUpdates(v);
+        });
+        c.addEventListener('change', ev => {
+            const t = ev.target;
+            if (t.dataset.stu === 'require_phone') { this.student.require_phone = t.checked; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; }
         });
         c.addEventListener('input', ev => {
             const t = ev.target;
             if (t.matches('[data-min]')) { this.editMinutes = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
+            if (t.dataset.stu === 'closed_message') { this.student.closed_message = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
             if (t.dataset.b) { this.blocked[t.dataset.b] = t.value; this.blkDirty = true; const s = $(c, '[data-ph="save-blk"]'); if (s) s.disabled = false; return; }
             if (t.matches('[data-ph-audq]')) { clearTimeout(this._aq); this.aud.q = t.value; this._aq = setTimeout(() => this.loadAudit(), 350); return; }
             if (t.matches('[data-ph-logq]')) { clearTimeout(this._lq); this.log.q = t.value; this._lq = setTimeout(() => this.loadLog(), 350); }
@@ -428,6 +464,7 @@ export class PhoneManager {
         .ph-set{display:flex;flex-direction:column;gap:12px}
         .ph-blk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.88rem}.ph-min{width:70px;text-align:center}
         .ph-sfoot{display:flex;justify-content:flex-end;border-top:1px solid #f1f5f9;padding-top:10px}
+        .ph-stu{padding-top:10px;border-top:1px solid #f1f5f9}.ph-stu b i{color:var(--primary-color)}.ph-seg button.bad-on{background:#dc2626}
         .ph-ov.mg{background:#fef3c7;color:#92400e}.ph-ov.pin{background:#e0f2fe;color:#0369a1}.ph-ov+.ph-ov{margin-right:4px}
         .ph-link{border:none;background:none;color:var(--primary-color);cursor:pointer;font-size:.8rem;padding:0;font-family:inherit}.ph-link:hover{text-decoration:underline}
         .ph-exp{display:flex;flex-direction:column;gap:6px}.ph-lbl{font-size:.8rem;font-weight:600;color:#475569}

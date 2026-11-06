@@ -10,6 +10,8 @@ const csv = v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" 
 const money = v => '₪' + (Number(v) || 0).toFixed(1);
 const heb = ts => { const d = new Date(String(ts || '').replace(' ', 'T')); return isNaN(d) ? '' : formatHebrewDate(d).split(' ').slice(0, -1).join(' '); };
 const $ = id => document.getElementById(id);
+const normPhone = v => { let d = String(v || '').replace(/\D/g, ''); if (d.startsWith('972')) d = '0' + d.slice(3); return d; };
+const fmtPhone = p => (p.length === 10 ? `${p.slice(0, 3)}-${p.slice(3)}` : p.length === 9 ? `${p.slice(0, 2)}-${p.slice(2)}` : p);
 
 const TYPE = { mishnayot: 'משניות', gemara: 'גמרא' };
 const pad = n => String(n).padStart(2, '0');
@@ -236,10 +238,11 @@ export class StudentManager {
 
     openForm(code = null, tab = 'details') {
         const s = code ? this.find(code) : null;
-        this.ed = { code: s ? s.student_code : null, q: '', seg: 'taken', pending: new Map(), review: false, items: [] };   // pending: שינויים שסומנו ועדיין לא נשמרו
+        this.ed = { code: s ? s.student_code : null, q: '', seg: 'taken', pending: new Map(), review: false, items: [], phones: s ? (s.phones || []).map(normPhone).filter(Boolean) : [] };   // pending: שינויים שסומנו ועדיין לא נשמרו
         $('stuForm').reset();
-        ['fFirst', 'fLast', 'fClass', 'fCode'].forEach(id => this.fieldErr(id, ''));
+        ['fFirst', 'fLast', 'fClass', 'fCode', 'fPhone'].forEach(id => this.fieldErr(id, ''));
         this.say(null);
+        this.paintPhones();
         $('fOrig').value = s ? s.student_code : '';
         $('stuFormTitle').innerHTML = s ? `<i class="fas fa-pen"></i> ${esc(this.fullName(s))}` : '<i class="fas fa-user-plus"></i> תלמיד חדש';
         $('fAddCode').style.display = s ? 'none' : '';
@@ -252,7 +255,7 @@ export class StudentManager {
         $('fAutoHint').textContent = `הקוד הבא בערך: ${nums.length ? Math.max(...nums) + 1 : 1000}`;
         if (s) {
             $('fFirst').value = s.first_name || ''; $('fLast').value = s.last_name || ''; $('fClass').value = s.class_grade || '';
-            $('fPhone').value = (s.phones || []).join(', '); $('fCurCode').textContent = s.student_code;
+            $('fCurCode').textContent = s.student_code;
         }
         $('stuFormModal').classList.remove('hidden');
         this.tab(s && tab === 'exams' ? 'exams' : 'details');
@@ -308,12 +311,32 @@ export class StudentManager {
         this.say('error', msg);
     }
 
+    // ---------- טלפונים של התלמיד: רשימה (בלי פסיקים) ----------
+    paintPhones() {
+        const list = this.ed.phones;
+        $('fPhones').innerHTML = list.length ? list.map((p, i) => `<span class="stu-ph"><span dir="ltr">${esc(fmtPhone(p))}</span><button type="button" data-rmphone="${i}" title="הסרה" aria-label="הסרה">&times;</button></span>`).join('')
+            : '<span class="stu-mut">עדיין לא נוספו טלפונים</span>';
+        $('fPhoneAdd').disabled = list.length >= 5;
+    }
+    // מוסיף את מה שמוקלד בשדה. מחזיר false אם יש שגיאה
+    addPhone() {
+        const inp = $('fPhone'), raw = inp.value.trim();
+        if (!raw) return true;
+        const p = normPhone(raw);
+        if (!/^0\d{8,9}$/.test(p)) { this.fieldErr('fPhone', 'מספר טלפון לא תקין (למשל 0501234567)'); inp.focus(); return false; }
+        if (this.ed.phones.includes(p)) { this.fieldErr('fPhone', 'המספר כבר ברשימה'); inp.focus(); return false; }
+        if (this.ed.phones.length >= 5) { this.fieldErr('fPhone', 'אפשר עד 5 טלפונים לתלמיד'); return false; }
+        this.ed.phones.push(p); inp.value = ''; this.fieldErr('fPhone', ''); this.paintPhones(); inp.focus();
+        return true;
+    }
+
     async save() {
         this.say(null);
+        if (!this.addPhone()) return;          // מספר שהוקלד ולא נוסף — נוסף עכשיו (או מציג שגיאה)
         if (!this.validate()) return;
         const orig = $('fOrig').value, btn = $('fSave'), label = btn.innerHTML;
         const body = { first_name: $('fFirst').value.trim(), last_name: $('fLast').value.trim(), class_grade: $('fClass').value.trim(),
-                       phones: $('fPhone').value.split(/[,\s;]+/).filter(Boolean) };
+                       phones: this.ed.phones.slice() };
         if (!orig && !$('fAuto').checked) body.student_code = $('fCode').value.trim();
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר...';
         const r = orig ? await this.call('PUT', `/students/${encodeURIComponent(orig)}`, body) : await this.call('POST', '/students', body);
@@ -511,6 +534,9 @@ export class StudentManager {
         $('stuForm').addEventListener('click', e => { const c = e.target.closest('[data-cls]'); if (c) { $('fClass').value = c.dataset.cls; this.fieldErr('fClass', ''); } });
         $('fAuto').addEventListener('change', e => { $('fCode').disabled = e.target.checked; if (e.target.checked) { $('fCode').value = ''; this.fieldErr('fCode', ''); } $('fAutoHint').style.visibility = e.target.checked ? 'visible' : 'hidden'; });
         $('fChange').addEventListener('click', () => this.changeCode());
+        $('fPhoneAdd').addEventListener('click', () => this.addPhone());
+        $('fPhone').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.addPhone(); } });
+        $('fPhones').addEventListener('click', e => { const b = e.target.closest('[data-rmphone]'); if (b) { this.ed.phones.splice(+b.dataset.rmphone, 1); this.paintPhones(); } });
         ['stuFormClose', 'fCancel', 'fDone'].forEach(id => $(id).addEventListener('click', () => this.closeForm()));
         $('stuTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) this.tab(b.dataset.tab); });
         $('stuAlert').addEventListener('click', e => { if (e.target.closest('[data-ax]')) this.say(null); });
@@ -549,7 +575,10 @@ export class StudentManager {
                 <div class="stu-2">${f('fFirst', 'שם פרטי', 'required')}${f('fLast', 'שם משפחה', 'required')}</div>
                 <div class="stu-2">
                     <div class="stu-f"><label for="fClass">כיתה <i class="stu-req">חובה</i></label><input id="fClass" required><small class="stu-ferr"></small><div class="stu-chips" id="fClassChips"></div></div>
-                    ${f('fPhone', 'טלפון (אפשר כמה, מופרדים בפסיק)', 'placeholder="0501234567"')}</div>
+                    <div class="stu-f"><label for="fPhone">טלפונים <span class="stu-mut">(רק מהם אפשר להיכנס לאזור האישי בטלפון)</span></label>
+                        <div class="stu-phones" id="fPhones"></div>
+                        <div class="stu-padd"><input id="fPhone" placeholder="0501234567" inputmode="tel" autocomplete="off"><button type="button" class="btn btn-secondary btn-sm" id="fPhoneAdd"><i class="fas fa-plus"></i> הוספה</button></div>
+                        <small class="stu-ferr"></small></div></div>
                 <div class="stu-box" id="fAddCode">${f('fCode', 'קוד תלמיד (ייחודי)', 'placeholder="הקש קוד רצוי"')}
                     <label class="stu-chk"><input type="checkbox" id="fAuto"> הקצה קוד עוקב אוטומטית <span class="stu-mut" id="fAutoHint" style="visibility:hidden"></span></label></div>
                 <div class="stu-box" id="fEditCode" style="display:none;flex-direction:row;justify-content:space-between;align-items:center">
@@ -628,6 +657,10 @@ export class StudentManager {
         .stu-f label{display:block;margin-bottom:4px;font-size:.8rem;font-weight:600;color:#475569}
         .stu-f input{width:100%;padding:8px;border:1px solid var(--border-color);border-radius:6px;outline:none}.stu-f input:focus{border-color:var(--primary-color)}
         .stu-box{background:#f8fafc;border:1px solid var(--border-color);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+        .stu-phones{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:26px;align-items:center}
+        .stu-ph{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:99px;padding:2px 4px 2px 10px;font-size:.84rem;font-family:ui-monospace,Menlo,Consolas,monospace}
+        .stu-ph button{border:none;background:none;color:#64748b;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;border-radius:50%}.stu-ph button:hover{background:#dbeafe;color:#b91c1c}
+        .stu-padd{display:flex;gap:6px}.stu-padd input{flex:1;padding:8px;border:1px solid var(--border-color);border-radius:6px;outline:none;direction:ltr;text-align:right}.stu-padd input:focus{border-color:var(--primary-color)}
         .stu-chk{display:flex;gap:8px;align-items:center;font-size:.85rem;cursor:pointer}
         .stu-mc{max-width:680px;width:94%;height:auto;max-height:92vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden}
         .stu-tabs{display:flex;gap:4px;padding:8px 14px 0;background:#f8fafc;border-bottom:1px solid var(--border-color)}
