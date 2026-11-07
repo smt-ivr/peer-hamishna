@@ -51,12 +51,14 @@ export class ExamUpdateManager {
         }
         this.student = me;
         if (silent) { this.paintTop(); this.refreshRows(); if (!$('geHistModal').classList.contains('hidden')) this.paintHist(); return; }
-        this.rows = [this.newRow()]; this.report = null;
+        this.rows = this.blankRows(); this.report = null;
         this.closeHist();
         this.render();
     }
 
     newRow() { return { id: this.nextId++, code: '', status: null, force: false, note: '' }; }
+    // נפתחות 10 שורות ריקות. שורה ריקה לא נשלחת — אפשר לשמור גם אם לא מילאו את כולן
+    blankRows(keep = []) { const rows = keep.slice(); while (rows.length < 10) rows.push(this.newRow()); return rows; }
     mine(code) { return this.student && this.student.exams.find(e => e.exam_code === code); }
     desc(ex) {
         const d = ex.details || {};
@@ -218,7 +220,7 @@ export class ExamUpdateManager {
         const problem = new Map([...skipped, ...errors].map(x => [x.exam_code, x.reason]));
         const keep = this.rows.filter(row => problem.has(row.code));
         keep.forEach(row => { row.note = problem.get(row.code); });
-        this.rows = keep.length ? keep : [this.newRow()];
+        this.rows = this.blankRows(keep);
         await this.loadStudentData(this.student.student_code, true);
         this.paintRows(); this.paintReport();
         if (this.onChanged) { clearTimeout(this._t); this._t = setTimeout(() => this.onChanged(), 1500); }

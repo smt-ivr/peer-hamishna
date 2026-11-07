@@ -1,0 +1,15 @@
+<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="utf-8"><link rel="stylesheet" href="/styles.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"></head><body>
+<div id="sp" style="padding:16px"></div>
+<script type="module">
+window.__posts = [];
+window.fetch = async (u, c = {}) => {
+  if (c.method === 'POST') { const b = JSON.parse(c.body); window.__posts.push(b); return new Response(JSON.stringify({ updated: b.exams.map(e => e.exam_code), skipped: [], errors: [] }), { status: 200 }); }
+  return new Response(JSON.stringify([{ student_code: '1001', first_name: 'משה', last_name: 'כהן', class_grade: 'ג', stats: { total_attempted: 0, total_available_exams: 2, total_passed: 0, total_reward: 0 },
+    exams: [{ exam_code: '5א', exam_type: 'mishnayot', passed: null, details: { masechet: 'ברכות', chapter_num: 1 } }, { exam_code: '6א', exam_type: 'mishnayot', passed: null, details: { masechet: 'ברכות', chapter_num: 2 } }] }]), { status: 200 });
+};
+window.notify = () => {}; window.customAlert = () => {}; window.customConfirm = async () => true;
+import { ExamUpdateManager } from '/client-exam-update.js';
+window.em = new ExamUpdateManager('/api', document.getElementById('sp'), () => {}, () => {});
+em.loadStudentData('1001');
+</script></body></html>
