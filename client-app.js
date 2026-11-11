@@ -341,6 +341,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         fetchAuthAndSetupUI();
         logEntry(API_BASE);
         await initApp();
+    } else if (localStorage.getItem('peer_api_key')) {
+        // סיסמה שמורה בזיכרון — נכנסים מיד (מסך הכניסה לא מוצג), והסיסמה נבדקת מול השרת
+        await enterWithSavedKey();
     } else {
         await checkAuthAndInit();
     }
@@ -404,13 +407,37 @@ function enableLoginForm(text) {
     loginBtn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
 }
 
+async function enterWithSavedKey() {
+    appStarted = true;
+    document.getElementById('auth-overlay').style.display = 'none';
+    document.getElementById('mainContainer').classList.remove('blurred-bg');
+    try {
+        const response = await fetch(`${API_BASE}/auth-check`);
+        const data = await response.json();
+        if (data.is_authorized) {
+            if (data.is_ip_allowed) localStorage.setItem('peer_ip_allowed', 'true');
+            updateTopbarInfo(data);
+            logEntry(API_BASE);
+            await initApp();
+            return;
+        }
+        localStorage.removeItem('peer_api_key');   // הסיסמה השמורה כבר לא תקפה
+    } catch (e) { /* תקלת תקשורת — חוזרים למסך הכניסה */ }
+    appStarted = false;
+    const noFlicker = document.getElementById('noFlickerStyle');
+    if (noFlicker) noFlicker.remove();
+    document.getElementById('auth-overlay').style.display = 'flex';
+    document.getElementById('mainContainer').classList.add('blurred-bg');
+    await checkAuthAndInit();
+}
+
 async function checkAuthAndInit() {
     const authMessage = document.getElementById('authMessage');
     const apiKeyInput = document.getElementById('apiKeyInput');
 
     // לא מחכים לבדיקה — אפשר להקליד סיסמה מיד
     enableLoginForm();
-    authMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i>בודק הרשאת גישה ברקע · אפשר כבר להזין סיסמה';
+    authMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i>בודק הרשאת IP...';
     apiKeyInput.focus();
     apiKeyInput.addEventListener('input', () => { if (apiKeyInput.value) manualLogin = true; });
 
@@ -433,7 +460,7 @@ async function checkAuthAndInit() {
             updateTopbarInfo(data);
         }
     } catch (e) {
-        if (!appStarted && !manualLogin) authMessage.innerText = 'שגיאת תקשורת בבדיקת הרשאות מול השרת. אפשר להיכנס עם סיסמה.';
+        if (!appStarted && !manualLogin) authMessage.innerText = 'שגיאת תקשורת בבדיקת הרשאות מול השרת.';
     }
 }
 
