@@ -41,19 +41,19 @@
                 <div class="lg-mobile-logo"><img src="https://smt-tel-manager.netlify.app/smt.png" alt="" draggable="false"></div>
                 <h1 id="lgTitle">כניסה למערכת</h1>
                 <p id="authMessage" class="lg-status">
-                    <i class="fas fa-spinner fa-spin"></i>בודק הרשאת גישה...
+                    <i class="fas fa-lock"></i>הזינו את סיסמת הגישה
                 </p>
 
                 <label class="lg-label" for="apiKeyInput">סיסמת גישה</label>
                 <div class="lg-field">
                     <i class="fas fa-lock lg-field-ico"></i>
-                    <input type="password" id="apiKeyInput" placeholder="הקלידו את הסיסמה" class="lg-input" autocomplete="current-password" spellcheck="false" disabled>
+                    <input type="password" id="apiKeyInput" placeholder="הקלידו את הסיסמה" class="lg-input" autocomplete="current-password" spellcheck="false">
                     <button type="button" class="lg-eye" id="lgEye" aria-label="הצגת סיסמה" tabindex="-1"><i class="fas fa-eye"></i></button>
                 </div>
                 <div class="lg-caps hidden" id="lgCaps"><i class="fas fa-arrow-alt-circle-up"></i> Caps Lock פעיל</div>
 
-                <button id="loginBtn" class="lg-btn" disabled>
-                    <span>מאמת נתונים...</span>
+                <button id="loginBtn" class="lg-btn">
+                    <span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>
                 </button>
 
                 <div id="loginError" class="lg-error hidden" role="alert">

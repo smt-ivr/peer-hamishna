@@ -337,6 +337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // אם ה-IP כבר מאושר בזיכרון, מדלגים על הבדיקה ונכנסים מיד
     if (localStorage.getItem('peer_ip_allowed') === 'true') {
+        appStarted = true;
         fetchAuthAndSetupUI();
         logEntry(API_BASE);
         await initApp();
@@ -389,39 +390,50 @@ async function fetchAuthAndSetupUI() {
     } catch(e) {}
 }
 
-async function checkAuthAndInit() {
+// מצב הכניסה: הטופס פתוח מיד, בדיקת ה-IP רצה ברקע
+let appStarted = false;       // האתר כבר נטען (מונע טעינה כפולה)
+let manualLogin = false;      // המשתמש התחיל להקליד / לחץ כניסה — בדיקת הרקע לא תיכנס במקומו
+
+function enableLoginForm(text) {
     const authMessage = document.getElementById('authMessage');
     const apiKeyInput = document.getElementById('apiKeyInput');
     const loginBtn = document.getElementById('loginBtn');
+    if (text !== undefined) authMessage.innerText = text;
+    apiKeyInput.disabled = false;
+    loginBtn.disabled = false;
+    loginBtn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
+}
+
+async function checkAuthAndInit() {
+    const authMessage = document.getElementById('authMessage');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+
+    // לא מחכים לבדיקה — אפשר להקליד סיסמה מיד
+    enableLoginForm();
+    authMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i>בודק הרשאת גישה ברקע · אפשר כבר להזין סיסמה';
+    apiKeyInput.focus();
+    apiKeyInput.addEventListener('input', () => { if (apiKeyInput.value) manualLogin = true; });
 
     try {
         const response = await fetch(`${API_BASE}/auth-check`);
         const data = await response.json();
+        if (appStarted || manualLogin) return;
 
         if (data.is_authorized) {
             if (data.is_ip_allowed) {
                 localStorage.setItem('peer_ip_allowed', 'true');
             }
+            appStarted = true;
             hideAuthOverlay();
             updateTopbarInfo(data);
             logEntry(API_BASE);
             await initApp();
         } else {
             authMessage.innerText = data.message || 'כתובת ה-IP אינה מורשית, נדרשת סיסמה';
-            
-            apiKeyInput.disabled = false;
-            loginBtn.disabled = false;
-            loginBtn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
-            apiKeyInput.focus();
-            
             updateTopbarInfo(data);
         }
     } catch (e) {
-        authMessage.innerText = 'שגיאת תקשורת בבדיקת הרשאות מול השרת.';
-        apiKeyInput.disabled = false;
-        loginBtn.disabled = false;
-        loginBtn.innerHTML = '<span>כניסה למערכת</span> <i class="fas fa-arrow-left" style="margin-right: 8px;"></i>';
-        apiKeyInput.focus();
+        if (!appStarted && !manualLogin) authMessage.innerText = 'שגיאת תקשורת בבדיקת הרשאות מול השרת. אפשר להיכנס עם סיסמה.';
     }
 }
 
@@ -437,7 +449,8 @@ function hideAuthOverlay() {
 
 async function performLogin() {
     const key = document.getElementById('apiKeyInput').value.trim();
-    if (!key) return;
+    if (!key || appStarted) return;
+    manualLogin = true;
     
     const btn = document.getElementById('loginBtn');
     const errDiv = document.getElementById('loginError');
@@ -465,7 +478,9 @@ async function performLogin() {
                 localStorage.setItem('peer_ip_allowed', 'true');
             }
             try { sessionStorage.setItem('peer_entry_logged', '1'); } catch (e) {}
-            
+            if (appStarted) return;
+            appStarted = true;
+
             hideAuthOverlay();
             updateTopbarInfo(data);
             await initApp();
