@@ -102,6 +102,7 @@ export class StudentManager {
                 <div><h3><i class="fas fa-users"></i> ניהול תלמידים</h3><div class="stu-kpis" id="stuKpis"></div></div>
                 <div class="stu-btns">
                     <button class="btn btn-outline btn-sm" id="stuExport"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
+                    <button class="btn btn-outline btn-sm" id="stuPayXlsx" title="כל התלמידים: משניות, דפי גמרא וסכום להטענה"><i class="fas fa-file-invoice-dollar"></i> אקסל סכומים להטענה</button>
                     <button class="btn btn-secondary btn-sm" id="stuPrintList" title="רשימת שמות וקודים להדפסה / PDF"><i class="fas fa-print"></i> רשימה להדפסה / PDF</button>
                     <button class="btn btn-primary btn-sm" id="stuAdd"><i class="fas fa-user-plus"></i> תלמיד חדש</button>
                 </div>
@@ -475,6 +476,64 @@ export class StudentManager {
         setTimeout(() => { row.saved = false; if (this.ed && this.ed.code === sc && this.ed.tab === 'exams' && !this.ed.review) this.paintExams(); }, 2200);
     }
 
+    // ============================================================
+    //  אקסל סכומים להטענה: כל התלמידים, משניות, דפי גמרא וסכום (רק מבחנים שעברו)
+    // ============================================================
+    loadXlsx() {
+        if (window.XLSX) return Promise.resolve();
+        if (this._xlsx) return this._xlsx;
+        this._xlsx = new Promise((resolve, reject) => {
+            const sc = document.createElement('script');
+            sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+            sc.onload = resolve; sc.onerror = () => { this._xlsx = null; reject(new Error('xlsx')); };
+            document.head.appendChild(sc);
+        });
+        return this._xlsx;
+    }
+
+    async exportPayments() {
+        const btn = $('stuPayXlsx'), label = btn.innerHTML;
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין...';
+        try {
+            const r = await this.call('GET', '/student-summary');      // נתונים עדכניים מהשרת
+            if (!r.ok || !Array.isArray(r.data)) return window.customAlert(this.errText(r, 'לא ניתן לטעון את הנתונים.'), true);
+            const list = r.data.slice().sort((a, b) => String(a.last_name || '').localeCompare(String(b.last_name || ''), 'he')
+                || String(a.first_name || '').localeCompare(String(b.first_name || ''), 'he'));
+            const head = ['מס׳', 'קוד תלמיד', 'שם משפחה', 'שם פרטי', 'כיתה', 'משניות', 'דפי גמרא', 'סכום להטענה'];
+            const rows = list.map((s, i) => {
+                const st = s.stats || {};
+                const code = Number(s.student_code);
+                return [i + 1, String(code) === String(s.student_code) ? code : s.student_code, s.last_name || '', s.first_name || '', s.class_grade || '',
+                    Number(st.total_mishnayot) || 0, Number(st.total_gemara_pages) || 0, Math.round((Number(st.total_reward) || 0) * 100) / 100];
+            });
+            const stamp = formatHebrewDate(new Date()).replace(/[׳״"']/g, '').replace(/\s+/g, '_');
+            try { await this.loadXlsx(); } catch (e) { window.XLSX = null; }
+
+            if (!window.XLSX) {      // אין גישה לספרייה — קובץ CSV עם אותן עמודות
+                const lines = [head, ...rows].map(row => row.map(csv).join(','));
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' }));
+                a.download = `סכומים_להטענה_${stamp}.csv`; document.body.appendChild(a); a.click(); a.remove();
+                return;
+            }
+            const X = window.XLSX, n = rows.length, last = n + 1;
+            const ws = X.utils.aoa_to_sheet([head, ...rows]);
+            // שורת סיכום עם נוסחאות
+            X.utils.sheet_add_aoa(ws, [['', '', 'סה״כ', `${n} תלמידים`, '', { t: 'n', f: `SUM(F2:F${last})` }, { t: 'n', f: `SUM(G2:G${last})` }, { t: 'n', f: `SUM(H2:H${last})` }]], { origin: `A${last + 1}` });
+            for (let rI = 2; rI <= last + 1; rI++) { const c = ws[`H${rI}`]; if (c) c.z = '"₪"#,##0.00'; }
+            ws['!cols'] = [{ wch: 5 }, { wch: 11 }, { wch: 16 }, { wch: 14 }, { wch: 7 }, { wch: 9 }, { wch: 10 }, { wch: 14 }];
+            ws['!autofilter'] = { ref: `A1:H${last}` };
+            const wb = X.utils.book_new();
+            X.utils.book_append_sheet(wb, ws, 'סכומים להטענה');
+            wb.Workbook = { Views: [{ RTL: true }] };       // גיליון מימין לשמאל
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([X.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+            a.download = `סכומים_להטענה_${stamp}.xlsx`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        } finally { btn.disabled = false; btn.innerHTML = label; }
+    }
+
     exportCsv() {
         const lines = [['קוד', 'שם פרטי', 'שם משפחה', 'כיתה', 'טלפון', 'נבחן', 'מתוך', 'עברו', 'לא עברו', 'מלגה'].map(csv).join(',')];
         this.rowsData().forEach(s => {
@@ -505,6 +564,7 @@ export class StudentManager {
             const t = e.target;
             if (t.closest('#stuAdd')) return this.openForm();
             if (t.closest('#stuExport')) return this.exportCsv();
+            if (t.closest('#stuPayXlsx')) return this.exportPayments();
             if (t.closest('#stuPrintList')) return this.openPrintList();
             if (t.closest('#stuNoneKpi')) { this.f.status = 'none'; this.render(this.students); return; }
             const seg = t.closest('#stuStatus button');
