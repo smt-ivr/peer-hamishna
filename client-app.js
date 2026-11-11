@@ -513,13 +513,39 @@ async function initApp() {
     adminManager = new AdminManager(document.getElementById('view-admin'), API_BASE, document.getElementById('adminMenuItem'));
     phoneManager = new PhoneManager(document.getElementById('view-phone'), API_BASE, document.getElementById('phoneMenuItem'));
     // הרשאות טלפון: מנהל-על והרשאה מלאה. ניהול הרשאות הגישה לאתר: מנהל-על בלבד
-    adminManager.init().then(() => phoneManager.show(['super_admin', 'admin'].includes(adminManager.level)));
+    // אחרי שידוע מה מותר — פותחים את הלשונית שבכתובת (#students, #phone/log ...)
+    adminManager.init().then(() => { phoneManager.show(['super_admin', 'admin'].includes(adminManager.level)); applyRoute(); });
     
     setupTabs();
     setupMobileNav();
     setupSearchBox();
     await refreshAllData();
 }
+
+// ============================================================
+//  קישור ישיר לכל לשונית: הכתובת משתנה בלחיצה (#students, #phone/log),
+//  כתובת שנפתחת ישירות מגיעה ללשונית, וכפתורי אחורה / קדימה של הדפדפן עובדים.
+// ============================================================
+const ROUTES = { 'view-dashboard': 'dashboard', 'view-update': 'update', 'view-reports': 'reports', 'view-students': 'students',
+                 'view-exams': 'exams', 'view-history': 'history', 'view-phone': 'phone', 'view-admin': 'admin' };
+const SUB_TABS = { 'view-phone': ['numbers', 'log', 'audit'], 'view-admin': ['rules', 'log'] };
+let routing = false;
+window.setRouteSub = (main, sub) => {
+    const h = '#' + main + (sub ? '/' + sub : '');
+    if (!routing && location.hash !== h) history.pushState(null, '', h);
+};
+function applyRoute() {
+    const [main, sub] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
+    const target = Object.keys(ROUTES).find(k => ROUTES[k] === main);
+    if (!target) return;
+    const item = document.querySelector(`.menu-item[data-target="${target}"]`);
+    if (!item || item.classList.contains('hidden')) return;          // אין הרשאה ללשונית — נשארים בלוח הבקרה
+    const mgr = target === 'view-phone' ? phoneManager : target === 'view-admin' ? adminManager : null;
+    if (mgr && sub && (SUB_TABS[target] || []).includes(sub)) mgr.tab = sub;
+    routing = true;
+    try { item.click(); } finally { routing = false; }
+}
+window.addEventListener('popstate', applyRoute);
 
 function setupTabs() {
     const menuItems = document.querySelectorAll('.menu-item:not(#logoutBtn)');
@@ -529,6 +555,10 @@ function setupTabs() {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const targetId = item.getAttribute('data-target');
+            if (ROUTES[targetId]) {
+                const mgr = targetId === 'view-phone' ? phoneManager : targetId === 'view-admin' ? adminManager : null;
+                window.setRouteSub(ROUTES[targetId], mgr && mgr.tab && mgr.tab !== SUB_TABS[targetId][0] ? mgr.tab : '');
+            }
             
             menuItems.forEach(mi => mi.classList.remove('active'));
             item.classList.add('active');
