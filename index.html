@@ -12,8 +12,8 @@
     
     <!-- מנגנון מניעת הבהוב: אם ה-IP כבר מאושר בזיכרון, מסתיר את המסך מיד עוד לפני רינדור העמוד -->
     <script>
-        if (localStorage.getItem('peer_ip_allowed') === 'true') {
-            document.write('<style>#auth-overlay { display: none !important; } #mainContainer { filter: none !important; pointer-events: auto !important; }</style>');
+        if (localStorage.getItem('peer_ip_allowed') === 'true' || localStorage.getItem('peer_api_key')) {
+            document.write('<style id="noFlickerStyle">#auth-overlay { display: none !important; } #mainContainer { filter: none !important; pointer-events: auto !important; }</style>');
         }
     </script>
 </head>
@@ -41,7 +41,7 @@
                 <div class="lg-mobile-logo"><img src="https://smt-tel-manager.netlify.app/smt.png" alt="" draggable="false"></div>
                 <h1 id="lgTitle">כניסה למערכת</h1>
                 <p id="authMessage" class="lg-status">
-                    <i class="fas fa-lock"></i>הזינו את סיסמת הגישה
+                    <i class="fas fa-spinner fa-spin"></i>בודק הרשאת IP...
                 </p>
 
                 <label class="lg-label" for="apiKeyInput">סיסמת גישה</label>
