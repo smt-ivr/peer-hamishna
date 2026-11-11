@@ -395,7 +395,7 @@ export class PhoneManager {
             if (!b || b.disabled) return;
             const act = b.dataset.ph, v = b.dataset.v, num = this.data && this.data.numbers.find(n => String(n.id) === String(v));
             if (act === 'reload') return this.load();
-            if (act === 'tab') { this.tab = v; this.render(); if (v === 'log') this.loadLog(); if (v === 'audit') this.loadAudit(); return; }
+            if (act === 'tab') { this.tab = v; if (window.setRouteSub) window.setRouteSub('phone', v === 'numbers' ? '' : v); this.render(); if (v === 'log') this.loadLog(); if (v === 'audit') this.loadAudit(); return; }
             if (act === 'new' || act === 'add-sugg') return this.openModal(blank(act === 'add-sugg' ? v : ''));
             if (act === 'edit' && num) return this.openModal({ ...num, days: parseDays(num.days), sched_enabled: !!num.sched_enabled, can_override: !!num.can_override, can_manage: !!num.can_manage });
             if (act === 'act' && num) return this.openActivity(num);

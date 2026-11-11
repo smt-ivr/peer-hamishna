@@ -21,6 +21,31 @@ const ICONS = { error: ic('<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 
                 info: ic('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/>'), success: ic('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>') };
 const STATUS = { true: ['✓ עבר', 'ok'], false: ['✕ לא עבר', 'bad'], null: ['טרם נבחן', 'none'] };
 
+// עמודות אפשריות לאקסל הסכומים (לפי הסדר הזה בקובץ)
+const numCode = s => { const c = Number(s.student_code); return String(c) === String(s.student_code) ? c : s.student_code; };
+const PAY_COLS = {
+    num:       { head: 'מס׳', w: 5, val: (s, i) => i + 1 },
+    code:      { head: 'קוד תלמיד', w: 11, val: numCode },
+    last:      { head: 'שם משפחה', w: 16, val: s => s.last_name || '' },
+    first:     { head: 'שם פרטי', w: 14, val: s => s.first_name || '' },
+    class:     { head: 'כיתה', w: 7, val: s => s.class_grade || '' },
+    phone:     { head: 'טלפון', w: 14, val: s => (s.phones || []).join(' / ') },
+    attempted: { head: 'נבחן', w: 8, sum: true, val: s => Number((s.stats || {}).total_attempted) || 0 },
+    available: { head: 'מתוך', w: 8, val: s => Number((s.stats || {}).total_available_exams) || 0 },
+    passed:    { head: 'עבר', w: 8, sum: true, val: s => Number((s.stats || {}).total_passed) || 0 },
+    failed:    { head: 'לא עבר', w: 8, sum: true, val: s => Math.max(0, (Number((s.stats || {}).total_attempted) || 0) - (Number((s.stats || {}).total_passed) || 0)) },
+    mishnayot: { head: 'משניות', w: 9, sum: true, val: s => Number((s.stats || {}).total_mishnayot) || 0 },
+    gemara:    { head: 'דפי גמרא', w: 10, sum: true, val: s => Number((s.stats || {}).total_gemara_pages) || 0 },
+    amount:    { head: 'סכום להטענה', w: 14, sum: true, money: true, val: s => Math.round((Number((s.stats || {}).total_reward) || 0) * 100) / 100 }
+};
+const PAY_SORTS = { last: 'שם משפחה', first: 'שם פרטי', class: 'כיתה', code: 'קוד', amount: 'סכום (מהגבוה)' };
+// סוגי קובץ: בחירת סוג מסמנת את העמודות שלו (ואפשר לשנות אחר כך)
+const PAY_KINDS = {
+    amounts: { label: 'סכומים להטענה', file: 'סכומים_להטענה', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'gemara', 'amount'] },
+    full:    { label: 'דוח מבחנים מלא', file: 'דוח_מבחנים', cols: ['code', 'last', 'first', 'class', 'attempted', 'available', 'passed', 'failed', 'mishnayot', 'gemara', 'amount'] },
+    list:    { label: 'רשימת תלמידים', file: 'רשימת_תלמידים', cols: ['code', 'last', 'first', 'class', 'phone'] }
+};
+
 export class StudentManager {
     constructor(container, apiBase, onGrades, onRefresh) {
         Object.assign(this, { container, apiBase, onGrades, onRefresh });
@@ -101,9 +126,8 @@ export class StudentManager {
             <div class="stu-card stu-head">
                 <div><h3><i class="fas fa-users"></i> ניהול תלמידים</h3><div class="stu-kpis" id="stuKpis"></div></div>
                 <div class="stu-btns">
-                    <button class="btn btn-outline btn-sm" id="stuExport"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
-                    <button class="btn btn-outline btn-sm" id="stuPayXlsx" title="כל התלמידים: משניות, דפי גמרא וסכום להטענה"><i class="fas fa-file-invoice-dollar"></i> אקסל סכומים להטענה</button>
-                    <button class="btn btn-secondary btn-sm" id="stuPrintList" title="רשימת שמות וקודים להדפסה / PDF"><i class="fas fa-print"></i> רשימה להדפסה / PDF</button>
+                    <button class="btn btn-outline btn-sm" id="stuPayXlsx" title="בוחרים סוג, עמודות וסדר"><i class="fas fa-file-excel" style="color:#16a34a"></i> אקסל</button>
+                    <button class="btn btn-outline btn-sm" id="stuPrintList" title="בוחרים סוג, עמודות וסדר — להדפסה או קובץ PDF"><i class="fas fa-file-pdf" style="color:#dc2626"></i> PDF / הדפסה</button>
                     <button class="btn btn-primary btn-sm" id="stuAdd"><i class="fas fa-user-plus"></i> תלמיד חדש</button>
                 </div>
             </div>
@@ -491,46 +515,124 @@ export class StudentManager {
         return this._xlsx;
     }
 
+    // ---------- אפשרויות האקסל (נשמרות בשרת, משותפות לכל המשתמשים) ----------
+    async openPayModal() {
+        const def = { kind: 'amounts', scope: 'all', sort: 'last', cols: PAY_KINDS.amounts.cols.slice() };
+        if (!this.payOpt) {
+            this.payOpt = def;
+            try {
+                const r = await fetch(`${this.apiBase}/report-settings?profile=student_xlsx`, { silent: true });
+                const d = r.ok ? await r.json() : null;
+                if (d && d.settings && Array.isArray(d.settings.cols)) this.payOpt = { ...def, ...d.settings, cols: d.settings.cols.filter(c => PAY_COLS[c]) };
+                if (!PAY_KINDS[this.payOpt.kind]) this.payOpt.kind = 'custom';
+            } catch (e) { /* ברירת מחדל */ }
+        }
+        let m = $('stuPayModal');
+        if (!m) {
+            document.body.insertAdjacentHTML('beforeend', `<div id="stuPayModal" class="modal hidden" style="z-index:9990"><div class="modal-content stu-pmc">
+                <div class="modal-header"><h3><i class="fas fa-file-excel" style="color:#16a34a"></i> ייצוא לאקסל</h3><button class="close-modal-btn" data-pay="close" aria-label="סגור">&times;</button></div>
+                <div class="stu-pbody" id="stuPayBody"></div>
+                <div class="stu-mfoot"><span class="stu-mut" id="stuPayNote" style="flex:1"></span><button type="button" class="btn btn-outline" data-pay="close">ביטול</button>
+                    <button type="button" class="btn btn-primary" data-pay="go" id="stuPayGo"><i class="fas fa-download"></i> הורדת הקובץ</button></div></div></div>`);
+            m = $('stuPayModal');
+            m.addEventListener('click', e => {
+                const b = e.target.closest('[data-pay]');
+                if (b && b.dataset.pay === 'close') return m.classList.add('hidden');
+                if (b && b.dataset.pay === 'go') return this.exportPayments();
+                const so = e.target.closest('[data-sort]');
+                if (so) { this.payOpt.sort = so.dataset.sort; this.paintPayModal(); }
+                const ki = e.target.closest('[data-kind]');
+                if (ki) { this.payOpt.kind = ki.dataset.kind; this.payOpt.cols = PAY_KINDS[ki.dataset.kind].cols.slice(); this.paintPayModal(); }
+                const sc = e.target.closest('[data-scope]');
+                if (sc) { this.payOpt.scope = sc.dataset.scope; this.paintPayModal(); }
+            });
+            m.addEventListener('change', e => {
+                const c = e.target.closest('[data-col]');
+                if (!c) return;
+                const set = new Set(this.payOpt.cols);
+                c.checked ? set.add(c.dataset.col) : set.delete(c.dataset.col);
+                this.payOpt.cols = Object.keys(PAY_COLS).filter(k => set.has(k));
+                const same = k => PAY_KINDS[k] && PAY_KINDS[k].cols.join() === this.payOpt.cols.join();
+                this.payOpt.kind = Object.keys(PAY_KINDS).find(same) || 'custom';     // שינוי עמודות ידני = "מותאם"
+                this.paintPayModal();
+            });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape' && !m.classList.contains('hidden')) m.classList.add('hidden'); });
+        }
+        this.paintPayModal();
+        m.classList.remove('hidden');
+    }
+
+    paintPayModal() {
+        const o = this.payOpt;
+        const shown = this.rowsData().length, filtered = shown !== this.students.length;
+        $('stuPayBody').innerHTML = `
+            <div class="stu-plbl">סוג הקובץ</div>
+            <div class="stu-segc stu-psort">${Object.entries(PAY_KINDS).map(([k, v]) => `<button type="button" data-kind="${k}" class="${o.kind === k ? 'on' : ''}">${v.label}</button>`).join('')}${o.kind === 'custom' ? '<button type="button" class="on" disabled>מותאם</button>' : ''}</div>
+            <div class="stu-plbl">אילו תלמידים</div>
+            <div class="stu-segc stu-psort"><button type="button" data-scope="all" class="${o.scope !== 'screen' ? 'on' : ''}">כל התלמידים (${this.students.length})</button>
+                <button type="button" data-scope="screen" class="${o.scope === 'screen' ? 'on' : ''}" ${filtered ? '' : 'disabled title="אין כרגע סינון במסך"'}>רק מה שמוצג במסך (${shown})</button></div>
+            <div class="stu-plbl">סדר התלמידים</div>
+            <div class="stu-segc stu-psort">${Object.entries(PAY_SORTS).map(([k, t]) => `<button type="button" data-sort="${k}" class="${o.sort === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+            <div class="stu-plbl">עמודות בקובץ</div>
+            <div class="stu-pcols">${Object.entries(PAY_COLS).map(([k, c]) => `<label class="${o.cols.includes(k) ? 'on' : ''}"><input type="checkbox" data-col="${k}" ${o.cols.includes(k) ? 'checked' : ''}> ${c.head}</label>`).join('')}</div>`;
+        $('stuPayGo').disabled = !o.cols.length;
+        $('stuPayNote').textContent = o.cols.length ? 'משניות, דפי גמרא וסכום: רק ממבחנים שעברו' : 'יש לבחור לפחות עמודה אחת';
+        if (o.scope === 'screen' && !filtered) o.scope = 'all';
+    }
+
     async exportPayments() {
-        const btn = $('stuPayXlsx'), label = btn.innerHTML;
+        const o = this.payOpt, btn = $('stuPayGo'), label = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין...';
         try {
+            fetch(`${this.apiBase}/report-settings?profile=student_xlsx`, { method: 'PUT', silent: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: o }) }).catch(() => {});
             const r = await this.call('GET', '/student-summary');      // נתונים עדכניים מהשרת
             if (!r.ok || !Array.isArray(r.data)) return window.customAlert(this.errText(r, 'לא ניתן לטעון את הנתונים.'), true);
-            const list = r.data.slice().sort((a, b) => String(a.last_name || '').localeCompare(String(b.last_name || ''), 'he')
-                || String(a.first_name || '').localeCompare(String(b.first_name || ''), 'he'));
-            const head = ['מס׳', 'קוד תלמיד', 'שם משפחה', 'שם פרטי', 'כיתה', 'משניות', 'דפי גמרא', 'סכום להטענה'];
-            const rows = list.map((s, i) => {
-                const st = s.stats || {};
-                const code = Number(s.student_code);
-                return [i + 1, String(code) === String(s.student_code) ? code : s.student_code, s.last_name || '', s.first_name || '', s.class_grade || '',
-                    Number(st.total_mishnayot) || 0, Number(st.total_gemara_pages) || 0, Math.round((Number(st.total_reward) || 0) * 100) / 100];
-            });
+            const he = (a, b) => String(a || '').localeCompare(String(b || ''), 'he', { numeric: true });
+            const byLast = (a, b) => he(a.last_name, b.last_name) || he(a.first_name, b.first_name);
+            const cmp = {
+                last: byLast,
+                first: (a, b) => he(a.first_name, b.first_name) || he(a.last_name, b.last_name),
+                class: (a, b) => he(a.class_grade, b.class_grade) || byLast(a, b),
+                code: (a, b) => he(a.student_code, b.student_code),
+                amount: (a, b) => ((b.stats || {}).total_reward || 0) - ((a.stats || {}).total_reward || 0) || byLast(a, b)
+            }[o.sort] || byLast;
+            const onScreen = new Set(this.rowsData().map(x => x.student_code));
+            const list = r.data.filter(x => o.scope !== 'screen' || onScreen.has(x.student_code)).sort(cmp);
+            const cols = o.cols.filter(k => PAY_COLS[k]);
+            const head = cols.map(k => PAY_COLS[k].head);
+            const rows = list.map((s, i) => cols.map(k => PAY_COLS[k].val(s, i)));
             const stamp = formatHebrewDate(new Date()).replace(/[׳״"']/g, '').replace(/\s+/g, '_');
+            const fname = (PAY_KINDS[o.kind] || { file: 'ייצוא_תלמידים' }).file;
             try { await this.loadXlsx(); } catch (e) { window.XLSX = null; }
 
             if (!window.XLSX) {      // אין גישה לספרייה — קובץ CSV עם אותן עמודות
                 const lines = [head, ...rows].map(row => row.map(csv).join(','));
                 const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' }));
-                a.download = `סכומים_להטענה_${stamp}.csv`; document.body.appendChild(a); a.click(); a.remove();
+                a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' }));
+                a.download = `${fname}_${stamp}.csv`; document.body.appendChild(a); a.click(); a.remove();
+                $('stuPayModal').classList.add('hidden');
                 return;
             }
-            const X = window.XLSX, n = rows.length, last = n + 1;
+            const X = window.XLSX, n = rows.length, last = n + 1, L = i => X.utils.encode_col(i);
             const ws = X.utils.aoa_to_sheet([head, ...rows]);
-            // שורת סיכום עם נוסחאות
-            X.utils.sheet_add_aoa(ws, [['', '', 'סה״כ', `${n} תלמידים`, '', { t: 'n', f: `SUM(F2:F${last})` }, { t: 'n', f: `SUM(G2:G${last})` }, { t: 'n', f: `SUM(H2:H${last})` }]], { origin: `A${last + 1}` });
-            for (let rI = 2; rI <= last + 1; rI++) { const c = ws[`H${rI}`]; if (c) c.z = '"₪"#,##0.00'; }
-            ws['!cols'] = [{ wch: 5 }, { wch: 11 }, { wch: 16 }, { wch: 14 }, { wch: 7 }, { wch: 9 }, { wch: 10 }, { wch: 14 }];
-            ws['!autofilter'] = { ref: `A1:H${last}` };
+            // שורת סה״כ: נוסחה לכל עמודה מספרית, וכיתוב בעמודה הטקסטואלית הראשונה
+            if (cols.some(k => PAY_COLS[k].sum)) {
+                const firstText = cols.findIndex(k => !PAY_COLS[k].sum && k !== 'num');
+                const total = cols.map((k, i) => PAY_COLS[k].sum ? { t: 'n', f: `SUM(${L(i)}2:${L(i)}${last})` } : (i === firstText ? `סה״כ (${n} תלמידים)` : ''));
+                X.utils.sheet_add_aoa(ws, [total], { origin: `A${last + 1}` });
+            }
+            cols.forEach((k, i) => { if (PAY_COLS[k].money) for (let rI = 2; rI <= last + 1; rI++) { const c = ws[`${L(i)}${rI}`]; if (c) c.z = '"₪"#,##0.00'; } });
+            ws['!cols'] = cols.map(k => ({ wch: PAY_COLS[k].w }));
+            ws['!autofilter'] = { ref: `A1:${L(cols.length - 1)}${last}` };
             const wb = X.utils.book_new();
-            X.utils.book_append_sheet(wb, ws, 'סכומים להטענה');
+            X.utils.book_append_sheet(wb, ws, (PAY_KINDS[o.kind] || { label: 'תלמידים' }).label);
             wb.Workbook = { Views: [{ RTL: true }] };       // גיליון מימין לשמאל
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([X.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-            a.download = `סכומים_להטענה_${stamp}.xlsx`;
+            a.download = `${fname}_${stamp}.xlsx`;
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            $('stuPayModal').classList.add('hidden');
         } finally { btn.disabled = false; btn.innerHTML = label; }
     }
 
@@ -548,9 +650,10 @@ export class StudentManager {
     }
 
     // רשימה מעוצבת להדפסה / PDF — נפתחת עם הכיתה והסינון שנבחרו כעת במסך
-    openPrintList() {
+    async openPrintList() {
         if (!this.listExporter) this.listExporter = new StudentListExporter(this.apiBase);
-        this.listExporter.open(this.students, { scope: this.f.cls });
+        await this.loadSummary();       // נתונים עדכניים: משניות, דפי גמרא וסכום
+        this.listExporter.open(this.students, { scope: this.f.cls }, s => this.sum.get(s.student_code));
     }
 
     // ============================================================
@@ -563,8 +666,7 @@ export class StudentManager {
         c.addEventListener('click', e => {
             const t = e.target;
             if (t.closest('#stuAdd')) return this.openForm();
-            if (t.closest('#stuExport')) return this.exportCsv();
-            if (t.closest('#stuPayXlsx')) return this.exportPayments();
+            if (t.closest('#stuPayXlsx')) return this.openPayModal();
             if (t.closest('#stuPrintList')) return this.openPrintList();
             if (t.closest('#stuNoneKpi')) { this.f.status = 'none'; this.render(this.students); return; }
             const seg = t.closest('#stuStatus button');
@@ -721,6 +823,11 @@ export class StudentManager {
         .stu-ph{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:99px;padding:2px 4px 2px 10px;font-size:.84rem;font-family:ui-monospace,Menlo,Consolas,monospace}
         .stu-ph button{border:none;background:none;color:#64748b;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;border-radius:50%}.stu-ph button:hover{background:#dbeafe;color:#b91c1c}
         .stu-padd{display:flex;gap:6px}.stu-padd input{flex:1;padding:8px;border:1px solid var(--border-color);border-radius:6px;outline:none;direction:ltr;text-align:right}.stu-padd input:focus{border-color:var(--primary-color)}
+        .stu-pmc{max-width:520px;width:94%;height:auto;border-radius:12px;overflow:hidden}
+        .stu-pbody{padding:16px 18px;display:flex;flex-direction:column;gap:8px}.stu-plbl{font-size:.82rem;font-weight:700;color:#475569;margin-top:4px}
+        .stu-psort{flex-wrap:wrap}.stu-pcols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+        .stu-pcols label{display:flex;align-items:center;gap:7px;border:1px solid var(--border-color);border-radius:8px;padding:7px 10px;font-size:.86rem;cursor:pointer}
+        .stu-pcols label.on{background:#eff6ff;border-color:#93c5fd}
         .stu-chk{display:flex;gap:8px;align-items:center;font-size:.85rem;cursor:pointer}
         .stu-mc{max-width:680px;width:94%;height:auto;max-height:92vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden}
         .stu-tabs{display:flex;gap:4px;padding:8px 14px 0;background:#f8fafc;border-bottom:1px solid var(--border-color)}

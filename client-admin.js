@@ -186,7 +186,7 @@ export class AdminManager {
             const v = b.getAttribute('data-v');
             const rule = this.rules.find(r => r.rule_value === v);
             if (act === 'reload') return this.load();
-            if (act === 'tab') { this.tab = v; this.render(); return this.load(); }
+            if (act === 'tab') { this.tab = v; if (window.setRouteSub) window.setRouteSub('admin', v === 'rules' ? '' : v); this.render(); return this.load(); }
             if (act === 'log-result') { this.log.result = v; return this.loadLog(); }
             if (act === 'log-more') return this.loadLog(true);
             if (act === 'log-ip') { this.log.q = v; return this.loadLog(); }

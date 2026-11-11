@@ -14,19 +14,24 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const cmp = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'he', { numeric: true, sensitivity: 'base' });
 const $ = id => document.getElementById(id);
 
-const SORTS = { last: 'שם משפחה', first: 'שם פרטי', class: 'כיתות', code: 'קוד' };
+const SORTS = { last: 'שם משפחה', first: 'שם פרטי', class: 'כיתות', code: 'קוד', amount: 'סכום (מהגבוה)' };
+const KINDS = { codes: 'שמות וקודים', amounts: 'סכומים להטענה' };
+const TITLES = { codes: 'רשימת תלמידים וקודים', amounts: 'סכומים להטענה' };
+const money = v => '₪' + (Number(v) || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const INNER = { last: 'שם משפחה', first: 'שם פרטי', code: 'קוד' };
 const SIZES = { s: { label: 'קטן', fs: 2.8, pad: .55 }, m: { label: 'רגיל', fs: 3.2, pad: .75 }, l: { label: 'גדול', fs: 3.7, pad: 1 } };
 
-const DEFAULTS = { sort: 'last', inner: 'last', columns: 3, size: 'm', num: false, cls: true, pageBreak: false, title: 'רשימת תלמידים וקודים' };
+const DEFAULTS = { kind: 'codes', sort: 'last', inner: 'last', columns: 3, size: 'm', num: false, cls: true, pageBreak: false, title: 'רשימת תלמידים וקודים',
+    code: true, mish: true, gem: true, amt: true };   // code/mish/gem/amt: עמודות בסוג 'סכומים להטענה'
 
 function clean(raw) {
     const o = { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
-    if (!SORTS[o.sort]) o.sort = DEFAULTS.sort;
+    if (!KINDS[o.kind]) o.kind = DEFAULTS.kind;
+    if (!SORTS[o.sort] || (o.sort === 'amount' && o.kind !== 'amounts')) o.sort = DEFAULTS.sort;
     if (!INNER[o.inner]) o.inner = DEFAULTS.inner;
     if (!SIZES[o.size]) o.size = DEFAULTS.size;
-    o.columns = [2, 3].includes(Number(o.columns)) ? Number(o.columns) : DEFAULTS.columns;
-    ['num', 'cls', 'pageBreak'].forEach(k => { o[k] = !!o[k]; });
+    o.columns = [1, 2, 3].includes(Number(o.columns)) ? Number(o.columns) : DEFAULTS.columns;
+    ['num', 'cls', 'pageBreak', 'code', 'mish', 'gem', 'amt'].forEach(k => { o[k] = !!o[k]; });
     o.title = String(o.title ?? '').slice(0, 60);
     return o;
 }
@@ -75,8 +80,9 @@ export class StudentListExporter {
     status(t) { const el = $('slSaved'); if (el) el.textContent = t; }
 
     // ============================================================
-    async open(students, preset = {}) {
+    async open(students, preset = {}, statsFn = null) {
         this.students = students || [];
+        this.statsFn = statsFn || (() => ({}));
         this.classes = [...new Set(this.students.map(s => s.class_grade).filter(Boolean))].sort(cmp);
         this.scope = this.classes.includes(preset.scope) ? preset.scope : '';
         $('slModal').classList.remove('hidden');
@@ -94,20 +100,27 @@ export class StudentListExporter {
     sorter(key) {
         const code = (a, b) => { const x = Number(a.student_code), y = Number(b.student_code); return !isNaN(x) && !isNaN(y) ? x - y : cmp(a.student_code, b.student_code); };
         if (key === 'code') return code;
+        if (key === 'amount') return (a, b) => (this.st(b).total_reward || 0) - (this.st(a).total_reward || 0) || cmp(a.last_name, b.last_name) || code(a, b);
         if (key === 'first') return (a, b) => cmp(a.first_name, b.first_name) || cmp(a.last_name, b.last_name) || code(a, b);
         return (a, b) => cmp(a.last_name, b.last_name) || cmp(a.first_name, b.first_name) || code(a, b);
     }
+    st(s) { return this.statsFn(s) || {}; }
+    amounts() { return this.o.kind === 'amounts'; }
     showCls() { return this.o.cls && this.o.sort !== 'class' && !this.scope; }
     firstFirst() { return this.o.sort === 'first' || (this.o.sort === 'class' && this.o.inner === 'first'); }
 
     blocks() {
         const o = this.o, list = this.students.filter(s => !this.scope || s.class_grade === this.scope);
-        const span = 3 + (o.num ? 1 : 0) + (this.showCls() ? 1 : 0);
+        const A = this.amounts(), showCode = !A || o.code;
+        const nums = A ? ['mish', 'gem', 'amt'].filter(k => o[k]) : [];
+        const span = 2 + (showCode ? 1 : 0) + (o.num ? 1 : 0) + (this.showCls() ? 1 : 0) + nums.length;
         const ff = this.firstFirst();
         let n = 0;
+        const val = (s, k) => { const st = this.st(s); return k === 'mish' ? (st.total_mishnayot || 0) : k === 'gem' ? (st.total_gemara_pages || 0) : (st.total_reward || 0); };
+        const cell = (k, v) => `<td class="c-v ${k === 'amt' ? 'c-m' : ''}">${k === 'amt' ? money(v) : v}</td>`;
         const row = s => `<tbody class="r"><tr>${o.num ? `<td class="c-n">${++n}</td>` : ''}
             <td class="c-a">${esc(ff ? s.first_name : s.last_name)}</td><td class="c-b">${esc(ff ? s.last_name : s.first_name)}</td>
-            ${this.showCls() ? `<td class="c-c">${esc(s.class_grade || '')}</td>` : ''}<td class="c-k">${esc(s.student_code)}</td></tr></tbody>`;
+            ${this.showCls() ? `<td class="c-c">${esc(s.class_grade || '')}</td>` : ''}${showCode ? `<td class="c-k">${esc(s.student_code)}</td>` : ''}${nums.map(k => cell(k, val(s, k))).join('')}</tr></tbody>`;
         const out = [];
         if (o.sort === 'class') {
             const by = new Map();
@@ -121,12 +134,19 @@ export class StudentListExporter {
         } else {
             list.slice().sort(this.sorter(o.sort)).forEach(s => out.push({ html: row(s) }));
         }
+        // סה״כ בסוף הרשימה (סכומים)
+        if (A && nums.length && list.length) {
+            const lead = span - nums.length;
+            out.push({ html: `<tbody class="tot"><tr><td colspan="${lead}">סה״כ · ${list.length} תלמידים</td>${nums.map(k => cell(k, list.reduce((a, s) => a + val(s, k), 0))).join('')}</tr></tbody>` });
+        }
         return { out, count: list.length };
     }
 
     thead() {
         const o = this.o, ff = this.firstFirst();
-        return `<thead><tr>${o.num ? '<th class="c-n">#</th>' : ''}<th>${ff ? 'שם פרטי' : 'משפחה'}</th><th>${ff ? 'משפחה' : 'שם פרטי'}</th>${this.showCls() ? '<th class="c-c">כיתה</th>' : ''}<th class="c-k">קוד</th></tr></thead>`;
+        const A = this.amounts(), H = { mish: 'משניות', gem: 'דפי גמרא', amt: 'סכום להטענה' };
+        const nums = A ? ['mish', 'gem', 'amt'].filter(k => o[k]) : [];
+        return `<thead><tr>${o.num ? '<th class="c-n">#</th>' : ''}<th>${ff ? 'שם פרטי' : 'משפחה'}</th><th>${ff ? 'משפחה' : 'שם פרטי'}</th>${this.showCls() ? '<th class="c-c">כיתה</th>' : ''}${!A || o.code ? '<th class="c-k">קוד</th>' : ''}${nums.map(k => `<th class="c-v ${k === 'amt' ? 'c-m' : ''}">${H[k]}</th>`).join('')}</tr></thead>`;
     }
 
     pageShell(count) {
@@ -135,7 +155,7 @@ export class StudentListExporter {
         const cols = Array.from({ length: o.columns }, () => `<div class="sl-col"><table class="sl-t">${this.thead()}</table></div>`).join('');
         return `<div class="sl-page" style="--fs:${S.fs}mm;--pd:${S.pad}mm">
             <header class="sl-head">${this._logo ? `<img class="sl-logo" src="${esc(this._logo)}" alt="">` : ''}
-                <div class="sl-ttl"><h1>${esc(o.title.trim() || DEFAULTS.title)}</h1><div class="sl-sub">${esc(sub)}</div></div>
+                <div class="sl-ttl"><h1>${esc(o.title.trim() || TITLES[o.kind])}</h1><div class="sl-sub">${esc(sub)}</div></div>
                 <div class="sl-date">${esc(formatHebrewDate(new Date()))}</div></header>
             <div class="sl-cols">${cols}</div>
             <footer class="sl-foot"><span>הופק ממערכת ניהול פאר המשנה</span><span class="sl-pg"></span></footer></div>`;
@@ -204,16 +224,18 @@ export class StudentListExporter {
         const o = this.o;
         const seg = (key, map, cur) => `<div class="sl-seg">${Object.entries(map).map(([k, v]) => `<button type="button" class="${String(cur) === k ? 'on' : ''}" data-set="${key}" data-v="${k}">${typeof v === 'string' ? v : v.label}</button>`).join('')}</div>`;
         const chk = (key, label, hide) => hide ? '' : `<label class="sl-chk"><input type="checkbox" data-chk="${key}" ${o[key] ? 'checked' : ''}> ${label}</label>`;
+        const sorts = Object.fromEntries(Object.entries(SORTS).filter(([k]) => k !== 'amount' || this.amounts()));
         $('slCtl').innerHTML = `
+            <label class="sl-lbl">סוג</label>${seg('kind', KINDS, o.kind)}
             <label class="sl-lbl">כיתה</label>
             <select id="slScope" class="sl-in"><option value="">כל הכיתות (${this.students.length})</option>
                 ${this.classes.map(c => `<option value="${esc(c)}" ${this.scope === c ? 'selected' : ''}>כיתה ${esc(c)} (${this.students.filter(s => s.class_grade === c).length})</option>`).join('')}</select>
-            <label class="sl-lbl">מיון</label>${seg('sort', SORTS, o.sort)}
+            <label class="sl-lbl">מיון</label>${seg('sort', sorts, o.sort)}
             ${o.sort === 'class' ? `<label class="sl-lbl">בתוך הכיתה</label>${seg('inner', INNER, o.inner)}` : ''}
-            <label class="sl-lbl">טורים בדף</label>${seg('columns', { 2: '2', 3: '3' }, o.columns)}
+            <label class="sl-lbl">טורים בדף</label>${seg('columns', { 1: '1', 2: '2', 3: '3' }, o.columns)}
             <label class="sl-lbl">גודל כתב</label>${seg('size', SIZES, o.size)}
             <label class="sl-lbl">כותרת</label><input id="slTitle" class="sl-in" value="${esc(o.title)}" maxlength="60">
-            <div class="sl-chks">${chk('cls', 'עמודת כיתה', o.sort === 'class' || this.scope)}${chk('num', 'מספור')}${chk('pageBreak', 'כל כיתה בעמוד חדש', o.sort !== 'class')}</div>
+            <div class="sl-chks">${chk('cls', 'כיתה', o.sort === 'class' || this.scope)}${chk('num', 'מספור')}${chk('code', 'קוד', !this.amounts())}${chk('mish', 'משניות', !this.amounts())}${chk('gem', 'דפי גמרא', !this.amounts())}${chk('amt', 'סכום', !this.amounts())}${chk('pageBreak', 'כל כיתה בעמוד חדש', o.sort !== 'class')}</div>
             <div class="sl-saved" id="slSaved"></div>`;
     }
 
@@ -221,7 +243,7 @@ export class StudentListExporter {
     //  הדפסה / PDF
     // ============================================================
     fileName() {
-        return [this.o.title.trim() || DEFAULTS.title, this.scope ? `כיתה ${this.scope}` : ''].filter(Boolean).join('_').replace(/[\\/:*?"<>|׳״']/g, '').replace(/\s+/g, '_');
+        return [this.o.title.trim() || TITLES[this.o.kind], this.scope ? `כיתה ${this.scope}` : ''].filter(Boolean).join('_').replace(/[\\/:*?"<>|׳״']/g, '').replace(/\s+/g, '_');
     }
     print() {
         const old = document.title;
@@ -294,7 +316,14 @@ export class StudentListExporter {
             const b = e.target.closest('[data-set]');
             if (!b) return;
             const k = b.dataset.set;
+            const prevKind = this.o.kind;
             this.o[k] = k === 'columns' ? Number(b.dataset.v) : b.dataset.v;
+            // החלפת סוג: כותרת וטורים שמתאימים לסוג החדש (אם לא שינו אותם ידנית)
+            if (k === 'kind' && prevKind !== this.o.kind) {
+                if (!this.o.title.trim() || this.o.title === TITLES[prevKind]) this.o.title = TITLES[this.o.kind];
+                this.o.columns = this.o.kind === 'amounts' ? 1 : 3;
+                if (this.o.sort === 'amount' && this.o.kind !== 'amounts') this.o.sort = 'last';
+            }
             changed(true);
         });
         ctl.addEventListener('change', e => {
@@ -364,6 +393,8 @@ export class StudentListExporter {
         .sl-t .c-a{font-weight:700}
         .sl-t .c-n{width:6.5mm;text-align:center;color:#64748b;font-size:.85em}
         .sl-t .c-c{width:9mm;text-align:center}
+        .sl-t .c-v{width:16mm;text-align:center}.sl-t .c-m{width:24mm;font-weight:700;white-space:nowrap}
+        .sl-t tbody.tot td{background:#e2e8f0 !important;font-weight:800;border-top:.4mm solid #1e293b}
         .sl-t .c-k{width:12.5mm;text-align:center;font-weight:800;border-right:.2mm solid #cbd5e1;letter-spacing:.1mm}
         .sl-t th.c-k,.sl-t th.c-c{text-align:center}
         .sl-t tbody.sec td{background:#e2e8f0 !important;font-weight:800;padding:calc(var(--pd) + .3mm) 1.4mm;border-bottom:.3mm solid #94a3b8}
