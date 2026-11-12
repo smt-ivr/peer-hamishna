@@ -19,6 +19,17 @@ const nowStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.
 const ic = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const ICONS = { error: ic('<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>'), warning: ic('<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.4v.01"/>'),
                 info: ic('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/>'), success: ic('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>') };
+// מאיפה עודכן המבחן: טלפון (שם המורשה / המספר), אתר, או לא ידוע (נתונים ישנים)
+function sourceHtml(e) {
+    if (e.passed === null || e.passed === undefined) return '';
+    const src = e.update_source;
+    if (src === 'phone') {
+        const who = e.update_by || (e.update_phone ? (e.update_phone.length === 10 ? `${e.update_phone.slice(0, 3)}-${e.update_phone.slice(3)}` : e.update_phone) : '');
+        return `<span class="stu-src ph" title="עודכן בטלפון${e.update_phone ? ' · ' + esc(e.update_phone) : ''}"><i class="fas fa-phone-alt"></i> טלפון${who ? ` · <span dir="auto">${esc(who)}</span>` : ''}</span>`;
+    }
+    if (src === 'web' || src === 'web-bulk') return '<span class="stu-src web" title="עודכן באתר"><i class="fas fa-desktop"></i> אתר</span>';
+    return '<span class="stu-src unk" title="נתונים ישנים — מקור העדכון לא נשמר"><i class="fas fa-question"></i> לא ידוע</span>';
+}
 const STATUS = { true: ['✓ עבר', 'ok'], false: ['✕ לא עבר', 'bad'], null: ['טרם נבחן', 'none'] };
 
 // עמודות אפשריות לאקסל הסכומים (לפי הסדר הזה בקובץ)
@@ -244,13 +255,13 @@ export class StudentManager {
                 const d = e.details || {}, pend = editable && this.ed && this.ed.pending.has(e.exam_code), eff = pend ? this.ed.pending.get(e.exam_code) : e.passed, [txt, cls] = STATUS[eff];
                 const what = e.exam_type === 'gemara' ? `${d.from_page || ''} – ${d.to_page || ''}` : `פרק ${d.chapter_name || d.chapter_num || ''}`;
                 const label = `<span class="w">${esc(what)}${d.chapter_title ? ` <i>${esc(d.chapter_title)}</i>` : ''}</span>`;
-                if (!editable) return `<div class="stu-r"><b>${esc(e.exam_code)}</b>${label}<span class="stu-pill ${cls}">${txt}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}</span></div>`;
+                if (!editable) return `<div class="stu-r"><b>${esc(e.exam_code)}</b>${label}<span class="stu-pill ${cls}">${txt}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}${sourceHtml(e) ? `<br>${sourceHtml(e)}` : ''}</span></div>`;
                 const on = v => eff === v ? ` on ${v ? 'ok' : 'bad'}` : '';
                 const lab = v => (v === true ? 'עבר' : v === false ? 'לא עבר' : 'טרם נבחן');
                 return `<div class="stu-r stu-xr ${e.busy ? 'busy' : ''} ${pend ? 'pend' : ''} ${cls}" data-code="${esc(e.exam_code)}"><b>${esc(e.exam_code)}</b>${label}
                     <div class="stu-set"><button type="button" data-set="true" class="${on(true)}" title="עבר">✓</button><button type="button" data-set="false" class="${on(false)}" title="לא עבר">✕</button>
                     <button type="button" data-set="none" title="הסר את התוצאה (טרם נבחן)" ${eff === null ? 'disabled' : ''}>⌫</button></div>
-                    <span class="fb ${e.err ? 'bad' : ''}">${pend ? `${e.err ? `<b class="stu-er">${esc(e.err)}</b><br>` : ''}<b class="stu-pt">ממתין: ${lab(e.passed)} ← ${lab(eff)}</b> <button type="button" class="stu-un" data-undo>בטל</button>` : e.err ? esc(e.err) : (e.saved ? 'נשמר ✓' : (e.passed !== null ? heb(e.updated_at) : ''))}</span></div>`;
+                    <span class="fb ${e.err ? 'bad' : ''}">${pend ? `${e.err ? `<b class="stu-er">${esc(e.err)}</b><br>` : ''}<b class="stu-pt">ממתין: ${lab(e.passed)} ← ${lab(eff)}</b> <button type="button" class="stu-un" data-undo>בטל</button>` : e.err ? esc(e.err) : (e.saved ? 'נשמר ✓' : (e.passed !== null ? `${heb(e.updated_at)} ${sourceHtml(e)}` : ''))}</span></div>`;
             }).join('');
         }).join('');
     }
@@ -807,8 +818,11 @@ export class StudentManager {
         .stu-bar i{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1)}.stu-bar span{font-size:.76rem;color:#64748b;white-space:nowrap}
         .stu-empty{text-align:center;padding:30px 10px;color:var(--text-muted)}
         .stu-ov{position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:9979;opacity:0;pointer-events:none;transition:opacity .2s}.stu-ov.open{opacity:1;pointer-events:auto}
-        .stu-dr{position:fixed;top:0;bottom:0;left:0;width:min(560px,96vw);background:#fff;z-index:9980;transform:translateX(-102%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:8px 0 30px rgba(15,23,42,.2)}
-        .stu-dr.open{transform:none}
+        .stu-dr{position:fixed;top:50%;left:50%;width:min(780px,96vw);max-height:92vh;background:#fff;z-index:9980;transform:translate(-50%,-47%) scale(.98);opacity:0;pointer-events:none;
+            transition:transform .2s,opacity .2s;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);border-radius:14px;overflow:hidden}
+        .stu-dr.open{transform:translate(-50%,-50%);opacity:1;pointer-events:auto}
+        .stu-src{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;border-radius:99px;padding:0 7px;margin-top:2px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+        .stu-src i{font-size:.62rem}.stu-src.ph{background:#eff6ff;color:#1d4ed8}.stu-src.web{background:#f0fdf4;color:#15803d}.stu-src.unk{background:#f1f5f9;color:#64748b}
         .stu-dh{display:flex;gap:14px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--border-color)}
         .stu-av{width:52px;height:52px;border-radius:50%;background:var(--primary-color);color:#fff;font-size:1.5rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
         .stu-id{flex:1;min-width:0}.stu-id h2{margin:0 0 5px;font-size:1.25rem}.stu-tags{display:flex;gap:6px;flex-wrap:wrap}
@@ -822,7 +836,7 @@ export class StudentManager {
         .stu-list{flex:1;overflow:auto;padding:0 0 16px}
         .stu-gh{display:flex;align-items:center;gap:8px;padding:8px 18px;background:#1e293b;color:#fff;font-size:.85rem;position:sticky;top:0}
         .stu-gh span{border:1px solid #fff;border-radius:99px;padding:0 8px;font-size:.7rem}.stu-gh em{margin-right:auto;font-style:normal;opacity:.85}
-        .stu-r{display:grid;grid-template-columns:48px 1fr auto 54px 70px;gap:8px;align-items:center;padding:7px 18px;border-bottom:1px solid #eef2f7;font-size:.84rem}
+        .stu-r{display:grid;grid-template-columns:48px 1fr auto 60px 150px;gap:8px;align-items:center;padding:7px 18px;border-bottom:1px solid #eef2f7;font-size:.84rem}
         .stu-r:nth-child(even){background:#f8fafc}.stu-r .w i{color:#64748b;font-style:normal}.stu-r .m{color:#0369a1;font-weight:700;text-align:left}.stu-r .dt{color:#64748b;font-size:.75rem;text-align:left}
         .stu-pill{border-radius:99px;padding:1px 9px;font-size:.74rem;font-weight:700;white-space:nowrap}
         .stu-pill.ok{background:#d1fae5;color:#047857}.stu-pill.bad{background:#fee2e2;color:#b91c1c}.stu-pill.none{background:#f1f5f9;color:#64748b}
@@ -871,7 +885,7 @@ export class StudentManager {
         .stu-rg{border:1px solid var(--border-color);border-radius:10px;padding:10px 14px}.stu-rg b{font-size:.9rem}.stu-rg ul{margin:6px 18px 0;padding:0;font-size:.85rem;line-height:1.7}
         .stu-rg.add{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.stu-rg.upd{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a}.stu-rg.del{background:#fef2f2;border-color:#fecaca;color:#991b1b}
         .stu-rd{font-size:.88rem;color:#047857;background:#f8fafc;border:1px solid var(--border-color);border-radius:10px;padding:8px 14px}.stu-rd.neg{color:#b91c1c}
-        @media(max-width:700px){.stu-2{grid-template-columns:1fr}.stu-tiles{grid-template-columns:1fr 1fr}.stu-r{grid-template-columns:44px 1fr auto}.stu-r .m,.stu-r .dt{display:none}}`;
+        @media(max-width:700px){.stu-2{grid-template-columns:1fr}.stu-tiles{grid-template-columns:1fr 1fr}.stu-r{grid-template-columns:44px 1fr auto}.stu-r .m{display:none}.stu-r .dt{grid-column:1/-1;text-align:right}.stu-r .dt br{display:none}.stu-r .dt .stu-src{margin-right:6px}}`;
         document.head.appendChild(st);
     }
 }
