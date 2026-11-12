@@ -10,7 +10,7 @@ const num = v => (Number(v) || 0).toLocaleString('he-IL');
 const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 const ddmm = d => { const [, m, day] = String(d).split('-'); return `${day}/${m}`; };
 const when = s => { const [d, t] = String(s || '').split(' '); return d ? `${ddmm(d)} ${String(t || '').slice(0, 5)}` : ''; };
-const SRC = { phone: ['טלפון', 'fa-phone'], web: ['אתר', 'fa-desktop'], 'web-bulk': ['אתר (מרובה)', 'fa-desktop'], other: ['לא ידוע', 'fa-question-circle'] };
+const SRC = { phone: ['טלפון', 'fa-phone'], web: ['אתר', 'fa-desktop'], 'web-bulk': ['אתר (מרובה)', 'fa-desktop'], legacy: ['גיליון גוגל ישן', 'fa-table'], legacy_sheet: ['גיליון גוגל ישן', 'fa-table'], other: ['לא ידוע', 'fa-question-circle'] };
 const srcLabel = s => (SRC[s] || SRC.other)[0];
 const srcIcon = s => (SRC[s] || (String(s).startsWith('web') ? SRC.web : SRC.other))[1];
 
@@ -183,7 +183,7 @@ export class DashboardManager {
     }
 
     sources(s) {
-        const rows = [['phone', s.phone], ['web', s.web], ['other', s.other]];
+        const rows = [['phone', s.phone], ['web', s.web], ['legacy', s.legacy || 0], ['other', s.other]].filter(([k, v]) => v || k !== 'legacy');
         const total = rows.reduce((a, [, v]) => a + v, 0) || 1;
         return rows.map(([k, v]) => this.hbar(`<i class="fas ${SRC[k][1]}"></i> ${SRC[k][0]}`, v, total, `${num(v)} (${Math.round(v / total * 100)}%)`)).join('');
     }

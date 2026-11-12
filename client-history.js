@@ -15,8 +15,9 @@ const hebShort = d => formatHebrewDate(d).split(' ').slice(0, -1).join(' ');
 const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 // מקור העדכון: טלפון (ימות) / אתר (ממשק הניהול) / לא ידוע
-const srcOf = u => (u === 'phone' ? 'phone' : (!u || u === 'unknown' ? 'other' : 'web'));
-const SRC = { phone: ['טלפון', 'fa-phone'], web: ['אתר', 'fa-desktop'], other: ['לא ידוע', 'fa-question-circle'] };
+// legacy_sheet = מבחנים שהועברו מגיליון גוגל הישן (הייבוא של 01/09/2026)
+const srcOf = u => (u === 'phone' ? 'phone' : u === 'legacy_sheet' ? 'legacy' : (!u || u === 'unknown' ? 'other' : 'web'));
+const SRC = { phone: ['טלפון', 'fa-phone'], web: ['אתר', 'fa-desktop'], legacy: ['גיליון גוגל ישן', 'fa-table'], other: ['לא ידוע', 'fa-question-circle'] };
 const PERIODS = [['all', 'הכל'], ['today', 'היום'], ['yest', 'אתמול'], ['week', '7 ימים'], ['month', '30 יום']];
 
 export class HistoryManager {
