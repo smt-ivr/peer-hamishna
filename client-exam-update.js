@@ -13,6 +13,15 @@ const heb = ts => { const d = new Date(String(ts || '').replace(' ', 'T')); retu
 const $ = id => document.getElementById(id);
 const TYPE = { mishnayot: 'משניות', gemara: 'גמרא' };
 
+// מאיפה עודכן: טלפון (שם / מספר), אתר, גיליון גוגל ישן, או לא ידוע
+function srcTag(e) {
+    const t = (cls, icon, txt, tip) => ` <span class="ge-src ${cls}" title="${tip}"><i class="fas ${icon}"></i> ${txt}</span>`;
+    if (e.update_source === 'phone') return t('ph', 'fa-phone-alt', `טלפון${e.update_by || e.update_phone ? ' · ' + esc(e.update_by || e.update_phone) : ''}`, 'עודכן בטלפון');
+    if (e.update_source === 'web' || e.update_source === 'web-bulk') return t('web', 'fa-desktop', 'אתר', 'עודכן באתר');
+    if (e.update_source === 'legacy_sheet') return t('legacy', 'fa-table', 'גיליון גוגל ישן', 'הועבר מגיליון גוגל הישן');
+    return e.update_source ? t('unk', 'fa-question', 'לא ידוע', 'מקור העדכון לא נשמר') : '';
+}
+
 export class ExamUpdateManager {
     constructor(apiBase, container, onSwitch, onChanged) {
         Object.assign(this, { apiBase, container, onSwitch, onChanged });
@@ -268,7 +277,7 @@ export class ExamUpdateManager {
         rows.forEach(e => { const k = (e.details || {}).masechet || 'כללי'; (groups.get(k) || groups.set(k, []).get(k)).push(e); });
         $('geHList').innerHTML = rows.length ? [...groups].map(([m, list]) => `<div class="ge-gh">${esc(m)}<em>${list.filter(e => e.passed).length}/${list.length}</em></div>` + list.map(e => `
             <div class="ge-hr"><b>${esc(e.exam_code)}</b><span class="w">${esc(this.desc(e).split(' · ').slice(1).join(' · '))}</span>
-                <span class="ge-pill ${e.passed ? 'ok' : 'bad'}">${e.passed ? '✓ עבר' : '✕ לא עבר'}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}</span>
+                <span class="ge-pill ${e.passed ? 'ok' : 'bad'}">${e.passed ? '✓ עבר' : '✕ לא עבר'}</span><span class="m">${e.passed ? money(e.reward_earned) : ''}</span><span class="dt">${heb(e.updated_at)}${srcTag(e)}</span>
                 <button type="button" data-fix="${esc(e.exam_code)}" title="תקן: הוסף לרשימת ההזנה עם הסטטוס ההפוך">✎</button></div>`).join('')).join('')
             : `<div class="ge-empty">${all.length ? 'לא נמצאו תוצאות' : 'התלמיד עדיין לא נבחן באף בחינה'}</div>`;
     }
@@ -396,6 +405,8 @@ export class ExamUpdateManager {
         .ge-hr{display:grid;grid-template-columns:46px 1fr auto 56px 60px 28px;gap:8px;align-items:center;padding:5px 16px;border-bottom:1px solid #eef2f7;font-size:.82rem}.ge-hr:nth-child(even){background:#f8fafc}
         .ge-hr .w{color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ge-hr .m{color:#0369a1;font-weight:700;text-align:left}.ge-hr .dt{color:#94a3b8;font-size:.72rem;text-align:left}
         .ge-hr button{border:1px solid var(--border-color);background:#fff;border-radius:7px;width:26px;height:26px;cursor:pointer;color:#475569}.ge-hr button:hover{background:#eff6ff;border-color:#93c5fd;color:var(--primary-color)}
+        .ge-src{display:inline-flex;align-items:center;gap:3px;font-size:.68rem;border-radius:99px;padding:0 6px;margin-right:4px;white-space:nowrap}
+        .ge-src i{font-size:.6rem}.ge-src.ph{background:#eff6ff;color:#1d4ed8}.ge-src.web{background:#f0fdf4;color:#15803d}.ge-src.legacy{background:#fef3c7;color:#92400e}.ge-src.unk{background:#f1f5f9;color:#64748b}
         .ge-pill{border-radius:99px;padding:0 8px;font-size:.7rem;font-weight:700;white-space:nowrap}.ge-pill.ok{background:#d1fae5;color:#047857}.ge-pill.bad{background:#fee2e2;color:#b91c1c}
         .ge-hnote{padding:8px 16px;font-size:.76rem;color:#64748b;background:#f8fafc;border-top:1px solid var(--border-color)}
         .ge-empty{padding:26px 10px;text-align:center;color:#94a3b8;font-size:.85rem}.ge-fail{padding:30px;text-align:center;color:#991b1b}
