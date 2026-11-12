@@ -36,13 +36,17 @@ const PAY_COLS = {
     failed:    { head: 'לא עבר', w: 8, sum: true, val: s => Math.max(0, (Number((s.stats || {}).total_attempted) || 0) - (Number((s.stats || {}).total_passed) || 0)) },
     mishnayot: { head: 'משניות', w: 9, sum: true, val: s => Number((s.stats || {}).total_mishnayot) || 0 },
     gemara:    { head: 'דפי גמרא', w: 10, sum: true, val: s => Number((s.stats || {}).total_gemara_pages) || 0 },
+    availmish: { head: 'משניות שזכאי להיבחן', w: 12, sum: true, val: s => Number((s.stats || {}).available_mishnayot) || 0 },
+    mishpct:   { head: 'אחוז משניות', w: 10, val: s => Number((s.stats || {}).mishnayot_pct) || 0, pct: true },
+    frame:     { head: 'זכאי לתעודה עם מסגרת', w: 12, val: s => ((s.stats || {}).frame_eligible ? 'כן' : 'לא') },
     amount:    { head: 'סכום להטענה', w: 14, sum: true, money: true, val: s => Math.round((Number((s.stats || {}).total_reward) || 0) * 100) / 100 }
 };
 const PAY_SORTS = { last: 'שם משפחה', first: 'שם פרטי', class: 'כיתה', code: 'קוד', amount: 'סכום (מהגבוה)' };
 // סוגי קובץ: בחירת סוג מסמנת את העמודות שלו (ואפשר לשנות אחר כך)
 const PAY_KINDS = {
     amounts: { label: 'סכומים להטענה', file: 'סכומים_להטענה', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'gemara', 'amount'] },
-    full:    { label: 'דוח מבחנים מלא', file: 'דוח_מבחנים', cols: ['code', 'last', 'first', 'class', 'attempted', 'available', 'passed', 'failed', 'mishnayot', 'gemara', 'amount'] },
+    full:    { label: 'דוח מבחנים מלא', file: 'דוח_מבחנים', cols: ['code', 'last', 'first', 'class', 'attempted', 'available', 'passed', 'failed', 'mishnayot', 'availmish', 'mishpct', 'gemara', 'frame', 'amount'] },
+    frame:   { label: 'זכאים לתעודה עם מסגרת', file: 'זכאים_למסגרת', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'availmish', 'mishpct', 'frame'] },
     list:    { label: 'רשימת תלמידים', file: 'רשימת_תלמידים', cols: ['code', 'last', 'first', 'class', 'phone'] }
 };
 
@@ -79,7 +83,9 @@ export class StudentManager {
             attempted: m ? m.total_attempted : ex.length,
             available: m ? m.total_available_exams : null,
             passed: m ? m.total_passed : ex.filter(e => e.passed).length,
-            reward: m ? m.total_reward : (s.total_reward || 0)
+            reward: m ? m.total_reward : (s.total_reward || 0),
+            mish: m ? (m.total_mishnayot || 0) : 0, gem: m ? (m.total_gemara_pages || 0) : 0,
+            availMish: m ? (m.available_mishnayot || 0) : 0, pct: m ? (m.mishnayot_pct || 0) : 0, frame: !!(m && m.frame_eligible)
         };
     }
     find(code) { return this.students.find(s => s.student_code === code); }
@@ -150,6 +156,7 @@ export class StudentManager {
         const none = all.filter(s => this.stats(s).attempted === 0).length;
         $('stuKpis').innerHTML = `<span class="stu-kpi">תלמידים <b>${all.length}</b></span>
             <span class="stu-kpi ${none ? 'click' : ''}" id="stuNoneKpi" title="הצג רק תלמידים שלא נבחנו כלל">לא נבחנו כלל <b>${none}</b></span>
+            <span class="stu-kpi">זכאים לתעודה עם מסגרת <b>${all.filter(s => this.stats(s).frame).length}</b></span>
             <span class="stu-kpi">סך מלגות <b>${money(all.reduce((a, s) => a + this.stats(s).reward, 0))}</b></span>
             <span class="stu-kpi">מוצגים <b>${rows.length}</b></span>`;
         $('stuBody').innerHTML = rows.length ? rows.map(s => this.rowHtml(s)).join('') : '<tr><td colspan="8" class="stu-empty">לא נמצאו תלמידים</td></tr>';
@@ -162,7 +169,7 @@ export class StudentManager {
     rowHtml(s) {
         const st = this.stats(s), pct = st.available ? Math.min(100, Math.round(st.attempted / st.available * 100)) : 0;
         return `<tr data-code="${esc(s.student_code)}">
-            <td class="stu-code">${esc(s.student_code)}</td><td><b>${esc(this.fullName(s))}</b></td>
+            <td class="stu-code">${esc(s.student_code)}</td><td><b>${esc(this.fullName(s))}</b>${st.frame ? ' <span class="stu-frame" title="עבר 50% מהמשניות שהוא זכאי להיבחן עליהן">★ מסגרת</span>' : ''}</td>
             <td><span class="stu-cls">${esc(s.class_grade || '-')}</span></td>
             <td class="stu-mut">${esc((s.phones || [])[0] || '')}</td>
             <td><div class="stu-bar"><div><i style="width:${pct}%"></i></div><span>${st.attempted}${st.available != null ? ` מתוך ${st.available}` : ''}</span></div></td>
@@ -203,7 +210,9 @@ export class StudentManager {
                     <div class="stu-tags"><span>קוד ${esc(s.student_code)}</span><span>כיתה ${esc(s.class_grade || '-')}</span>${phones ? `<span>${esc(phones)}</span>` : ''}</div></div>
                 <button class="stu-x" data-close>&times;</button>
             </div>
-            <div class="stu-tiles">${tile(st.available != null ? `${st.attempted} מתוך ${st.available}` : st.attempted, 'נבחן')}${tile(st.passed, 'עברו', 'ok')}${tile(Math.max(0, st.attempted - st.passed), 'לא עברו', 'bad')}${tile(money(st.reward), 'מלגה', 'money')}</div>
+            <div class="stu-tiles">${tile(st.available != null ? `${st.attempted} מתוך ${st.available}` : st.attempted, 'נבחן')}${tile(st.passed, 'עברו', 'ok')}${tile(Math.max(0, st.attempted - st.passed), 'לא עברו', 'bad')}${tile(money(st.reward), 'מלגה', 'money')}
+                ${tile(st.availMish ? `${st.mish} מתוך ${st.availMish}` : st.mish, `משניות שעבר${st.availMish ? ` (${st.pct}%)` : ''}`)}${tile(st.gem, 'דפי גמרא שעבר')}
+                ${tile(st.frame ? '★ זכאי' : 'לא זכאי', 'תעודה עם מסגרת', st.frame ? 'frame' : '')}</div>
             <div class="stu-btns" style="padding:0 18px 12px"><button class="btn btn-secondary btn-sm" data-edit><i class="fas fa-pen"></i> עריכת פרטים</button>
                 <button class="btn btn-secondary btn-sm" data-edit-exams><i class="fas fa-list-check"></i> עריכת בחינות</button>
                 <button class="btn btn-primary btn-sm" data-grades><i class="fas fa-edit"></i> הזנת בחינות</button></div>
@@ -570,7 +579,8 @@ export class StudentManager {
             <div class="stu-segc stu-psort">${Object.entries(PAY_KINDS).map(([k, v]) => `<button type="button" data-kind="${k}" class="${o.kind === k ? 'on' : ''}">${v.label}</button>`).join('')}${o.kind === 'custom' ? '<button type="button" class="on" disabled>מותאם</button>' : ''}</div>
             <div class="stu-plbl">אילו תלמידים</div>
             <div class="stu-segc stu-psort"><button type="button" data-scope="all" class="${o.scope !== 'screen' ? 'on' : ''}">כל התלמידים (${this.students.length})</button>
-                <button type="button" data-scope="screen" class="${o.scope === 'screen' ? 'on' : ''}" ${filtered ? '' : 'disabled title="אין כרגע סינון במסך"'}>רק מה שמוצג במסך (${shown})</button></div>
+                <button type="button" data-scope="screen" class="${o.scope === 'screen' ? 'on' : ''}" ${filtered ? '' : 'disabled title="אין כרגע סינון במסך"'}>רק מה שמוצג במסך (${shown})</button>
+                <button type="button" data-scope="frame" class="${o.scope === 'frame' ? 'on' : ''}">רק זכאים לתעודה עם מסגרת (${this.students.filter(x => this.stats(x).frame).length})</button></div>
             <div class="stu-plbl">סדר התלמידים</div>
             <div class="stu-segc stu-psort">${Object.entries(PAY_SORTS).map(([k, t]) => `<button type="button" data-sort="${k}" class="${o.sort === k ? 'on' : ''}">${t}</button>`).join('')}</div>
             <div class="stu-plbl">עמודות בקובץ</div>
@@ -597,7 +607,7 @@ export class StudentManager {
                 amount: (a, b) => ((b.stats || {}).total_reward || 0) - ((a.stats || {}).total_reward || 0) || byLast(a, b)
             }[o.sort] || byLast;
             const onScreen = new Set(this.rowsData().map(x => x.student_code));
-            const list = r.data.filter(x => o.scope !== 'screen' || onScreen.has(x.student_code)).sort(cmp);
+            const list = r.data.filter(x => (o.scope !== 'screen' || onScreen.has(x.student_code)) && (o.scope !== 'frame' || (x.stats || {}).frame_eligible)).sort(cmp);
             const cols = o.cols.filter(k => PAY_COLS[k]);
             const head = cols.map(k => PAY_COLS[k].head);
             const rows = list.map((s, i) => cols.map(k => PAY_COLS[k].val(s, i)));
@@ -621,6 +631,7 @@ export class StudentManager {
                 const total = cols.map((k, i) => PAY_COLS[k].sum ? { t: 'n', f: `SUM(${L(i)}2:${L(i)}${last})` } : (i === firstText ? `סה״כ (${n} תלמידים)` : ''));
                 X.utils.sheet_add_aoa(ws, [total], { origin: `A${last + 1}` });
             }
+            cols.forEach((k, i) => { if (PAY_COLS[k].pct) for (let rI = 2; rI <= last; rI++) { const c = ws[`${L(i)}${rI}`]; if (c) c.z = '0.0"%"'; } });
             cols.forEach((k, i) => { if (PAY_COLS[k].money) for (let rI = 2; rI <= last + 1; rI++) { const c = ws[`${L(i)}${rI}`]; if (c) c.z = '"₪"#,##0.00'; } });
             ws['!cols'] = cols.map(k => ({ wch: PAY_COLS[k].w }));
             ws['!autofilter'] = { ref: `A1:${L(cols.length - 1)}${last}` };
@@ -823,6 +834,8 @@ export class StudentManager {
         .stu-ph{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:99px;padding:2px 4px 2px 10px;font-size:.84rem;font-family:ui-monospace,Menlo,Consolas,monospace}
         .stu-ph button{border:none;background:none;color:#64748b;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;border-radius:50%}.stu-ph button:hover{background:#dbeafe;color:#b91c1c}
         .stu-padd{display:flex;gap:6px}.stu-padd input{flex:1;padding:8px;border:1px solid var(--border-color);border-radius:6px;outline:none;direction:ltr;text-align:right}.stu-padd input:focus{border-color:var(--primary-color)}
+        .stu-frame{display:inline-block;background:#fef9c3;color:#854d0e;border:1px solid #fde047;border-radius:99px;padding:0 7px;font-size:.7rem;font-weight:800;margin-right:4px;white-space:nowrap}
+        .stu-tile.frame{background:#fef9c3;border-color:#fde047}.stu-tile.frame b{color:#854d0e}
         .stu-pmc{max-width:520px;width:94%;height:auto;border-radius:12px;overflow:hidden}
         .stu-pbody{padding:16px 18px;display:flex;flex-direction:column;gap:8px}.stu-plbl{font-size:.82rem;font-weight:700;color:#475569;margin-top:4px}
         .stu-psort{flex-wrap:wrap}.stu-pcols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
