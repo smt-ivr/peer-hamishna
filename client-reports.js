@@ -97,7 +97,8 @@ export const TEXT_LABELS = [
 ];
 
 // ברירות המחדל הישנות — אם הן שמורות בשרת, מתעדכנות לחדשות (טקסט שהותאם אישית לא נוגעים בו)
-const LEGACY_TEXTS = { statAttempted: 'נבחן ב-', statPassed: 'עברו', statFailed: 'לא עברו', statMoney: 'סך מלגה', empty: 'לא נמצאו מבחנים להצגה' };
+const LEGACY_TEXTS = { statAttempted: 'נבחן ב-', statPassed: 'עברו', statFailed: 'לא עברו', statMoney: 'סך מלגה', empty: 'לא נמצאו מבחנים להצגה',
+    statMishnayot: 'משניות שעברו $', statGemara: 'דפי גמרא שעברו $' };
 
 export const COLOR_LABELS = [
     ['line', 'קו וכותרת עליונה'],
@@ -579,11 +580,14 @@ export class ReportManager {
         .rp-student .rp-meta { margin-top: 1.2mm; font-size: 3.4mm; color: #334155; }
         .rp-chip { display: inline-block; background: #e2e8f0; border-radius: 1mm; padding: .3mm 1.6mm; margin-right: 1.5mm; font-size: 3mm; }
 
-        .rp-stats { height: 11mm; flex: none; display: flex; gap: 3mm; margin: 3mm 0; }
-        .rp-stat { flex: 1; border: .3mm solid #cbd5e1; border-radius: 1.5mm; background: #f8fafc; display: flex; align-items: center; justify-content: center; gap: 1.8mm; font-size: 3.2mm; color: #334155; white-space: nowrap; }
+        /* שורת סיכום אחת: מסגרת אחת עם קווים דקים בין הנתונים (במקום קובייה לכל נתון) */
+        .rp-stats { height: 11mm; flex: none; display: flex; margin: 3mm 0; border: .3mm solid #cbd5e1; border-radius: 1.5mm; background: #f8fafc; overflow: hidden; }
+        .rp-stat { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 1.5mm; padding: 0 2mm; font-size: 3.2mm; color: #334155; white-space: nowrap; border-left: .25mm solid #cbd5e1; }
+        .rp-stat:last-child { border-left: none; }
+        .rp-sep { color: #94a3b8; margin: 0 .8mm; }
         .rp-stat b { font-size: 4.8mm; font-weight: 800; color: #0f172a; }
         .rp-stat.ok b { color: var(--pm); } .rp-stat.bad b { color: var(--fm); } .rp-stat.money b { color: #0284c7; }
-.rp-stats.many { gap: 2mm; } .rp-stats.many .rp-stat { font-size: 2.9mm; gap: 1.2mm; } .rp-stats.many .rp-stat b { font-size: 4.3mm; }
+.rp-stats.many .rp-stat { font-size: 3mm; gap: 1.2mm; padding: 0 1.6mm; } .rp-stats.many .rp-stat b { font-size: 4.3mm; }
         .rp-frame { display: inline-block; margin-top: 1.2mm; background: #fef9c3; border: .3mm solid #ca8a04; color: #854d0e; border-radius: 10mm; padding: .3mm 2.4mm; font-size: 3mm; font-weight: 800; }
         .rp-gap { height: 4mm; flex: none; }
         .rp-note { flex: none; height: 7mm; margin-bottom: 2mm; border-radius: 1.5mm; background: #f1f5f9; border-right: 1.3mm solid var(--ln); display: flex; align-items: center; padding: 0 3mm; font-size: 3.3mm; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1251,7 +1255,7 @@ export class ReportManager {
             passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}</div>`,
             failed: `<div class="rp-stat bad">${fillTpl(T.statFailed, failed)}</div>`,
             money: o.showReward ? `<div class="rp-stat money">${fillTpl(T.statMoney, '₪' + reward.toFixed(1))}</div>` : '',
-            learned: `<div class="rp-stat">${esc(T.statMishnayot)} <b>${mish}</b> · ${esc(T.statGemara)} <b>${gem}</b></div>`
+            learned: `<div class="rp-stat">${esc(String(T.statMishnayot).replace('$', '').trim())} <b>${mish}</b><span class="rp-sep">·</span>${esc(String(T.statGemara).replace('$', '').trim())} <b>${gem}</b></div>`
         };
         const visibleStats = o.showStats ? o.statsOrder.filter(id => o.statsVisible[id] && cards[id]) : [];
         const statsCls = visibleStats.length > 4 ? 'many' : '';
