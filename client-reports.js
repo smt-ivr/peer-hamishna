@@ -31,9 +31,9 @@ const typeOf = t => TYPE_INFO[t] || TYPE_INFO.other;
 // ============================================================
 
 const HEADER_IDS = ['logo', 'title', 'student'];
-const STAT_IDS = ['attempted', 'passed', 'failed', 'mishnayot', 'gemara', 'money', 'frame'];
+const STAT_IDS = ['attempted', 'passed', 'failed', 'learned', 'money'];
 const HEADER_LABELS = { logo: 'לוגו', title: 'כותרת הדוח ותאריך', student: 'פרטי התלמיד' };
-const STAT_LABELS = { attempted: 'נבחן ב-X מתוך Y', passed: 'עברו', failed: 'לא עברו', mishnayot: 'משניות שעברו', gemara: 'דפי גמרא שעברו', money: 'סך מלגה', frame: 'זכאי לתעודה עם מסגרת (רק למי שזכאי)' };
+const STAT_LABELS = { attempted: 'נבחן ב-X מתוך Y', passed: 'עברו', failed: 'לא עברו', learned: 'משניות ודפי גמרא שעברו', money: 'סך מלגה' };
 
 export const DEFAULT_DESIGN = {
     // טקסטים
@@ -44,8 +44,9 @@ export const DEFAULT_DESIGN = {
     bsd: false,
     // סדר (הראשון מופיע מימין)
     headerOrder: ['logo', 'title', 'student'],
-    statsOrder: ['attempted', 'passed', 'failed', 'mishnayot', 'gemara', 'money', 'frame'],
-    statsVisible: { attempted: true, passed: true, failed: true, mishnayot: true, gemara: true, money: true, frame: false },
+    statsOrder: ['attempted', 'passed', 'failed', 'learned', 'money'],
+    statsVisible: { attempted: true, passed: true, failed: true, learned: true, money: true },
+    showFrame: false,      // תג "זכאי לתעודה עם מסגרת" ליד שם התלמיד (רק לזכאים)
     // הצגה
     showLogo: true,
     showStats: true,
@@ -65,7 +66,7 @@ export const DEFAULT_DESIGN = {
     texts: {
         colCode: 'קוד', colMark: 'הישג', colReward: 'מלגה',
         statAttempted: 'נבחן ב-$ בחינות', statOf: 'מתוך', statPassed: 'עברו $ בחינות', statFailed: 'לא עברו $ בחינות', statMoney: 'סך מלגה $',
-        statMishnayot: 'משניות שעברו $', statGemara: 'דפי גמרא שעברו $', statFrame: 'זכאי לתעודה עם מסגרת',
+        statMishnayot: 'משניות', statGemara: 'דפי גמרא', statFrame: 'זכאי לתעודה עם מסגרת',
         grade: 'כיתה', code: 'קוד', typeM: 'משניות', typeG: 'גמרא',
         legPass: 'עבר', legFail: 'לא עבר', legNone: 'שורה ללא סימון – טרם נבחן',
         page: 'עמוד', pageOf: 'מתוך', bsd: 'בס״ד', empty: 'לא נמצאו בחינות להצגה',
@@ -88,7 +89,7 @@ export const TEXT_LABELS = [
     ['colCode', 'כותרת עמודה: קוד'], ['colMark', 'כותרת עמודה: הישג'], ['colReward', 'כותרת עמודה: מלגה'],
     ['statAttempted', 'כרטיס: נבחן ($ = המספר)'], ['statOf', 'כרטיס: מתוך (אחרי המספר)'], ['statPassed', 'כרטיס: עברו ($ = המספר)'],
     ['statFailed', 'כרטיס: לא עברו ($ = המספר)'], ['statMoney', 'כרטיס: סך מלגה ($ = הסכום)'],
-    ['statMishnayot', 'כרטיס: משניות שעברו ($ = המספר)'], ['statGemara', 'כרטיס: דפי גמרא שעברו ($ = המספר)'], ['statFrame', 'כרטיס: זכאי לתעודה עם מסגרת'],
+    ['statMishnayot', 'כרטיס: המילה "משניות"'], ['statGemara', 'כרטיס: המילה "דפי גמרא"'], ['statFrame', 'תג: זכאי לתעודה עם מסגרת'],
     ['grade', 'המילה "כיתה"'], ['code', 'המילה "קוד" (ליד התלמיד)'], ['typeM', 'תווית משניות'], ['typeG', 'תווית גמרא'],
     ['legPass', 'מקרא: עבר'], ['legFail', 'מקרא: לא עבר'], ['legNone', 'מקרא: טרם נבחן'],
     ['page', 'המילה "עמוד"'], ['pageOf', 'המילה "מתוך" (עמודים)'], ['bsd', 'בס״ד'], ['empty', 'הודעה כשאין בחינות'],
@@ -582,9 +583,8 @@ export class ReportManager {
         .rp-stat { flex: 1; border: .3mm solid #cbd5e1; border-radius: 1.5mm; background: #f8fafc; display: flex; align-items: center; justify-content: center; gap: 1.8mm; font-size: 3.2mm; color: #334155; white-space: nowrap; }
         .rp-stat b { font-size: 4.8mm; font-weight: 800; color: #0f172a; }
         .rp-stat.ok b { color: var(--pm); } .rp-stat.bad b { color: var(--fm); } .rp-stat.money b { color: #0284c7; }
-        .rp-stat small { font-size: .85em; color: #64748b; }
-        .rp-stat.frame { background: #fef9c3; border-color: #ca8a04; color: #854d0e; font-weight: 800; }
-        .rp-stats.many { gap: 1.6mm; } .rp-stats.many .rp-stat { font-size: 2.6mm; gap: 1mm; padding: 0 1mm; } .rp-stats.many .rp-stat b { font-size: 3.8mm; }
+.rp-stats.many { gap: 2mm; } .rp-stats.many .rp-stat { font-size: 2.9mm; gap: 1.2mm; } .rp-stats.many .rp-stat b { font-size: 4.3mm; }
+        .rp-frame { display: inline-block; margin-top: 1.2mm; background: #fef9c3; border: .3mm solid #ca8a04; color: #854d0e; border-radius: 10mm; padding: .3mm 2.4mm; font-size: 3mm; font-weight: 800; }
         .rp-gap { height: 4mm; flex: none; }
         .rp-note { flex: none; height: 7mm; margin-bottom: 2mm; border-radius: 1.5mm; background: #f1f5f9; border-right: 1.3mm solid var(--ln); display: flex; align-items: center; padding: 0 3mm; font-size: 3.3mm; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -1130,6 +1130,7 @@ export class ReportManager {
                 ${sw('showSummary', 'סיכום בכותרת כל מסכת (עברו / סה"כ)')}
                 ${sw('showTypeLabels', 'תווית "משניות" / "גמרא" בכותרת מסכת')}
                 ${sw('showStudentCode', 'קוד תלמיד בפרטי התעודה')}
+                ${sw('showFrame', 'תג "זכאי לתעודה עם מסגרת" ליד השם (רק לזכאים)')}
                 ${sw('showChapterLetter', 'אות הפרק ליד קוד הבחינה (במשניות)')}
                 ${sw('gemaraByChapter', 'בגמרא: כותרת לפי שם הפרק במקום שם המסכת')}
                 ${sw('showHebrewDate', 'תאריך עברי בכותרת')}
@@ -1250,12 +1251,10 @@ export class ReportManager {
             passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}</div>`,
             failed: `<div class="rp-stat bad">${fillTpl(T.statFailed, failed)}</div>`,
             money: o.showReward ? `<div class="rp-stat money">${fillTpl(T.statMoney, '₪' + reward.toFixed(1))}</div>` : '',
-            mishnayot: `<div class="rp-stat">${fillTpl(T.statMishnayot, mish)}${availMish ? ` <small>${esc(T.statOf)} ${availMish}</small>` : ''}</div>`,
-            gemara: `<div class="rp-stat">${fillTpl(T.statGemara, gem)}</div>`,
-            frame: frame ? `<div class="rp-stat frame">★ ${esc(T.statFrame)}</div>` : ''       // מוצג רק לזכאים
+            learned: `<div class="rp-stat">${esc(T.statMishnayot)} <b>${mish}</b> · ${esc(T.statGemara)} <b>${gem}</b></div>`
         };
         const visibleStats = o.showStats ? o.statsOrder.filter(id => o.statsVisible[id] && cards[id]) : [];
-        const statsCls = visibleStats.length > 5 ? 'many' : '';
+        const statsCls = visibleStats.length > 4 ? 'many' : '';
         const bodyH = computeBodyH(visibleStats.length > 0, !!note);
 
         const groups = groupExams(exams, { gemaraByChapter: o.gemaraByChapter });
@@ -1280,6 +1279,7 @@ export class ReportManager {
             student: (i) => `<div class="rp-student" style="text-align:${i === 0 ? 'right' : (i === last ? 'left' : 'center')}">
                     <div class="rp-name">${esc(student.first_name)} ${esc(student.last_name)}</div>
                     <div class="rp-meta">${esc(T.grade)} ${esc(student.class_grade || 'כללי')}${codeChip}</div>
+                    ${o.showFrame && frame ? `<div class="rp-frame">★ ${esc(T.statFrame)}</div>` : ''}
                 </div>`
         };
         const headHtml = present.map((id, i) => headParts[id](i)).join('');
