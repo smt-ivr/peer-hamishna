@@ -77,6 +77,12 @@ export class PhoneManager {
         this.editMinutes = r.data.settings.edit_minutes ?? 5;
         this.student = { enabled: true, require_phone: true, closed_message: '', ...(r.data.settings.student || {}) };
         this.render();
+        if (this.pendingPhone) {            // הגיעו מקישור על מבחן: פותחים את הפעילות של המספר
+            const p = this.pendingPhone; this.pendingPhone = null;
+            const num = this.data.numbers.find(n => n.phone === p);
+            if (num) this.openActivity(num);
+            else { this.tab = 'log'; this.log.q = p; this.log.line = 'manager'; this.render(); }
+        }
         if (this.tab === 'log') this.loadLog();
         if (this.tab === 'audit') this.loadAudit();
     }
