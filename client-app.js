@@ -577,17 +577,23 @@ window.setRouteSub = (main, sub) => {
     if (!routing && location.hash !== h) history.pushState(null, '', h);
 };
 function applyRoute() {
-    const [main, sub] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
+    const [main, sub, arg] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
     const target = Object.keys(ROUTES).find(k => ROUTES[k] === main);
     if (!target) return;
     const item = document.querySelector(`.menu-item[data-target="${target}"]`);
     if (!item || item.classList.contains('hidden')) return;          // אין הרשאה ללשונית — נשארים בלוח הבקרה
     const mgr = target === 'view-phone' ? phoneManager : target === 'view-admin' ? adminManager : null;
     if (mgr && sub && (SUB_TABS[target] || []).includes(sub)) mgr.tab = sub;
+    // #phone/number/0501234567 — ישר לפעילות של המספר (מלחיצה על "טלפון · שם" ליד מבחן)
+    if (target === 'view-phone' && sub === 'number' && arg) { phoneManager.tab = 'numbers'; phoneManager.pendingPhone = arg.replace(/\D/g, ''); }
+    if (studentManager && studentManager.cardCode) studentManager.closeCard();
+    const hm = document.getElementById('geHistModal'); if (hm) hm.classList.add('hidden');
     routing = true;
     try { item.click(); } finally { routing = false; }
 }
-window.addEventListener('popstate', applyRoute);
+window.addEventListener('hashchange', applyRoute);      // אחורה / קדימה, וקישורים בתוך המערכת
+// קישור לפעילות של טלפון — רק למי שרואה את מסך הרשאות הטלפון
+window.phoneLink = phone => { const m = document.getElementById('phoneMenuItem'); return phone && m && !m.classList.contains('hidden') ? `#phone/number/${phone}` : ''; };
 
 function setupTabs() {
     const menuItems = document.querySelectorAll('.menu-item:not(#logoutBtn)');

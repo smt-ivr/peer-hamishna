@@ -151,7 +151,9 @@ export class HistoryManager {
             <span class="who"><b>${esc(this.name(r.student_code))}</b>${s && s.class_grade ? `<i class="cls">${esc(s.class_grade)}</i>` : ''}<em>${esc(r.student_code)}</em></span>
             <span class="ex">${ty}<b>${esc(r.exam_code)}</b><span class="d">${esc(this.desc(r.exam_code))}</span></span>
             <span class="pl ${r.passed ? 'ok' : 'bad'}">${r.passed ? '✓ עבר' : '✕ לא עבר'}</span>
-            <span class="src" title="${esc(sn)}${r.source_identifier ? ' · ' + esc(r.source_identifier) : ''}"><i class="fas ${si}"></i> ${esc(r.source_identifier || sn)}</span>
+            ${(() => { const href = srcOf(r.update_source) === 'phone' && window.phoneLink ? window.phoneLink(String(r.source_identifier || '').replace(/\D/g, '').replace(/^972/, '0')) : '';
+                const inner = `<i class="fas ${si}"></i> ${esc(r.source_identifier || sn)}`;
+                return href ? `<a class="src hs-lnk" href="${href}" title="לכל הפעילות של המספר">${inner}</a>` : `<span class="src" title="${esc(sn)}${r.source_identifier ? ' · ' + esc(r.source_identifier) : ''}">${inner}</span>`; })()}
             <span class="act"><button data-open title="כרטיס התלמיד"><i class="fas fa-user"></i></button><button data-del class="d" title="מחק רישום"><i class="fas fa-trash"></i></button></span></div>`;
     }
 
@@ -263,7 +265,7 @@ export class HistoryManager {
         .hs-r .ex{display:flex;gap:7px;align-items:center;min-width:0}.hs-r .ex .d{color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .hs-ty{font-style:normal;border-radius:99px;padding:0 7px;font-size:.65rem;font-weight:800;border:1px solid;flex:none}.hs-ty.m{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.hs-ty.g{background:#fffbeb;color:#92400e;border-color:#fde68a}
         .hs-r .pl{border-radius:99px;padding:1px 9px;font-size:.74rem;font-weight:700;text-align:center;white-space:nowrap}.pl.ok{background:#d1fae5;color:#047857}.pl.bad{background:#fee2e2;color:#b91c1c}
-        .hs-r .src{color:#64748b;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hs-r .act{display:flex;gap:4px;justify-content:flex-end;opacity:.35;transition:.15s}.hs-r:hover .act{opacity:1}
+        .hs-r .src{color:#64748b;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hs-r a.hs-lnk{color:#1d4ed8;text-decoration:none}.hs-r a.hs-lnk:hover{text-decoration:underline}.hs-r .act{display:flex;gap:4px;justify-content:flex-end;opacity:.35;transition:.15s}.hs-r:hover .act{opacity:1}
         .hs-r .act button{border:1px solid var(--border-color);background:#fff;width:26px;height:26px;border-radius:7px;cursor:pointer;color:#475569;font-size:.75rem}.hs-r .act button:hover{background:#eff6ff;border-color:#93c5fd}.hs-r .act .d:hover{background:#fef2f2;border-color:#fecaca;color:#dc2626}
         .hs-more{padding:14px;text-align:center}.hs-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:50px 10px;color:#64748b}.hs-empty i{font-size:2rem;color:#cbd5e1}.hs-fail{padding:30px;text-align:center;color:#991b1b}
         .hs-table{width:100%;border-collapse:separate;border-spacing:0;font-size:.85rem}.hs-table th{position:sticky;top:0;background:#f1f5f9;color:#475569;font-size:.76rem;text-align:right;padding:9px 14px;border-bottom:1px solid var(--border-color)}

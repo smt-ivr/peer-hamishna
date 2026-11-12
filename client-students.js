@@ -25,7 +25,10 @@ function sourceHtml(e) {
     const src = e.update_source;
     if (src === 'phone') {
         const who = e.update_by || (e.update_phone ? (e.update_phone.length === 10 ? `${e.update_phone.slice(0, 3)}-${e.update_phone.slice(3)}` : e.update_phone) : '');
-        return `<span class="stu-src ph" title="עודכן בטלפון${e.update_phone ? ' · ' + esc(e.update_phone) : ''}"><i class="fas fa-phone-alt"></i> טלפון${who ? ` · <span dir="auto">${esc(who)}</span>` : ''}</span>`;
+        const href = window.phoneLink ? window.phoneLink(e.update_phone) : '';
+        const inner = `<i class="fas fa-phone-alt"></i> טלפון${who ? ` · <span dir="auto">${esc(who)}</span>` : ''}`;
+        return href ? `<a class="stu-src ph lnk" href="${href}" title="לכל הפעילות של המספר ${esc(e.update_phone)}">${inner}</a>`
+                    : `<span class="stu-src ph" title="עודכן בטלפון${e.update_phone ? ' · ' + esc(e.update_phone) : ''}">${inner}</span>`;
     }
     if (src === 'web' || src === 'web-bulk') return '<span class="stu-src web" title="עודכן באתר"><i class="fas fa-desktop"></i> אתר</span>';
     if (src === 'legacy_sheet') return '<span class="stu-src legacy" title="הועבר מגיליון גוגל הישן"><i class="fas fa-table"></i> גיליון גוגל ישן</span>';
@@ -823,7 +826,8 @@ export class StudentManager {
             transition:transform .2s,opacity .2s;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);border-radius:14px;overflow:hidden}
         .stu-dr.open{transform:translate(-50%,-50%);opacity:1;pointer-events:auto}
         .stu-src{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;border-radius:99px;padding:0 7px;margin-top:2px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
-        .stu-src i{font-size:.62rem}.stu-src.ph{background:#eff6ff;color:#1d4ed8}.stu-src.web{background:#f0fdf4;color:#15803d}.stu-src.unk{background:#f1f5f9;color:#64748b}.stu-src.legacy{background:#fef3c7;color:#92400e}
+        .stu-src i{font-size:.62rem}.stu-src.ph{background:#eff6ff;color:#1d4ed8}.stu-src.web{background:#f0fdf4;color:#15803d}.stu-src.unk{background:#f1f5f9;color:#64748b}.stu-src.lnk{text-decoration:none;cursor:pointer}.stu-src.lnk:hover{background:#dbeafe;text-decoration:underline}
+        .stu-src.legacy{background:#fef3c7;color:#92400e}
         .stu-dh{display:flex;gap:14px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--border-color)}
         .stu-av{width:52px;height:52px;border-radius:50%;background:var(--primary-color);color:#fff;font-size:1.5rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
         .stu-id{flex:1;min-width:0}.stu-id h2{margin:0 0 5px;font-size:1.25rem}.stu-tags{display:flex;gap:6px;flex-wrap:wrap}
