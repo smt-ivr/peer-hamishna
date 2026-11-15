@@ -585,6 +585,7 @@ export class ReportManager {
         .rp-stat { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 1.5mm; padding: 0 2mm; font-size: 3.2mm; color: #334155; white-space: nowrap; border-left: .25mm solid #cbd5e1; }
         .rp-stat:last-child { border-left: none; }
         .rp-sep { color: #94a3b8; margin: 0 .8mm; }
+        .rp-bon { font-size: .82em; color: #6d28d9; font-weight: 600; }
         .rp-stat b { font-size: 4.8mm; font-weight: 800; color: #0f172a; }
         .rp-stat.ok b { color: var(--pm); } .rp-stat.bad b { color: var(--fm); } .rp-stat.money b { color: #0284c7; }
 .rp-stats.many .rp-stat { font-size: 3mm; gap: 1.2mm; padding: 0 1.6mm; } .rp-stats.many .rp-stat b { font-size: 4.3mm; }
@@ -1254,7 +1255,7 @@ export class ReportManager {
             attempted: `<div class="rp-stat">${fillTpl(T.statAttempted, attempted)} ${esc(T.statOf)} ${total}</div>`,
             passed: `<div class="rp-stat ok">${fillTpl(T.statPassed, passed)}</div>`,
             failed: `<div class="rp-stat bad">${fillTpl(T.statFailed, failed)}</div>`,
-            money: o.showReward ? `<div class="rp-stat money">${fillTpl(T.statMoney, '₪' + reward.toFixed(1))}</div>` : '',
+            money: o.showReward ? `<div class="rp-stat money">${fillTpl(T.statMoney, '₪' + reward.toFixed(1))}${Number(st.bonus_visible) > 0 ? ` <small class="rp-bon">(כולל בונוס ₪${Number(st.bonus_visible).toFixed(1)})</small>` : ''}</div>` : '',
             learned: `<div class="rp-stat">${esc(String(T.statMishnayot).replace('$', '').trim())} <b>${mish}</b><span class="rp-sep">·</span>${esc(String(T.statGemara).replace('$', '').trim())} <b>${gem}</b></div>`
         };
         const visibleStats = o.showStats ? o.statsOrder.filter(id => o.statsVisible[id] && cards[id]) : [];

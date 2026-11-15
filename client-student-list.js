@@ -17,7 +17,7 @@ const $ = id => document.getElementById(id);
 const SORTS = { last: 'שם משפחה', first: 'שם פרטי', class: 'כיתות', code: 'קוד', amount: 'סכום (מהגבוה)' };
 const KINDS = { codes: 'שמות וקודים', amounts: 'סכומים להטענה' };
 const TITLES = { codes: 'רשימת תלמידים וקודים', amounts: 'סכומים להטענה' };
-const NUM_COLS = ['mish', 'pct', 'gem', 'amt', 'bon', 'tot', 'frame'];
+const NUM_COLS = ['mish', 'pct', 'gem', 'amt', 'bon', 'frame'];
 const money = v => '₪' + (Number(v) || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const INNER = { last: 'שם משפחה', first: 'שם פרטי', code: 'קוד' };
 const SIZES = { s: { label: 'קטן', fs: 2.8, pad: .55 }, m: { label: 'רגיל', fs: 3.2, pad: .75 }, l: { label: 'גדול', fs: 3.7, pad: 1 } };
@@ -118,7 +118,7 @@ export class StudentListExporter {
         const ff = this.firstFirst();
         let n = 0;
         const val = (s, k) => { const st = this.st(s);
-            return k === 'mish' ? (st.total_mishnayot || 0) : k === 'gem' ? (st.total_gemara_pages || 0) : k === 'pct' ? (st.mishnayot_pct || 0) : k === 'frame' ? (st.frame_eligible ? 1 : 0) : k === 'bon' ? (Number(st.bonus) || 0) : k === 'tot' ? (st.total_reward || 0) + (Number(st.bonus) || 0) : (st.total_reward || 0); };
+            return k === 'mish' ? (st.total_mishnayot || 0) : k === 'gem' ? (st.total_gemara_pages || 0) : k === 'pct' ? (st.mishnayot_pct || 0) : k === 'frame' ? (st.frame_eligible ? 1 : 0) : k === 'bon' ? (Number(st.bonus) || 0) : (st.total_reward || 0); };   // הסכום כולל בונוס
         const show = (k, v) => (k === 'amt' || k === 'bon' || k === 'tot') ? money(v) : k === 'pct' ? `${v}%` : k === 'frame' ? (v ? '★' : '') : v;
         const cell = (k, v) => `<td class="c-v ${k === 'amt' || k === 'bon' || k === 'tot' ? 'c-m' : ''} ${k === 'frame' && v ? 'c-fr' : ''}">${show(k, v)}</td>`;
         const row = s => `<tbody class="r"><tr>${o.num ? `<td class="c-n">${++n}</td>` : ''}
@@ -148,7 +148,7 @@ export class StudentListExporter {
 
     thead() {
         const o = this.o, ff = this.firstFirst();
-        const A = this.amounts(), H = { mish: 'משניות', pct: 'אחוז משניות', gem: 'דפי גמרא', amt: 'מלגה', bon: 'בונוס', tot: 'סכום להטענה', frame: 'מסגרת' };
+        const A = this.amounts(), H = { mish: 'משניות', pct: 'אחוז משניות', gem: 'דפי גמרא', amt: 'סכום להטענה', bon: 'מתוכו בונוס', frame: 'מסגרת' };
         const nums = A ? NUM_COLS.filter(k => o[k]) : [];
         return `<thead><tr>${o.num ? '<th class="c-n">#</th>' : ''}<th>${ff ? 'שם פרטי' : 'משפחה'}</th><th>${ff ? 'משפחה' : 'שם פרטי'}</th>${this.showCls() ? '<th class="c-c">כיתה</th>' : ''}${!A || o.code ? '<th class="c-k">קוד</th>' : ''}${nums.map(k => `<th class="c-v ${k === 'amt' || k === 'bon' || k === 'tot' ? 'c-m' : ''}">${H[k]}</th>`).join('')}</tr></thead>`;
     }
@@ -239,7 +239,7 @@ export class StudentListExporter {
             <label class="sl-lbl">טורים בדף</label>${seg('columns', { 1: '1', 2: '2', 3: '3' }, o.columns)}
             <label class="sl-lbl">גודל כתב</label>${seg('size', SIZES, o.size)}
             <label class="sl-lbl">כותרת</label><input id="slTitle" class="sl-in" value="${esc(o.title)}" maxlength="60">
-            <div class="sl-chks">${chk('cls', 'כיתה', o.sort === 'class' || this.scope)}${chk('num', 'מספור')}${chk('code', 'קוד', !this.amounts())}${chk('mish', 'משניות', !this.amounts())}${chk('gem', 'דפי גמרא', !this.amounts())}${chk('amt', 'מלגה', !this.amounts())}${chk('bon', 'בונוס', !this.amounts())}${chk('tot', 'סה״כ מלגה + בונוס', !this.amounts())}${chk('pct', 'אחוז משניות', !this.amounts())}${chk('frame', 'זכאי למסגרת', !this.amounts())}${chk('onlyFrame', 'רק זכאים למסגרת', !this.amounts())}${chk('pageBreak', 'כל כיתה בעמוד חדש', o.sort !== 'class')}</div>
+            <div class="sl-chks">${chk('cls', 'כיתה', o.sort === 'class' || this.scope)}${chk('num', 'מספור')}${chk('code', 'קוד', !this.amounts())}${chk('mish', 'משניות', !this.amounts())}${chk('gem', 'דפי גמרא', !this.amounts())}${chk('amt', 'סכום', !this.amounts())}${chk('bon', 'מתוכו בונוס', !this.amounts())}${chk('pct', 'אחוז משניות', !this.amounts())}${chk('frame', 'זכאי למסגרת', !this.amounts())}${chk('onlyFrame', 'רק זכאים למסגרת', !this.amounts())}${chk('pageBreak', 'כל כיתה בעמוד חדש', o.sort !== 'class')}</div>
             <div class="sl-saved" id="slSaved"></div>`;
     }
 
