@@ -54,13 +54,15 @@ const PAY_COLS = {
     availmish: { head: 'משניות שזכאי להיבחן', w: 12, sum: true, val: s => Number((s.stats || {}).available_mishnayot) || 0 },
     mishpct:   { head: 'אחוז משניות', w: 10, val: s => Number((s.stats || {}).mishnayot_pct) || 0, pct: true },
     frame:     { head: 'זכאי לתעודה עם מסגרת', w: 12, val: s => ((s.stats || {}).frame_eligible ? 'כן' : 'לא') },
-    amount:    { head: 'סכום להטענה', w: 14, sum: true, money: true, val: s => Math.round((Number((s.stats || {}).total_reward) || 0) * 100) / 100 }
+    amount:    { head: 'מלגה', w: 12, sum: true, money: true, val: s => Math.round((Number((s.stats || {}).total_reward) || 0) * 100) / 100 },
+    bonus:     { head: 'בונוס', w: 11, sum: true, money: true, val: s => Math.round((Number((s.stats || {}).bonus) || 0) * 100) / 100 },
+    total:     { head: 'סכום להטענה (מלגה + בונוס)', w: 16, sum: true, money: true, val: s => Math.round(((Number((s.stats || {}).total_reward) || 0) + (Number((s.stats || {}).bonus) || 0)) * 100) / 100 }
 };
 const PAY_SORTS = { last: 'שם משפחה', first: 'שם פרטי', class: 'כיתה', code: 'קוד', amount: 'סכום (מהגבוה)' };
 // סוגי קובץ: בחירת סוג מסמנת את העמודות שלו (ואפשר לשנות אחר כך)
 const PAY_KINDS = {
-    amounts: { label: 'סכומים להטענה', file: 'סכומים_להטענה', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'gemara', 'amount'] },
-    full:    { label: 'דוח מבחנים מלא', file: 'דוח_מבחנים', cols: ['code', 'last', 'first', 'class', 'attempted', 'available', 'passed', 'failed', 'mishnayot', 'availmish', 'mishpct', 'gemara', 'frame', 'amount'] },
+    amounts: { label: 'סכומים להטענה', file: 'סכומים_להטענה', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'gemara', 'amount', 'bonus', 'total'] },
+    full:    { label: 'דוח מבחנים מלא', file: 'דוח_מבחנים', cols: ['code', 'last', 'first', 'class', 'attempted', 'available', 'passed', 'failed', 'mishnayot', 'availmish', 'mishpct', 'gemara', 'frame', 'amount', 'bonus', 'total'] },
     frame:   { label: 'זכאים לתעודה עם מסגרת', file: 'זכאים_למסגרת', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'availmish', 'mishpct', 'frame'] },
     list:    { label: 'רשימת תלמידים', file: 'רשימת_תלמידים', cols: ['code', 'last', 'first', 'class', 'phone'] }
 };
@@ -100,7 +102,8 @@ export class StudentManager {
             passed: m ? m.total_passed : ex.filter(e => e.passed).length,
             reward: m ? m.total_reward : (s.total_reward || 0),
             mish: m ? (m.total_mishnayot || 0) : 0, gem: m ? (m.total_gemara_pages || 0) : 0,
-            availMish: m ? (m.available_mishnayot || 0) : 0, pct: m ? (m.mishnayot_pct || 0) : 0, frame: !!(m && m.frame_eligible)
+            availMish: m ? (m.available_mishnayot || 0) : 0, pct: m ? (m.mishnayot_pct || 0) : 0, frame: !!(m && m.frame_eligible),
+            bonus: m ? (Number(m.bonus) || 0) : 0, framePct: m ? (m.frame_pct || 50) : 50
         };
     }
     find(code) { return this.students.find(s => s.student_code === code); }
@@ -171,7 +174,8 @@ export class StudentManager {
         const none = all.filter(s => this.stats(s).attempted === 0).length;
         $('stuKpis').innerHTML = `<span class="stu-kpi">תלמידים <b>${all.length}</b></span>
             <span class="stu-kpi ${none ? 'click' : ''}" id="stuNoneKpi" title="הצג רק תלמידים שלא נבחנו כלל">לא נבחנו כלל <b>${none}</b></span>
-            <span class="stu-kpi">זכאים לתעודה עם מסגרת <b>${all.filter(s => this.stats(s).frame).length}</b></span>
+            <span class="stu-kpi click" id="stuFramePct" title="לחיצה לשינוי אחוז המשניות הנדרש לתעודה">זכאים לתעודה עם מסגרת (${all.length ? this.stats(all[0]).framePct : 50}%) <b>${all.filter(s => this.stats(s).frame).length}</b> <i class="fas fa-pen" style="font-size:.65rem"></i></span>
+            ${(() => { const tb = all.reduce((a, s) => a + this.stats(s).bonus, 0); return tb ? `<span class="stu-kpi">בונוסים <b>${money(tb)}</b></span>` : ''; })()}
             <span class="stu-kpi">סך מלגות <b>${money(all.reduce((a, s) => a + this.stats(s).reward, 0))}</b></span>
             <span class="stu-kpi">מוצגים <b>${rows.length}</b></span>`;
         $('stuBody').innerHTML = rows.length ? rows.map(s => this.rowHtml(s)).join('') : '<tr><td colspan="8" class="stu-empty">לא נמצאו תלמידים</td></tr>';
@@ -188,7 +192,7 @@ export class StudentManager {
             <td><span class="stu-cls">${esc(s.class_grade || '-')}</span></td>
             <td class="stu-mut">${esc((s.phones || [])[0] || '')}</td>
             <td><div class="stu-bar"><div><i style="width:${pct}%"></i></div><span>${st.attempted}${st.available != null ? ` מתוך ${st.available}` : ''}</span></div></td>
-            <td class="stu-ok">${st.passed}</td><td class="stu-money">${money(st.reward)}</td>
+            <td class="stu-ok">${st.passed}</td><td class="stu-money">${money(st.reward)}${st.bonus ? `<small class="stu-bon">+${money(st.bonus)} בונוס</small>` : ''}</td>
             <td><button class="btn btn-outline btn-sm" data-grades title="הזנת בחינות לתלמיד"><i class="fas fa-edit"></i> ציונים</button></td></tr>`;
     }
 
@@ -205,8 +209,10 @@ export class StudentManager {
         if (!this.find(code)) return;
         this.cardCode = code;
         this.seg = 'taken';
+        this.bonuses = null;
         this.paintCard();
         $('stuOv').classList.add('open'); $('stuDr').classList.add('open');
+        this.loadBonuses(code);
         if (!this.cards.has(code) && !(await this.loadCard(code))) this.cards.set(code, null);
         if (this.cardCode === code) this.paintCard();
     }
@@ -227,12 +233,63 @@ export class StudentManager {
             </div>
             <div class="stu-tiles">${tile(st.available != null ? `${st.attempted} מתוך ${st.available}` : st.attempted, 'נבחן')}${tile(st.passed, 'עברו', 'ok')}${tile(Math.max(0, st.attempted - st.passed), 'לא עברו', 'bad')}${tile(money(st.reward), 'מלגה', 'money')}
                 ${tile(st.availMish ? `${st.mish} מתוך ${st.availMish}` : st.mish, `משניות שעבר${st.availMish ? ` (${st.pct}%)` : ''}`)}${tile(st.gem, 'דפי גמרא שעבר')}
-                ${tile(st.frame ? '★ זכאי' : 'לא זכאי', 'תעודה עם מסגרת', st.frame ? 'frame' : '')}</div>
+                ${tile(st.frame ? '★ זכאי' : 'לא זכאי', `תעודה עם מסגרת (${st.framePct}%)`, st.frame ? 'frame' : '')}${tile(money(st.bonus), 'בונוס', 'money')}</div>
+            ${this.bonusHtml()}
             <div class="stu-btns" style="padding:0 18px 12px"><button class="btn btn-secondary btn-sm" data-edit><i class="fas fa-pen"></i> עריכת פרטים</button>
                 <button class="btn btn-secondary btn-sm" data-edit-exams><i class="fas fa-list-check"></i> עריכת בחינות</button>
                 <button class="btn btn-primary btn-sm" data-grades><i class="fas fa-edit"></i> הזנת בחינות</button></div>
             <div class="stu-lh"><b>מה נבחן</b><div class="stu-segc" id="stuSeg">${this.segHtml(exams)}</div></div>
             <div class="stu-list">${exams === null ? '<div class="stu-empty">לא ניתן לטעון את הבחינות. סגור ופתח שוב.</div>' : (exams ? this.listHtml(exams) : '<div class="stu-empty">טוען...</div>')}</div>`;
+    }
+
+    // ---------- בונוס כסף: מופיע כאן ובאקסל, לא בדוח התלמיד ----------
+    async loadBonuses(code) {
+        const r = await this.call('GET', `/bonuses?student_code=${encodeURIComponent(code)}`);
+        if (this.cardCode !== code) return;
+        this.bonuses = r.ok && r.data ? r.data.rows : [];
+        this.paintCard();
+    }
+    bonusHtml() {
+        const list = this.bonuses;
+        const rows = !list ? '<div class="stu-mut">טוען...</div>' : list.map(b => `<div class="stu-br"><b class="${b.amount < 0 ? 'neg' : ''}">${money(b.amount)}</b>
+            <span>${esc(b.note || '')}</span><span class="stu-mut">${esc(heb(b.created_at))}${b.created_by ? ' · ' + esc(b.created_by) : ''}</span>
+            <button type="button" class="stu-bdel" data-bonus-del="${b.id}" title="מחיקת הבונוס">&times;</button></div>`).join('');
+        return `<div class="stu-bonus"><div class="stu-bh"><b><i class="fas fa-gift"></i> בונוסים</b><span class="stu-mut">לא מופיעים בדוח התלמיד</span></div>
+            ${rows}
+            <div class="stu-badd"><input id="stuBonusAmt" type="number" step="0.5" placeholder="סכום ₪" inputmode="decimal"><input id="stuBonusNote" placeholder="סיבה (רשות)" maxlength="120">
+                <button type="button" class="btn btn-secondary btn-sm" data-bonus-add><i class="fas fa-plus"></i> הוספת בונוס</button></div>
+            <div class="stu-ferr" id="stuBonusErr"></div></div>`;
+    }
+    async addBonus() {
+        const amount = parseFloat($('stuBonusAmt').value), note = $('stuBonusNote').value.trim(), code = this.cardCode;
+        if (!amount) { $('stuBonusErr').textContent = 'יש להזין סכום'; return; }
+        const r = await this.call('POST', '/bonuses', { student_code: code, amount, note });
+        if (!r.ok) { $('stuBonusErr').textContent = this.errText(r, 'השמירה נכשלה'); return; }
+        await this.afterBonus(code);
+        window.notify && window.notify('הבונוס נוסף', 'success', { duration: 2000 });
+    }
+    async delBonus(id) {
+        if (!(await window.customConfirm('למחוק את הבונוס?'))) return;
+        const code = this.cardCode, r = await this.call('DELETE', `/bonuses?id=${id}`);
+        if (!r.ok) return window.customAlert(this.errText(r, 'המחיקה נכשלה'), true);
+        await this.afterBonus(code);
+    }
+    async afterBonus(code) {          // מרענן את הסכום בטבלה ובכרטיס
+        await this.loadSummary();
+        await this.loadBonuses(code);
+    }
+
+    // אחוז המשניות הנדרש לתעודה עם מסגרת (הגדרה כללית, נשמרת בשרת)
+    async editFramePct() {
+        const cur = this.students.length ? this.stats(this.students[0]).framePct : 50;
+        const v = await window.customPrompt('אחוז המשניות (מתוך המשניות שהתלמיד זכאי להיבחן עליהן) שנדרש לתעודה עם מסגרת:', String(cur));
+        if (v === null) return;
+        const n = Number(String(v).replace('%', '').trim());
+        if (!(n > 0 && n <= 100)) return window.customAlert('יש להזין מספר בין 1 ל-100', true);
+        const r = await this.call('PUT', '/report-settings?profile=app', { settings: { frame_pct: n } });
+        if (!r.ok) return window.customAlert(this.errText(r, 'השמירה נכשלה'), true);
+        await this.loadSummary();
+        window.notify && window.notify(`האחוז לתעודה עם מסגרת עודכן ל-${n}%`, 'success', { duration: 2500 });
     }
 
     segHtml(exams) {
@@ -694,6 +751,7 @@ export class StudentManager {
             if (t.closest('#stuAdd')) return this.openForm();
             if (t.closest('#stuPayXlsx')) return this.openPayModal();
             if (t.closest('#stuPrintList')) return this.openPrintList();
+            if (t.closest('#stuFramePct')) return this.editFramePct();
             if (t.closest('#stuNoneKpi')) { this.f.status = 'none'; this.render(this.students); return; }
             const seg = t.closest('#stuStatus button');
             if (seg) { this.f.status = seg.dataset.v; this.render(this.students); return; }
@@ -708,6 +766,8 @@ export class StudentManager {
         $('stuDr').addEventListener('click', e => {
             const t = e.target;
             if (t.closest('[data-close]')) return this.closeCard();
+            if (t.closest('[data-bonus-add]')) return this.addBonus();
+            const bd = t.closest('[data-bonus-del]'); if (bd) return this.delBonus(bd.dataset.bonusDel);
             if (t.closest('[data-edit]')) return this.openForm(this.cardCode, 'details');
             if (t.closest('[data-edit-exams]')) return this.openForm(this.cardCode, 'exams');
             if (t.closest('[data-grades]')) { const code = this.cardCode; this.closeCard(); if (this.onGrades) this.onGrades(code); return; }
@@ -855,6 +915,13 @@ export class StudentManager {
         .stu-padd{display:flex;gap:6px}.stu-padd input{flex:1;padding:8px;border:1px solid var(--border-color);border-radius:6px;outline:none;direction:ltr;text-align:right}.stu-padd input:focus{border-color:var(--primary-color)}
         .stu-frame{display:inline-block;background:#fef9c3;color:#854d0e;border:1px solid #fde047;border-radius:99px;padding:0 7px;font-size:.7rem;font-weight:800;margin-right:4px;white-space:nowrap}
         .stu-tile.frame{background:#fef9c3;border-color:#fde047}.stu-tile.frame b{color:#854d0e}
+        .stu-bon{display:block;font-size:.7rem;color:#7c3aed;font-weight:700}
+        .stu-bonus{margin:0 18px 12px;border:1px solid #e9d5ff;background:#faf5ff;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
+        .stu-bh{display:flex;gap:8px;align-items:baseline}.stu-bh b{color:#6d28d9;font-size:.88rem}.stu-bh i{margin-left:3px}
+        .stu-br{display:grid;grid-template-columns:70px 1fr auto 24px;gap:8px;align-items:center;font-size:.84rem;background:#fff;border-radius:6px;padding:4px 8px}
+        .stu-br b{color:#6d28d9}.stu-br b.neg{color:#b91c1c}.stu-bdel{border:none;background:none;color:#94a3b8;cursor:pointer;font-size:1.1rem}.stu-bdel:hover{color:#b91c1c}
+        .stu-badd{display:flex;gap:6px;flex-wrap:wrap}.stu-badd input{padding:6px 8px;border:1px solid #ddd6fe;border-radius:6px;font-size:.84rem;font-family:inherit}
+        .stu-badd #stuBonusAmt{width:100px}.stu-badd #stuBonusNote{flex:1;min-width:140px}
         .stu-pmc{max-width:520px;width:94%;height:auto;border-radius:12px;overflow:hidden}
         .stu-pbody{padding:16px 18px;display:flex;flex-direction:column;gap:8px}.stu-plbl{font-size:.82rem;font-weight:700;color:#475569;margin-top:4px}
         .stu-psort{flex-wrap:wrap}.stu-pcols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
