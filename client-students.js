@@ -596,14 +596,15 @@ export class StudentManager {
     //  רף תעודה עם מסגרת לפי כיתות: כמה משניות כל כיתה יכולה להיבחן, ומכמה משניות זכאים (לפי אחוזים לבחירה)
     // ============================================================
     async openFrameReport() {
-        if (!this.frOpt) this.frOpt = { pcts: String(this.students.length ? this.stats(this.students[0]).framePct : 50), students: true, eligible: true };
+        if (!this.frOpt) this.frOpt = { pcts: [this.students.length ? this.stats(this.students[0]).framePct : 50], students: true, eligible: true };
         let m = $('stuFrModal');
         if (!m) {
             document.body.insertAdjacentHTML('beforeend', `<div id="stuFrModal" class="modal hidden" style="z-index:9990"><div class="modal-content stu-pmc">
                 <div class="modal-header"><h3><i class="fas fa-award" style="color:#ca8a04"></i> רף תעודה עם מסגרת לפי כיתות</h3><button class="close-modal-btn" data-fr="close" aria-label="סגור">&times;</button></div>
                 <div class="stu-pbody">
-                    <div class="stu-plbl">אחוזים (אפשר כמה, למשל: 40, 50)</div>
-                    <input id="frPcts" class="stu-fr-in" inputmode="decimal" placeholder="50">
+                    <div class="stu-plbl">אחוזים — לוחצים לבחירה (אפשר כמה)</div>
+                    <div class="stu-frp" id="frPcts"></div>
+                    <div class="stu-fradd"><input id="frOther" type="number" min="1" max="100" placeholder="אחוז אחר"><button type="button" class="btn btn-outline btn-sm" data-fr="add"><i class="fas fa-plus"></i> הוספה</button></div>
                     <div class="stu-plbl">עמודות נוספות</div>
                     <label class="stu-chk"><input type="checkbox" id="frStudents"> מספר התלמידים בכיתה</label>
                     <label class="stu-chk"><input type="checkbox" id="frEligible"> כמה תלמידים כבר עברו את הרף (לכל אחוז)</label>
@@ -618,20 +619,33 @@ export class StudentManager {
                 const b = e.target.closest('[data-fr]');
                 if (!b) return;
                 if (b.dataset.fr === 'close') return m.classList.add('hidden');
+                if (b.dataset.fr === 'pct') { const v = Number(b.dataset.v), set = new Set(this.frOpt.pcts); set.has(v) ? set.delete(v) : set.add(v); this.frOpt.pcts = [...set].sort((a, c) => a - c); return this.paintFrPcts(); }
+                if (b.dataset.fr === 'add') {
+                    const v = Number($('frOther').value);
+                    if (!(v > 0 && v <= 100)) { $('frErr').textContent = 'אחוז בין 1 ל-100'; return; }
+                    if (!this.frOpt.pcts.includes(v)) this.frOpt.pcts = [...this.frOpt.pcts, v].sort((a, c) => a - c);
+                    if (!this.frExtra.includes(v)) this.frExtra.push(v);
+                    $('frOther').value = ''; $('frErr').textContent = ''; return this.paintFrPcts();
+                }
                 this.buildFrameReport(b.dataset.fr);
             });
             document.addEventListener('keydown', e => { if (e.key === 'Escape' && !m.classList.contains('hidden')) m.classList.add('hidden'); });
         }
-        $('frPcts').value = this.frOpt.pcts; $('frStudents').checked = this.frOpt.students; $('frEligible').checked = this.frOpt.eligible; $('frErr').textContent = '';
+        this.frExtra = this.frExtra || [];
+        this.paintFrPcts(); $('frStudents').checked = this.frOpt.students; $('frEligible').checked = this.frOpt.eligible; $('frErr').textContent = '';
         m.classList.remove('hidden');
-        setTimeout(() => $('frPcts').focus(), 30);
+    }
+    paintFrPcts() {
+        const all = [...new Set([30, 40, 50, 60, 70, 75, 80, ...this.frExtra, ...this.frOpt.pcts])].sort((a, b) => a - b);
+        $('frPcts').innerHTML = all.map(p => `<button type="button" data-fr="pct" data-v="${p}" class="${this.frOpt.pcts.includes(p) ? 'on' : ''}">${p}%\u200E</button>`).join('');
+        $('frErr').textContent = this.frOpt.pcts.length ? '' : 'יש לבחור לפחות אחוז אחד';
     }
 
     async buildFrameReport(kind) {
-        const pcts = [...new Set($('frPcts').value.split(/[,\s;]+/).filter(Boolean).map(x => Number(x.replace('%', ''))))];
-        if (!pcts.length || pcts.some(p => !(p > 0 && p <= 100)) || pcts.length > 5) { $('frErr').textContent = 'יש להזין אחוז בין 1 ל-100 (עד 5 אחוזים)'; return; }
-        pcts.sort((a, b) => a - b);
-        this.frOpt = { pcts: pcts.join(', '), students: $('frStudents').checked, eligible: $('frEligible').checked };
+        const pcts = this.frOpt.pcts.slice();
+        if (!pcts.length) { $('frErr').textContent = 'יש לבחור לפחות אחוז אחד'; return; }
+        if (pcts.length > 6) { $('frErr').textContent = 'אפשר לבחור עד 6 אחוזים'; return; }
+        this.frOpt = { pcts, students: $('frStudents').checked, eligible: $('frEligible').checked };
         const r = await this.call('GET', '/student-summary');      // נתונים עדכניים
         if (!r.ok || !Array.isArray(r.data)) { $('frErr').textContent = this.errText(r, 'לא ניתן לטעון את הנתונים'); return; }
 
@@ -1038,7 +1052,10 @@ export class StudentManager {
         .stu-br b{color:#6d28d9}.stu-br b.neg{color:#b91c1c}.stu-bdel{border:none;background:none;color:#94a3b8;cursor:pointer;font-size:1.1rem}.stu-bdel:hover{color:#b91c1c}
         .stu-badd{display:flex;gap:6px;flex-wrap:wrap}.stu-badd input{padding:6px 8px;border:1px solid #ddd6fe;border-radius:6px;font-size:.84rem;font-family:inherit}
         .stu-badd #stuBonusAmt{width:100px}.stu-badd #stuBonusNote{flex:1;min-width:140px}
-        .stu-fr-in{padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;font-size:.95rem;font-family:inherit;direction:ltr;text-align:right}
+        .stu-frp{display:flex;flex-wrap:wrap;gap:6px}
+        .stu-frp button{min-width:58px;border:1px solid var(--border-color);background:#fff;border-radius:99px;padding:6px 12px;font-weight:700;font-size:.92rem;cursor:pointer;font-family:inherit;color:#334155}
+        .stu-frp button:hover{border-color:#93c5fd}.stu-frp button.on{background:var(--primary-color);border-color:var(--primary-color);color:#fff}
+        .stu-fradd{display:flex;gap:6px;align-items:center}.stu-fradd input{width:110px;padding:6px 8px;border:1px solid var(--border-color);border-radius:6px;font-family:inherit}
         .stu-pmc{max-width:520px;width:94%;height:auto;border-radius:12px;overflow:hidden}
         .stu-pbody{padding:16px 18px;display:flex;flex-direction:column;gap:8px}.stu-plbl{font-size:.82rem;font-weight:700;color:#475569;margin-top:4px}
         .stu-psort{flex-wrap:wrap}.stu-pcols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
