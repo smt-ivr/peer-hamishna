@@ -81,7 +81,20 @@ export class StudentListExporter {
     status(t) { const el = $('slSaved'); if (el) el.textContent = t; }
 
     // ============================================================
+    // תצוגה מקדימה של טבלה מוכנה (למשל "רף מסגרת לפי כיתות") — אותו חלון, אותם כפתורי הורדת PDF / הדפסה
+    async openTable(table) {
+        this.table = table;
+        $('slCtl').style.display = 'none';
+        $('slTitleBar').textContent = table.title;
+        $('slModal').classList.remove('hidden');
+        await this.getLogo();
+        this.refresh();
+    }
+
     async open(students, preset = {}, statsFn = null) {
+        this.table = null;
+        $('slCtl').style.display = '';
+        $('slTitleBar').textContent = 'רשימת תלמידים להדפסה';
         this.students = students || [];
         this.statsFn = statsFn || (() => ({}));
         this.classes = [...new Set(this.students.map(s => s.class_grade).filter(Boolean))].sort(cmp);
@@ -208,6 +221,7 @@ export class StudentListExporter {
         this._rt = setTimeout(() => {
             if ($('slModal').classList.contains('hidden')) return;
             $('slStage').style.zoom = '';
+            if (this.table) { this.paintTable(); $('slInfo').textContent = this.table.info || ''; this.fit(); return; }
             const { pages, count } = this.paginate();
             $('slInfo').textContent = `${count} תלמידים · ${pages} ${pages === 1 ? 'עמוד' : 'עמודים'}`;
             this.fit();
@@ -246,7 +260,21 @@ export class StudentListExporter {
     // ============================================================
     //  הדפסה / PDF
     // ============================================================
+    paintTable() {
+        const t = this.table;
+        const logo = this._logo ? `<img class="sl-logo" src="${esc(this._logo)}" alt="">` : '';
+        $('slStage').innerHTML = `<div class="sl-page sl-tpage">
+            <header class="sl-head">${logo}
+                <div class="sl-ttl"><h1>${esc(t.title)}</h1><div class="sl-sub">${esc(t.sub || '')}</div></div>
+                <div class="sl-date">${esc(formatHebrewDate(new Date()))}</div></header>
+            <table class="sl-ft"><thead><tr>${t.head.map((h, i) => `<th class="${(t.mark || []).includes(i) ? 'mk' : ''}">${esc(h)}</th>`).join('')}</tr></thead>
+                <tbody>${t.rows.map(r => `<tr>${r.map((v, i) => `<td class="${i === 0 ? 'c0' : ''} ${(t.mark || []).includes(i) ? 'mk' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+            ${t.note ? `<div class="sl-fnote">${esc(t.note)}</div>` : ''}
+            <footer class="sl-foot"><span>הופק ממערכת ניהול פאר המשנה</span><span></span></footer></div>`;
+    }
+
     fileName() {
+        if (this.table) return this.table.file;
         return [this.o.title.trim() || TITLES[this.o.kind], this.scope ? `כיתה ${this.scope}` : ''].filter(Boolean).join('_').replace(/[\\/:*?"<>|׳״']/g, '').replace(/\s+/g, '_');
     }
     print() {
@@ -349,7 +377,7 @@ export class StudentListExporter {
         <div id="slModal" class="modal hidden" style="z-index:9995">
             <div class="modal-content sl-mc">
                 <div class="sl-bar no-print">
-                    <div class="sl-bt"><h3><i class="fas fa-print"></i> רשימת תלמידים להדפסה</h3><span id="slInfo"></span></div>
+                    <div class="sl-bt"><h3><i class="fas fa-print"></i> <span id="slTitleBar">רשימת תלמידים להדפסה</span></h3><span id="slInfo"></span></div>
                     <div class="sl-acts">
                         <button class="btn btn-secondary btn-sm" id="slPdf"><i class="fas fa-file-pdf"></i> הורד PDF</button>
                         <button class="btn btn-primary btn-sm" id="slPrint"><i class="fas fa-print"></i> הדפס</button>
@@ -399,6 +427,11 @@ export class StudentListExporter {
         .sl-t .c-c{width:9mm;text-align:center}
         .sl-t .c-v{width:16mm;text-align:center}.sl-t .c-m{width:24mm;font-weight:700;white-space:nowrap}
         .sl-t .c-fr{color:#a16207;font-weight:900}
+        .sl-tpage .sl-ft{width:100%;border-collapse:collapse;margin-top:6mm;font-size:3.6mm}
+        .sl-ft th{background:#1e293b;color:#fff;font-weight:700;padding:2.2mm 2mm;text-align:center;font-size:3.3mm}
+        .sl-ft td{padding:2.2mm 2mm;text-align:center;border-bottom:.25mm solid #cbd5e1}.sl-ft tbody tr:nth-child(even) td{background:#f1f5f9}
+        .sl-ft td.c0{font-weight:800;font-size:4mm}.sl-ft th.mk{background:#854d0e}.sl-ft td.mk{font-weight:800;color:#854d0e;background:#fef9c3 !important}
+        .sl-fnote{margin-top:4mm;font-size:3mm;color:#475569;line-height:1.5}
         .sl-t tbody.tot td{background:#e2e8f0 !important;font-weight:800;border-top:.4mm solid #1e293b}
         .sl-t .c-k{width:12.5mm;text-align:center;font-weight:800;border-right:.2mm solid #cbd5e1;letter-spacing:.1mm}
         .sl-t th.c-k,.sl-t th.c-c{text-align:center}
