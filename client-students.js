@@ -151,6 +151,7 @@ export class StudentManager {
                 <div class="stu-btns">
                     <button class="btn btn-outline btn-sm" id="stuPayXlsx" title="בוחרים סוג, עמודות וסדר"><i class="fas fa-file-excel" style="color:#16a34a"></i> אקסל</button>
                     <button class="btn btn-outline btn-sm" id="stuPrintList" title="בוחרים סוג, עמודות וסדר — להדפסה או קובץ PDF"><i class="fas fa-file-pdf" style="color:#dc2626"></i> PDF / הדפסה</button>
+                    <button class="btn btn-outline btn-sm" id="stuFrameReport" title="לכל כיתה: כמה משניות אפשר להיבחן, ומכמה משניות זכאים לתעודה עם מסגרת"><i class="fas fa-award" style="color:#ca8a04"></i> רף מסגרת לפי כיתות</button>
                     <button class="btn btn-primary btn-sm" id="stuAdd"><i class="fas fa-user-plus"></i> תלמיד חדש</button>
                 </div>
             </div>
@@ -591,6 +592,111 @@ export class StudentManager {
     // ============================================================
     //  אקסל סכומים להטענה: כל התלמידים, משניות, דפי גמרא וסכום (רק מבחנים שעברו)
     // ============================================================
+    // ============================================================
+    //  רף תעודה עם מסגרת לפי כיתות: כמה משניות כל כיתה יכולה להיבחן, ומכמה משניות זכאים (לפי אחוזים לבחירה)
+    // ============================================================
+    async openFrameReport() {
+        if (!this.frOpt) this.frOpt = { pcts: String(this.students.length ? this.stats(this.students[0]).framePct : 50), students: true, eligible: true };
+        let m = $('stuFrModal');
+        if (!m) {
+            document.body.insertAdjacentHTML('beforeend', `<div id="stuFrModal" class="modal hidden" style="z-index:9990"><div class="modal-content stu-pmc">
+                <div class="modal-header"><h3><i class="fas fa-award" style="color:#ca8a04"></i> רף תעודה עם מסגרת לפי כיתות</h3><button class="close-modal-btn" data-fr="close" aria-label="סגור">&times;</button></div>
+                <div class="stu-pbody">
+                    <div class="stu-plbl">אחוזים (אפשר כמה, למשל: 40, 50)</div>
+                    <input id="frPcts" class="stu-fr-in" inputmode="decimal" placeholder="50">
+                    <div class="stu-plbl">עמודות נוספות</div>
+                    <label class="stu-chk"><input type="checkbox" id="frStudents"> מספר התלמידים בכיתה</label>
+                    <label class="stu-chk"><input type="checkbox" id="frEligible"> כמה תלמידים כבר עברו את הרף (לכל אחוז)</label>
+                    <div class="stu-ferr" id="frErr"></div>
+                </div>
+                <div class="stu-mfoot"><span class="stu-mut" style="flex:1">המשניות נספרות לפי המבחנים שהכיתה זכאית להיבחן עליהם</span>
+                    <button type="button" class="btn btn-outline" data-fr="close">ביטול</button>
+                    <button type="button" class="btn btn-secondary" data-fr="pdf"><i class="fas fa-file-pdf"></i> PDF / הדפסה</button>
+                    <button type="button" class="btn btn-primary" data-fr="xlsx"><i class="fas fa-file-excel"></i> אקסל</button></div></div></div>`);
+            m = $('stuFrModal');
+            m.addEventListener('click', e => {
+                const b = e.target.closest('[data-fr]');
+                if (!b) return;
+                if (b.dataset.fr === 'close') return m.classList.add('hidden');
+                this.buildFrameReport(b.dataset.fr);
+            });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape' && !m.classList.contains('hidden')) m.classList.add('hidden'); });
+        }
+        $('frPcts').value = this.frOpt.pcts; $('frStudents').checked = this.frOpt.students; $('frEligible').checked = this.frOpt.eligible; $('frErr').textContent = '';
+        m.classList.remove('hidden');
+        setTimeout(() => $('frPcts').focus(), 30);
+    }
+
+    async buildFrameReport(kind) {
+        const pcts = [...new Set($('frPcts').value.split(/[,\s;]+/).filter(Boolean).map(x => Number(x.replace('%', ''))))];
+        if (!pcts.length || pcts.some(p => !(p > 0 && p <= 100)) || pcts.length > 5) { $('frErr').textContent = 'יש להזין אחוז בין 1 ל-100 (עד 5 אחוזים)'; return; }
+        pcts.sort((a, b) => a - b);
+        this.frOpt = { pcts: pcts.join(', '), students: $('frStudents').checked, eligible: $('frEligible').checked };
+        const r = await this.call('GET', '/student-summary');      // נתונים עדכניים
+        if (!r.ok || !Array.isArray(r.data)) { $('frErr').textContent = this.errText(r, 'לא ניתן לטעון את הנתונים'); return; }
+
+        // לכל כיתה: משניות שאפשר להיבחן (זהה לכל תלמידי הכיתה), תלמידים, וכמה עברו כל רף
+        const by = new Map();
+        r.data.forEach(s => {
+            const k = s.class_grade || 'ללא כיתה', st = s.stats || {};
+            const c = by.get(k) || { cls: k, avail: 0, list: [] };
+            c.avail = Math.max(c.avail, Number(st.available_mishnayot) || 0);
+            c.list.push(Number(st.total_mishnayot) || 0);
+            by.set(k, c);
+        });
+        const classes = [...by.values()].sort((a, b) => a.cls.localeCompare(b.cls, 'he', { numeric: true }));
+        const thr = (avail, p) => Math.ceil(avail * p / 100);     // "לפחות" — כמו בחישוב הזכאות
+        const head = ['כיתה', 'משניות שאפשר להיבחן'];
+        if (this.frOpt.students) head.push('תלמידים');
+        pcts.forEach(p => { head.push(`רף ${p}%\u200E (משניות)`); if (this.frOpt.eligible) head.push(`עברו ${p}%\u200E`); });   // \u200E: "40%" ולא "%40"
+        const rows = classes.map(c => {
+            const row = [c.cls, c.avail];
+            if (this.frOpt.students) row.push(c.list.length);
+            pcts.forEach(p => { const t = thr(c.avail, p); row.push(t); if (this.frOpt.eligible) row.push(c.avail ? c.list.filter(x => x >= t).length : 0); });
+            return row;
+        });
+        const title = 'רף תעודה עם מסגרת לפי כיתות', stamp = formatHebrewDate(new Date());
+        const fname = `רף_מסגרת_לפי_כיתות_${stamp.replace(/[׳״"']/g, '').replace(/\s+/g, '_')}`;
+
+        if (kind === 'xlsx') {
+            try { await this.loadXlsx(); } catch (e) { window.XLSX = null; }
+            if (!window.XLSX) {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(['\uFEFF' + [head, ...rows].map(x => x.map(csv).join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' }));
+                a.download = `${fname}.csv`; document.body.appendChild(a); a.click(); a.remove();
+            } else {
+                const X = window.XLSX, ws = X.utils.aoa_to_sheet([head, ...rows]);
+                ws['!cols'] = head.map((h, i) => ({ wch: i === 0 ? 10 : Math.max(10, h.length + 2) }));
+                const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'רף מסגרת'); wb.Workbook = { Views: [{ RTL: true }] };
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([X.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+                a.download = `${fname}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            }
+            $('stuFrModal').classList.add('hidden');
+            return;
+        }
+        // PDF / הדפסה: דף מסודר בחלון חדש → הדפסה (או "שמירה כ-PDF")
+        const w = window.open('', '_blank');
+        if (!w) { $('frErr').textContent = 'הדפדפן חסם חלון חדש. יש לאפשר חלונות קופצים לאתר ולנסות שוב.'; return; }
+        const th = head.map(h => `<th>${esc(h)}</th>`).join('');
+        const tr = rows.map(row => `<tr>${row.map((v, i) => `<td class="${i === 0 ? 'c' : ''} ${String(head[i]).startsWith('רף') ? 't' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('');
+        w.document.write(`<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+            @page{size:A4 portrait;margin:14mm}body{font-family:'Segoe UI','Noto Sans Hebrew',Arial,sans-serif;color:#0f172a;margin:0}
+            .hd{display:flex;align-items:center;gap:12px;border-bottom:2px solid #0f172a;padding-bottom:8px;margin-bottom:14px}.hd img{height:54px}
+            h1{margin:0;font-size:22px}.sub{color:#475569;font-size:13px;margin-top:3px}
+            table{width:100%;border-collapse:collapse;font-size:14px}th{background:#1e293b;color:#fff;padding:8px 6px;font-weight:700}
+            td{border-bottom:1px solid #cbd5e1;padding:7px 6px;text-align:center}tr:nth-child(even) td{background:#f1f5f9}
+            td.c{font-weight:800}td.t{font-weight:800;color:#854d0e;background:#fef9c3 !important}
+            .ft{margin-top:12px;color:#64748b;font-size:11px}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>
+            <div class="hd"><img src="https://smti.uk/img/peer.jpg" alt=""><div><h1>${esc(title)}</h1><div class="sub">${esc(stamp)} · אחוזים: ${pcts.map(p => p + '%\u200E').join(', ')}</div></div></div>
+            <table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>
+            <div class="ft">"רף" = מספר המשניות המינימלי שצריך לעבור כדי להיות זכאי לתעודה עם מסגרת. המשניות נספרות לפי המבחנים שהכיתה זכאית להיבחן עליהם.</div>
+            <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+        w.document.close();
+        $('stuFrModal').classList.add('hidden');
+    }
+
     loadXlsx() {
         if (window.XLSX) return Promise.resolve();
         if (this._xlsx) return this._xlsx;
@@ -758,6 +864,7 @@ export class StudentManager {
             if (t.closest('#stuAdd')) return this.openForm();
             if (t.closest('#stuPayXlsx')) return this.openPayModal();
             if (t.closest('#stuPrintList')) return this.openPrintList();
+            if (t.closest('#stuFrameReport')) return this.openFrameReport();
             if (t.closest('#stuFramePct')) return this.editFramePct();
             if (t.closest('#stuNoneKpi')) { this.f.status = 'none'; this.render(this.students); return; }
             const seg = t.closest('#stuStatus button');
@@ -931,6 +1038,7 @@ export class StudentManager {
         .stu-br b{color:#6d28d9}.stu-br b.neg{color:#b91c1c}.stu-bdel{border:none;background:none;color:#94a3b8;cursor:pointer;font-size:1.1rem}.stu-bdel:hover{color:#b91c1c}
         .stu-badd{display:flex;gap:6px;flex-wrap:wrap}.stu-badd input{padding:6px 8px;border:1px solid #ddd6fe;border-radius:6px;font-size:.84rem;font-family:inherit}
         .stu-badd #stuBonusAmt{width:100px}.stu-badd #stuBonusNote{flex:1;min-width:140px}
+        .stu-fr-in{padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;font-size:.95rem;font-family:inherit;direction:ltr;text-align:right}
         .stu-pmc{max-width:520px;width:94%;height:auto;border-radius:12px;overflow:hidden}
         .stu-pbody{padding:16px 18px;display:flex;flex-direction:column;gap:8px}.stu-plbl{font-size:.82rem;font-weight:700;color:#475569;margin-top:4px}
         .stu-psort{flex-wrap:wrap}.stu-pcols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
