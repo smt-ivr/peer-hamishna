@@ -690,25 +690,16 @@ export class StudentManager {
             $('stuFrModal').classList.add('hidden');
             return;
         }
-        // PDF / הדפסה: דף מסודר בחלון חדש → הדפסה (או "שמירה כ-PDF")
-        const w = window.open('', '_blank');
-        if (!w) { $('frErr').textContent = 'הדפדפן חסם חלון חדש. יש לאפשר חלונות קופצים לאתר ולנסות שוב.'; return; }
-        const th = head.map(h => `<th>${esc(h)}</th>`).join('');
-        const tr = rows.map(row => `<tr>${row.map((v, i) => `<td class="${i === 0 ? 'c' : ''} ${String(head[i]).startsWith('רף') ? 't' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('');
-        w.document.write(`<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-            @page{size:A4 portrait;margin:14mm}body{font-family:'Segoe UI','Noto Sans Hebrew',Arial,sans-serif;color:#0f172a;margin:0}
-            .hd{display:flex;align-items:center;gap:12px;border-bottom:2px solid #0f172a;padding-bottom:8px;margin-bottom:14px}.hd img{height:54px}
-            h1{margin:0;font-size:22px}.sub{color:#475569;font-size:13px;margin-top:3px}
-            table{width:100%;border-collapse:collapse;font-size:14px}th{background:#1e293b;color:#fff;padding:8px 6px;font-weight:700}
-            td{border-bottom:1px solid #cbd5e1;padding:7px 6px;text-align:center}tr:nth-child(even) td{background:#f1f5f9}
-            td.c{font-weight:800}td.t{font-weight:800;color:#854d0e;background:#fef9c3 !important}
-            .ft{margin-top:12px;color:#64748b;font-size:11px}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>
-            <div class="hd"><img src="https://smti.uk/img/peer.jpg" alt=""><div><h1>${esc(title)}</h1><div class="sub">${esc(stamp)} · אחוזים: ${pcts.map(p => p + '%\u200E').join(', ')}</div></div></div>
-            <table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>
-            <div class="ft">"רף" = מספר המשניות המינימלי שצריך לעבור כדי להיות זכאי לתעודה עם מסגרת. המשניות נספרות לפי המבחנים שהכיתה זכאית להיבחן עליהם.</div>
-            <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
-        w.document.close();
+        // PDF / הדפסה: תצוגה מקדימה כמו בדוח — משם "הורד PDF" או "הדפס"
+        if (!this.listExporter) this.listExporter = new StudentListExporter(this.apiBase);
         $('stuFrModal').classList.add('hidden');
+        this.listExporter.openTable({
+            title, file: fname, sub: `אחוזים: ${pcts.map(p => p + '%\u200E').join(', ')}`,
+            info: `${classes.length} כיתות`,
+            head, rows, mark: head.map((h, i) => (String(h).startsWith('רף') ? i : -1)).filter(i => i >= 0),
+            note: '"רף" = מספר המשניות המינימלי שצריך לעבור כדי להיות זכאי לתעודה עם מסגרת. המשניות נספרות לפי המבחנים שהכיתה זכאית להיבחן עליהם.'
+        });
+        return;
     }
 
     loadXlsx() {
