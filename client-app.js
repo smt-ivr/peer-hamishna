@@ -294,6 +294,11 @@ window.fetch = async function(...args) {
 
         try {
             const response = await originalFetch(resource, config);
+            // השרת אומר שההרשאה השמורה כבר לא תקפה → ניתוק מיידי
+            if (response.status === 401 && appStarted && resource.indexOf('/auth-check') === -1 && resource.indexOf('/auth/login') === -1) {
+                forceLogout();
+                return response;
+            }
             if (!response.ok && !silent && resource.indexOf('/auth-check') === -1) { 
                 response.clone().json().then(data => {
                     if (data && data.message) {
@@ -395,6 +400,47 @@ async function fetchAuthAndSetupUI() {
 
 // מצב הכניסה: הטופס פתוח מיד, בדיקת ה-IP רצה ברקע
 let appStarted = false;       // האתר כבר נטען (מונע טעינה כפולה)
+
+// ============================================================
+//  ניתוק אוטומטי: סיסמה / אישור IP שמורים בדפדפן, והשרת אומר שהם כבר לא תקפים
+//  (נמחקו / שונו בניהול ההרשאות) → מנקים את הזיכרון וחוזרים למסך הכניסה.
+//  תקלת תקשורת לא מנתקת — רק תשובה מפורשת של השרת.
+// ============================================================
+let loggingOut = false, authLevel = null, lastVerify = 0;
+const LOGOUT_MSG = 'ההרשאה השמורה בדפדפן כבר לא תקפה (הסיסמה או כתובת ה-IP הוסרו או שונו). יש להתחבר מחדש.';
+function forceLogout(msg = LOGOUT_MSG) {
+    if (loggingOut) return;
+    loggingOut = true;
+    localStorage.removeItem('peer_api_key');
+    localStorage.removeItem('peer_ip_allowed');
+    try { sessionStorage.setItem('peer_logout_reason', msg); } catch (e) { /* ignore */ }
+    location.reload();
+}
+async function verifyAuth() {
+    if (!appStarted || loggingOut) return;
+    lastVerify = Date.now();
+    try {
+        const r = await fetch(`${API_BASE}/auth-check`, { silent: true });
+        if (!r.ok) return;                                  // שגיאת שרת — לא מנתקים
+        const d = await r.json();
+        if (!d || typeof d.is_authorized !== 'boolean') return;
+        if (!d.is_authorized) return forceLogout();
+        if (authLevel === null) authLevel = d.access_level;
+        else if (d.access_level !== authLevel) {             // רמת ההרשאה שונתה — טוענים מחדש עם ההרשאה החדשה
+            location.reload();
+        }
+    } catch (e) { /* אין תקשורת — לא מנתקים */ }
+}
+let authWatchStarted = false;
+function startAuthWatch() {
+    if (authWatchStarted) return;
+    authWatchStarted = true;
+    verifyAuth();                                            // גם כשנכנסים ישר מאישור IP שמור
+    setInterval(verifyAuth, 5 * 60 * 1000);                 // כל 5 דקות
+    const again = () => { if (document.visibilityState === 'visible' && Date.now() - lastVerify > 30 * 1000) verifyAuth(); };
+    document.addEventListener('visibilitychange', again);   // חוזרים ללשונית / למחשב
+    window.addEventListener('focus', again);
+}
 let manualLogin = false;      // המשתמש התחיל להקליד / לחץ כניסה — בדיקת הרקע לא תיכנס במקומו
 
 function enableLoginForm(text) {
@@ -422,6 +468,7 @@ async function enterWithSavedKey() {
             return;
         }
         localStorage.removeItem('peer_api_key');   // הסיסמה השמורה כבר לא תקפה
+        try { sessionStorage.setItem('peer_logout_reason', LOGOUT_MSG); } catch (e) { /* ignore */ }
     } catch (e) { /* תקלת תקשורת — חוזרים למסך הכניסה */ }
     appStarted = false;
     const noFlicker = document.getElementById('noFlickerStyle');
@@ -437,6 +484,12 @@ async function checkAuthAndInit() {
 
     // לא מחכים לבדיקה — אפשר להקליד סיסמה מיד
     enableLoginForm();
+    let reason = null;
+    try { reason = sessionStorage.getItem('peer_logout_reason'); sessionStorage.removeItem('peer_logout_reason'); } catch (e) { /* ignore */ }
+    if (reason) {
+        const box = document.getElementById('loginError'), t = document.getElementById('loginErrorText');
+        if (box && t) { t.textContent = reason; box.classList.remove('hidden'); }
+    }
     authMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i>בודק הרשאת IP...';
     apiKeyInput.focus();
     apiKeyInput.addEventListener('input', () => { if (apiKeyInput.value) manualLogin = true; });
@@ -536,6 +589,7 @@ function performLogout() {
 }
 
 async function initApp() {
+    startAuthWatch();
     refreshAllData = async () => {
         await Promise.all([fetchStudentsList(), fetchExamsList()]);
         if(examManager) examManager.setExams(allExams);
