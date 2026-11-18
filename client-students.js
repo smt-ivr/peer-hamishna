@@ -53,16 +53,22 @@ const PAY_COLS = {
     gemara:    { head: 'דפי גמרא', w: 10, sum: true, val: s => Number((s.stats || {}).total_gemara_pages) || 0 },
     availmish: { head: 'משניות שזכאי להיבחן', w: 12, sum: true, val: s => Number((s.stats || {}).available_mishnayot) || 0 },
     mishpct:   { head: 'אחוז משניות', w: 10, val: s => Number((s.stats || {}).mishnayot_pct) || 0, pct: true },
+    availgem:  { head: 'דפי גמרא שזכאי להיבחן', w: 12, sum: true, val: s => Number((s.stats || {}).available_gemara_pages) || 0 },
+    gempct:    { head: 'אחוז גמרא', w: 10, val: s => Number((s.stats || {}).gemara_pct) || 0, pct: true },
     frame:     { head: 'זכאי לתעודה עם מסגרת', w: 12, val: s => ((s.stats || {}).frame_eligible ? 'כן' : 'לא') },
     amount:    { head: 'סכום להטענה', w: 14, sum: true, money: true, val: s => Math.round((Number((s.stats || {}).total_reward) || 0) * 100) / 100 },   // כולל בונוס
     bonus:     { head: 'מתוכו בונוס', w: 11, sum: true, money: true, val: s => Math.round((Number((s.stats || {}).bonus) || 0) * 100) / 100 }
 };
+// "משניות 50%" / "גמרא 40%" / "משניות 50% או גמרא 40%" / "... וגם ..."
+const frameLabel = F => { if (!F) return 'משניות 50%\u200E'; const parts = [];
+    if (F.useM) parts.push(`משניות ${F.pct}%\u200E`); if (F.useG) parts.push(`גמרא ${F.gpct}%\u200E`);
+    return parts.join(F.combine === 'all' ? ' וגם ' : ' או '); };
 const PAY_SORTS = { last: 'שם משפחה', first: 'שם פרטי', class: 'כיתה', code: 'קוד', amount: 'סכום (מהגבוה)' };
 // סוגי קובץ: בחירת סוג מסמנת את העמודות שלו (ואפשר לשנות אחר כך)
 const PAY_KINDS = {
     amounts: { label: 'סכומים להטענה', file: 'סכומים_להטענה', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'gemara', 'amount'] },
-    full:    { label: 'דוח מבחנים מלא', file: 'דוח_מבחנים', cols: ['code', 'last', 'first', 'class', 'attempted', 'available', 'passed', 'failed', 'mishnayot', 'availmish', 'mishpct', 'gemara', 'frame', 'amount'] },
-    frame:   { label: 'זכאים לתעודה עם מסגרת', file: 'זכאים_למסגרת', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'availmish', 'mishpct', 'frame'] },
+    full:    { label: 'דוח מבחנים מלא', file: 'דוח_מבחנים', cols: ['code', 'last', 'first', 'class', 'attempted', 'available', 'passed', 'failed', 'mishnayot', 'availmish', 'mishpct', 'gemara', 'availgem', 'gempct', 'frame', 'amount'] },
+    frame:   { label: 'זכאים לתעודה עם מסגרת', file: 'זכאים_למסגרת', cols: ['code', 'last', 'first', 'class', 'mishnayot', 'availmish', 'mishpct', 'gemara', 'availgem', 'gempct', 'frame'] },
     list:    { label: 'רשימת תלמידים', file: 'רשימת_תלמידים', cols: ['code', 'last', 'first', 'class', 'phone'] }
 };
 
@@ -102,7 +108,10 @@ export class StudentManager {
             reward: m ? m.total_reward : (s.total_reward || 0),
             mish: m ? (m.total_mishnayot || 0) : 0, gem: m ? (m.total_gemara_pages || 0) : 0,
             availMish: m ? (m.available_mishnayot || 0) : 0, pct: m ? (m.mishnayot_pct || 0) : 0, frame: !!(m && m.frame_eligible),
-            bonus: m ? (Number(m.bonus) || 0) : 0, framePct: m ? (m.frame_pct || 50) : 50
+            bonus: m ? (Number(m.bonus) || 0) : 0, framePct: m ? (m.frame_pct || 50) : 50,
+            availGem: m ? (m.available_gemara_pages || 0) : 0, gpct: m ? (m.gemara_pct || 0) : 0,
+            frameRule: m ? { pct: m.frame_pct || 50, gpct: m.frame_gemara_pct || 50, useM: m.frame_use_mish !== false, useG: !!m.frame_use_gemara, combine: m.frame_combine || 'any' }
+                         : { pct: 50, gpct: 50, useM: true, useG: false, combine: 'any' }
         };
     }
     find(code) { return this.students.find(s => s.student_code === code); }
@@ -174,7 +183,7 @@ export class StudentManager {
         const none = all.filter(s => this.stats(s).attempted === 0).length;
         $('stuKpis').innerHTML = `<span class="stu-kpi">תלמידים <b>${all.length}</b></span>
             <span class="stu-kpi ${none ? 'click' : ''}" id="stuNoneKpi" title="הצג רק תלמידים שלא נבחנו כלל">לא נבחנו כלל <b>${none}</b></span>
-            <span class="stu-kpi click" id="stuFramePct" title="לחיצה לשינוי אחוז המשניות הנדרש לתעודה">זכאים לתעודה עם מסגרת (${all.length ? this.stats(all[0]).framePct : 50}%) <b>${all.filter(s => this.stats(s).frame).length}</b> <i class="fas fa-pen" style="font-size:.65rem"></i></span>
+            <span class="stu-kpi click" id="stuFramePct" title="לחיצה להגדרות התעודה (משניות / גמרא, אחוזים)">זכאים לתעודה עם מסגרת (${frameLabel(all.length ? this.stats(all[0]).frameRule : null)}) <b>${all.filter(s => this.stats(s).frame).length}</b> <i class="fas fa-pen" style="font-size:.65rem"></i></span>
             ${(() => { const tb = all.reduce((a, s) => a + this.stats(s).bonus, 0); return tb ? `<span class="stu-kpi">בונוסים <b>${money(tb)}</b></span>` : ''; })()}
             <span class="stu-kpi">סך מלגות <b>${money(all.reduce((a, s) => a + this.stats(s).reward, 0))}</b></span>
             <span class="stu-kpi">מוצגים <b>${rows.length}</b></span>`;
@@ -232,8 +241,8 @@ export class StudentManager {
                 <button class="stu-x" data-close>&times;</button>
             </div>
             <div class="stu-tiles">${tile(st.available != null ? `${st.attempted} מתוך ${st.available}` : st.attempted, 'נבחן')}${tile(st.passed, 'עברו', 'ok')}${tile(Math.max(0, st.attempted - st.passed), 'לא עברו', 'bad')}${tile(money(st.reward), 'מלגה', 'money')}
-                ${tile(st.availMish ? `${st.mish} מתוך ${st.availMish}` : st.mish, `משניות שעבר${st.availMish ? ` (${st.pct}%)` : ''}`)}${tile(st.gem, 'דפי גמרא שעבר')}
-                ${tile(st.frame ? '★ זכאי' : 'לא זכאי', `תעודה עם מסגרת (${st.framePct}%)`, st.frame ? 'frame' : '')}${tile(money(st.bonus), 'מתוכו בונוס', 'money')}</div>
+                ${tile(st.availMish ? `${st.mish} מתוך ${st.availMish}` : st.mish, `משניות שעבר${st.availMish ? ` (${st.pct}%)` : ''}`)}${tile(st.availGem ? `${st.gem} מתוך ${st.availGem}` : st.gem, `דפי גמרא שעבר${st.availGem ? ` (${st.gpct}%)` : ''}`)}
+                ${tile(st.frame ? '★ זכאי' : 'לא זכאי', `תעודה עם מסגרת (${frameLabel(st.frameRule)})`, st.frame ? 'frame' : '')}${tile(money(st.bonus), 'מתוכו בונוס', 'money')}</div>
             ${this.bonusHtml()}
             <div class="stu-btns" style="padding:0 18px 12px"><button class="btn btn-secondary btn-sm" data-edit><i class="fas fa-pen"></i> עריכת פרטים</button>
                 <button class="btn btn-secondary btn-sm" data-edit-exams><i class="fas fa-list-check"></i> עריכת בחינות</button>
@@ -288,16 +297,58 @@ export class StudentManager {
     }
 
     // אחוז המשניות הנדרש לתעודה עם מסגרת (הגדרה כללית, נשמרת בשרת)
+    // הגדרות התעודה עם מסגרת (התאמה אישית): לפי משניות ו/או גמרא, אחוז לכל אחד, אחד מהם או שניהם
     async editFramePct() {
-        const cur = this.students.length ? this.stats(this.students[0]).framePct : 50;
-        const v = await window.customPrompt('אחוז המשניות (מתוך המשניות שהתלמיד זכאי להיבחן עליהן) שנדרש לתעודה עם מסגרת:', String(cur));
-        if (v === null) return;
-        const n = Number(String(v).replace('%', '').trim());
-        if (!(n > 0 && n <= 100)) return window.customAlert('יש להזין מספר בין 1 ל-100', true);
-        const r = await this.call('PUT', '/report-settings?profile=app', { settings: { frame_pct: n } });
-        if (!r.ok) return window.customAlert(this.errText(r, 'השמירה נכשלה'), true);
+        const F = { ...(this.students.length ? this.stats(this.students[0]).frameRule : { pct: 50, gpct: 50, useM: true, useG: false, combine: 'any' }) };
+        let m = $('stuFsModal');
+        if (!m) {
+            document.body.insertAdjacentHTML('beforeend', `<div id="stuFsModal" class="modal hidden" style="z-index:9990"><div class="modal-content stu-pmc">
+                <div class="modal-header"><h3><i class="fas fa-award" style="color:#ca8a04"></i> הגדרות תעודה עם מסגרת</h3><button class="close-modal-btn" data-fs="close" aria-label="סגור">&times;</button></div>
+                <div class="stu-pbody" id="stuFsBody"></div>
+                <div class="stu-mfoot"><span class="stu-ferr" id="stuFsErr" style="flex:1"></span><button type="button" class="btn btn-outline" data-fs="close">ביטול</button>
+                    <button type="button" class="btn btn-primary" data-fs="save"><i class="fas fa-save"></i> שמירה</button></div></div></div>`);
+            m = $('stuFsModal');
+            m.addEventListener('click', e => {
+                const b = e.target.closest('[data-fs]');
+                if (!b) return;
+                if (b.dataset.fs === 'close') return m.classList.add('hidden');
+                if (b.dataset.fs === 'combine') { this.fs.combine = b.dataset.v; return this.paintFs(); }
+                if (b.dataset.fs === 'save') return this.saveFs();
+            });
+            m.addEventListener('change', e => {
+                const t = e.target;
+                if (t.id === 'fsUseM') { this.fs.useM = t.checked; this.paintFs(); }
+                if (t.id === 'fsUseG') { this.fs.useG = t.checked; this.paintFs(); }
+            });
+            m.addEventListener('input', e => { if (e.target.id === 'fsPct') this.fs.pct = e.target.value; if (e.target.id === 'fsGpct') this.fs.gpct = e.target.value; });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape' && !m.classList.contains('hidden')) m.classList.add('hidden'); });
+        }
+        this.fs = F;
+        this.paintFs();
+        m.classList.remove('hidden');
+    }
+    paintFs() {
+        const F = this.fs;
+        $('stuFsBody').innerHTML = `
+            <div class="stu-plbl">זכאות לפי</div>
+            <label class="stu-chk stu-fsrow"><input type="checkbox" id="fsUseM" ${F.useM ? 'checked' : ''}> משניות — לפחות <input id="fsPct" type="number" min="1" max="100" value="${esc(F.pct)}" ${F.useM ? '' : 'disabled'}>% מהמשניות שהתלמיד זכאי להיבחן עליהן</label>
+            <label class="stu-chk stu-fsrow"><input type="checkbox" id="fsUseG" ${F.useG ? 'checked' : ''}> גמרא — לפחות <input id="fsGpct" type="number" min="1" max="100" value="${esc(F.gpct)}" ${F.useG ? '' : 'disabled'}>% מדפי הגמרא שהתלמיד זכאי להיבחן עליהם</label>
+            ${F.useM && F.useG ? `<div class="stu-plbl">כשמסומנים שניהם</div>
+                <div class="stu-segc stu-psort"><button type="button" data-fs="combine" data-v="any" class="${F.combine !== 'all' ? 'on' : ''}">מספיק אחד מהם</button><button type="button" data-fs="combine" data-v="all" class="${F.combine === 'all' ? 'on' : ''}">צריך את שניהם</button></div>` : ''}
+            <div class="stu-mut">כיתה שאין לה מבחני גמרא (או משניות), התחום הזה לא נדרש ממנה.</div>`;
+        $('stuFsErr').textContent = '';
+    }
+    async saveFs() {
+        const F = this.fs, pct = Number(F.pct), gpct = Number(F.gpct);
+        if (!F.useM && !F.useG) { $('stuFsErr').textContent = 'יש לבחור משניות, גמרא או שניהם'; return; }
+        if ((F.useM && !(pct > 0 && pct <= 100)) || (F.useG && !(gpct > 0 && gpct <= 100))) { $('stuFsErr').textContent = 'אחוז בין 1 ל-100'; return; }
+        const settings = { frame_pct: pct > 0 && pct <= 100 ? pct : 50, frame_gemara_pct: gpct > 0 && gpct <= 100 ? gpct : 50,
+            frame_use_mish: !!F.useM, frame_use_gemara: !!F.useG, frame_combine: F.combine === 'all' ? 'all' : 'any' };
+        const r = await this.call('PUT', '/report-settings?profile=app', { settings });
+        if (!r.ok) { $('stuFsErr').textContent = this.errText(r, 'השמירה נכשלה'); return; }
+        $('stuFsModal').classList.add('hidden');
         await this.loadSummary();
-        window.notify && window.notify(`האחוז לתעודה עם מסגרת עודכן ל-${n}%`, 'success', { duration: 2500 });
+        window.notify && window.notify(`תעודה עם מסגרת: ${frameLabel({ pct: settings.frame_pct, gpct: settings.frame_gemara_pct, useM: settings.frame_use_mish, useG: settings.frame_use_gemara, combine: settings.frame_combine })}`, 'success', { duration: 3000 });
     }
 
     segHtml(exams) {
@@ -596,12 +647,15 @@ export class StudentManager {
     //  רף תעודה עם מסגרת לפי כיתות: כמה משניות כל כיתה יכולה להיבחן, ומכמה משניות זכאים (לפי אחוזים לבחירה)
     // ============================================================
     async openFrameReport() {
-        if (!this.frOpt) this.frOpt = { pcts: [this.students.length ? this.stats(this.students[0]).framePct : 50], students: true, eligible: true };
+        if (!this.frOpt) { const R = this.students.length ? this.stats(this.students[0]).frameRule : { pct: 50, gpct: 50, useM: true, useG: false };
+            this.frOpt = { pcts: [...new Set([R.useM ? R.pct : null, R.useG ? R.gpct : null].filter(Boolean))], students: true, eligible: true, by: R.useM && R.useG ? 'both' : R.useG ? 'gem' : 'mish' }; }
         let m = $('stuFrModal');
         if (!m) {
             document.body.insertAdjacentHTML('beforeend', `<div id="stuFrModal" class="modal hidden" style="z-index:9990"><div class="modal-content stu-pmc">
                 <div class="modal-header"><h3><i class="fas fa-award" style="color:#ca8a04"></i> רף תעודה עם מסגרת לפי כיתות</h3><button class="close-modal-btn" data-fr="close" aria-label="סגור">&times;</button></div>
                 <div class="stu-pbody">
+                    <div class="stu-plbl">לפי</div>
+                    <div class="stu-segc stu-psort" id="frBy"></div>
                     <div class="stu-plbl">אחוזים — לוחצים לבחירה (אפשר כמה)</div>
                     <div class="stu-frp" id="frPcts"></div>
                     <div class="stu-fradd"><input id="frOther" type="number" min="1" max="100" placeholder="אחוז אחר"><button type="button" class="btn btn-outline btn-sm" data-fr="add"><i class="fas fa-plus"></i> הוספה</button></div>
@@ -619,6 +673,7 @@ export class StudentManager {
                 const b = e.target.closest('[data-fr]');
                 if (!b) return;
                 if (b.dataset.fr === 'close') return m.classList.add('hidden');
+                if (b.dataset.fr === 'by') { this.frOpt.by = b.dataset.v; return this.paintFrPcts(); }
                 if (b.dataset.fr === 'pct') { const v = Number(b.dataset.v), set = new Set(this.frOpt.pcts); set.has(v) ? set.delete(v) : set.add(v); this.frOpt.pcts = [...set].sort((a, c) => a - c); return this.paintFrPcts(); }
                 if (b.dataset.fr === 'add') {
                     const v = Number($('frOther').value);
@@ -637,6 +692,7 @@ export class StudentManager {
     }
     paintFrPcts() {
         const all = [...new Set([30, 40, 50, 60, 70, 75, 80, ...this.frExtra, ...this.frOpt.pcts])].sort((a, b) => a - b);
+        $('frBy').innerHTML = [['mish', 'משניות'], ['gem', 'גמרא'], ['both', 'משניות וגמרא']].map(([k, t]) => `<button type="button" data-fr="by" data-v="${k}" class="${this.frOpt.by === k ? 'on' : ''}">${t}</button>`).join('');
         $('frPcts').innerHTML = all.map(p => `<button type="button" data-fr="pct" data-v="${p}" class="${this.frOpt.pcts.includes(p) ? 'on' : ''}">${p}%\u200E</button>`).join('');
         $('frErr').textContent = this.frOpt.pcts.length ? '' : 'יש לבחור לפחות אחוז אחד';
     }
@@ -645,7 +701,8 @@ export class StudentManager {
         const pcts = this.frOpt.pcts.slice();
         if (!pcts.length) { $('frErr').textContent = 'יש לבחור לפחות אחוז אחד'; return; }
         if (pcts.length > 6) { $('frErr').textContent = 'אפשר לבחור עד 6 אחוזים'; return; }
-        this.frOpt = { pcts, students: $('frStudents').checked, eligible: $('frEligible').checked };
+        this.frOpt = { pcts, students: $('frStudents').checked, eligible: $('frEligible').checked, by: this.frOpt.by || 'mish' };
+        const useM = this.frOpt.by !== 'gem', useG = this.frOpt.by !== 'mish';
         const r = await this.call('GET', '/student-summary');      // נתונים עדכניים
         if (!r.ok || !Array.isArray(r.data)) { $('frErr').textContent = this.errText(r, 'לא ניתן לטעון את הנתונים'); return; }
 
@@ -653,20 +710,29 @@ export class StudentManager {
         const by = new Map();
         r.data.forEach(s => {
             const k = s.class_grade || 'ללא כיתה', st = s.stats || {};
-            const c = by.get(k) || { cls: k, avail: 0, list: [] };
+            const c = by.get(k) || { cls: k, avail: 0, list: [], availG: 0, listG: [] };
             c.avail = Math.max(c.avail, Number(st.available_mishnayot) || 0);
             c.list.push(Number(st.total_mishnayot) || 0);
+            c.availG = Math.max(c.availG, Number(st.available_gemara_pages) || 0);
+            c.listG.push(Number(st.total_gemara_pages) || 0);
             by.set(k, c);
         });
         const classes = [...by.values()].sort((a, b) => a.cls.localeCompare(b.cls, 'he', { numeric: true }));
         const thr = (avail, p) => Math.ceil(avail * p / 100);     // "לפחות" — כמו בחישוב הזכאות
-        const head = ['כיתה', 'משניות שאפשר להיבחן'];
+        const head = ['כיתה'];
+        if (useM) head.push('משניות שאפשר להיבחן');
+        if (useG) head.push('דפי גמרא שאפשר להיבחן');
         if (this.frOpt.students) head.push('תלמידים');
-        pcts.forEach(p => { head.push(`רף ${p}%\u200E (משניות)`); if (this.frOpt.eligible) head.push(`עברו ${p}%\u200E`); });   // \u200E: "40%" ולא "%40"
+        // \u200E: "40%" ולא "%40"
+        if (useM) pcts.forEach(p => { head.push(`רף ${p}%\u200E משניות`); if (this.frOpt.eligible) head.push(`עברו ${p}%\u200E משניות`); });
+        if (useG) pcts.forEach(p => { head.push(`רף ${p}%\u200E גמרא (דפים)`); if (this.frOpt.eligible) head.push(`עברו ${p}%\u200E גמרא`); });
         const rows = classes.map(c => {
-            const row = [c.cls, c.avail];
+            const row = [c.cls];
+            if (useM) row.push(c.avail);
+            if (useG) row.push(c.availG);
             if (this.frOpt.students) row.push(c.list.length);
-            pcts.forEach(p => { const t = thr(c.avail, p); row.push(t); if (this.frOpt.eligible) row.push(c.avail ? c.list.filter(x => x >= t).length : 0); });
+            if (useM) pcts.forEach(p => { const t = thr(c.avail, p); row.push(t); if (this.frOpt.eligible) row.push(c.avail ? c.list.filter(x => x >= t).length : 0); });
+            if (useG) pcts.forEach(p => { const t = thr(c.availG, p); row.push(c.availG ? t : '—'); if (this.frOpt.eligible) row.push(c.availG ? c.listG.filter(x => x >= t).length : '—'); });
             return row;
         });
         const title = 'רף תעודה עם מסגרת לפי כיתות', stamp = formatHebrewDate(new Date());
@@ -694,10 +760,10 @@ export class StudentManager {
         if (!this.listExporter) this.listExporter = new StudentListExporter(this.apiBase);
         $('stuFrModal').classList.add('hidden');
         this.listExporter.openTable({
-            title, file: fname, sub: `אחוזים: ${pcts.map(p => p + '%\u200E').join(', ')}`,
+            title, file: fname, sub: `${{ mish: 'לפי משניות', gem: 'לפי גמרא', both: 'לפי משניות וגמרא' }[this.frOpt.by]} · אחוזים: ${pcts.map(p => p + '%\u200E').join(', ')}`,
             info: `${classes.length} כיתות`,
             head, rows, mark: head.map((h, i) => (String(h).startsWith('רף') ? i : -1)).filter(i => i >= 0),
-            note: '"רף" = מספר המשניות המינימלי שצריך לעבור כדי להיות זכאי לתעודה עם מסגרת. המשניות נספרות לפי המבחנים שהכיתה זכאית להיבחן עליהם.'
+            note: '"רף" = המספר המינימלי (משניות / דפי גמרא) שצריך לעבור כדי להיות זכאי לתעודה עם מסגרת. נספר לפי המבחנים שהכיתה זכאית להיבחן עליהם. "—" = אין לכיתה מבחני גמרא.'
         });
         return;
     }
@@ -1043,6 +1109,7 @@ export class StudentManager {
         .stu-br b{color:#6d28d9}.stu-br b.neg{color:#b91c1c}.stu-bdel{border:none;background:none;color:#94a3b8;cursor:pointer;font-size:1.1rem}.stu-bdel:hover{color:#b91c1c}
         .stu-badd{display:flex;gap:6px;flex-wrap:wrap}.stu-badd input{padding:6px 8px;border:1px solid #ddd6fe;border-radius:6px;font-size:.84rem;font-family:inherit}
         .stu-badd #stuBonusAmt{width:100px}.stu-badd #stuBonusNote{flex:1;min-width:140px}
+        .stu-fsrow{flex-wrap:wrap;line-height:2}.stu-fsrow input[type=number]{width:64px;padding:4px 6px;border:1px solid var(--border-color);border-radius:6px;margin:0 4px;font-family:inherit}
         .stu-frp{display:flex;flex-wrap:wrap;gap:6px}
         .stu-frp button{min-width:58px;border:1px solid var(--border-color);background:#fff;border-radius:99px;padding:6px 12px;font-weight:700;font-size:.92rem;cursor:pointer;font-family:inherit;color:#334155}
         .stu-frp button:hover{border-color:#93c5fd}.stu-frp button.on{background:var(--primary-color);border-color:var(--primary-color);color:#fff}
