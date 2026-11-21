@@ -4,6 +4,7 @@
 // ============================================================
 import { formatHebrewDate } from './client-reports.js';
 import { StudentListExporter } from './client-student-list.js';
+import { openChangeLog } from './client-changelog.js';
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const csv = v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; };
@@ -161,6 +162,7 @@ export class StudentManager {
                     <button class="btn btn-outline btn-sm" id="stuPayXlsx" title="בוחרים סוג, עמודות וסדר"><i class="fas fa-file-excel" style="color:#16a34a"></i> אקסל</button>
                     <button class="btn btn-outline btn-sm" id="stuPrintList" title="בוחרים סוג, עמודות וסדר — להדפסה או קובץ PDF"><i class="fas fa-file-pdf" style="color:#dc2626"></i> PDF / הדפסה</button>
                     <button class="btn btn-outline btn-sm" id="stuFrameReport" title="לכל כיתה: כמה משניות אפשר להיבחן, ומכמה משניות זכאים לתעודה עם מסגרת"><i class="fas fa-award" style="color:#ca8a04"></i> רף מסגרת לפי כיתות</button>
+                    <button class="btn btn-outline btn-sm" id="stuLog" title="מי שינה תלמיד (כיתה, שם, טלפונים), מתי ומה"><i class="fas fa-history"></i> היסטוריית שינויים</button>
                     <button class="btn btn-primary btn-sm" id="stuAdd"><i class="fas fa-user-plus"></i> תלמיד חדש</button>
                 </div>
             </div>
@@ -933,6 +935,7 @@ export class StudentManager {
         c.addEventListener('click', e => {
             const t = e.target;
             if (t.closest('#stuAdd')) return this.openForm();
+            if (t.closest('#stuLog')) return openChangeLog(this.apiBase, 'student');
             if (t.closest('#stuPayXlsx')) return this.openPayModal();
             if (t.closest('#stuPrintList')) return this.openPrintList();
             if (t.closest('#stuFrameReport')) return this.openFrameReport();
