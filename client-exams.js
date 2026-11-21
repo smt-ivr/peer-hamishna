@@ -2,6 +2,7 @@
 //  client-exams.js — ניהול מבחנים: טבלה מתקדמת + הוספה / עריכה / הוספה מרוכזת
 //  new ExamManager(container, API_BASE, onChanged)   (בלי apiBase — תצוגה בלבד)
 // ============================================================
+import { openChangeLog } from './client-changelog.js';
 
 const GRADES = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'יא', 'יב'];
 
@@ -337,6 +338,7 @@ export class ExamManager {
                     ${ce ? `<button class="btn btn-primary" id="exAddBtn"><i class="fas fa-plus"></i> מבחן חדש</button>
                     <button class="btn btn-secondary" id="exBulkAddBtn"><i class="fas fa-layer-group"></i> הוספה מרוכזת</button>` : ''}
                     <button class="btn btn-outline" id="exExportBtn"><i class="fas fa-file-excel"></i> ייצוא</button>
+                    ${ce ? `<button class="btn btn-outline" id="exLogBtn" title="מי שינה מבחן, מתי ומה"><i class="fas fa-history"></i> היסטוריית שינויים</button>` : ''}
                     ${ce ? `<button class="btn btn-outline ${f.trash ? 'ex-trash-on' : ''}" id="exTrashBtn"><i class="fas fa-trash-restore"></i> <span id="exTrashLbl"></span></button>` : ''}
                 </div>
             </div>
@@ -491,6 +493,7 @@ export class ExamManager {
             if (t.closest('#exAddBtn')) return this.openEditor();
             if (t.closest('#exBulkAddBtn')) return this.openBulk();
             if (t.closest('#exExportBtn')) return this.exportCsv();
+            if (t.closest('#exLogBtn')) return openChangeLog(this.apiBase, 'exam');
             if (t.closest('#exTrashBtn')) { this.f.trash = !this.f.trash; this.sel.clear(); this.renderShell(); this.renderBody(); return; }
             if (t.closest('#exBulkClear')) { this.sel.clear(); this.renderBody(); return; }
             if (t.closest('#exBulkDel')) return this.bulkDelete();
